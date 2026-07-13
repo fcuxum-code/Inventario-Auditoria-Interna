@@ -1257,7 +1257,8 @@ const GS_CODE =
 '  var opciones = { htmlBody: html };\n'+
 '  if(d.fotos && d.fotos.length){\n'+
 '    opciones.attachments = d.fotos.map(function(f){\n'+
-'      return Utilities.newBlob(Utilities.base64Decode(f.b64), "image/jpeg", f.name);\n'+
+'      var limpiaB64 = f.b64.replace(/^data:image\\/(png|jpeg|jpg);base64,/, "");\n'+
+'      return Utilities.newBlob(Utilities.base64Decode(limpiaB64), "image/jpeg", f.name || "foto_inventario.jpg");\n'+
 '    });\n'+
 '  }\n'+
 '  MailApp.sendEmail(d.correo, asunto, cuerpo, opciones);\n'+
@@ -1268,10 +1269,10 @@ const GS_CODE =
 '  var fol = it.hasNext() ? it.next() : DriveApp.createFolder(CARPETA);\n'+
 '  var viejos = fol.getFilesByName(nombre);\n'+
 '  while(viejos.hasNext()){ viejos.next().setTrashed(true); }\n'+
-'  fol.createFile(Utilities.newBlob(Utilities.base64Decode(b64), "image/jpeg", nombre));\n'+
+'  var limpiaB64 = b64.replace(/^data:image\\/(png|jpeg|jpg);base64,/, "");\n'+
+'  fol.createFile(Utilities.newBlob(Utilities.base64Decode(limpiaB64), "image/jpeg", nombre));\n'+
 '}\n'+
 'function _out(o){ return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }';
-
 /* ================= MENÚ ================= */
 function openMenu(){
   document.getElementById("sheet").innerHTML =
