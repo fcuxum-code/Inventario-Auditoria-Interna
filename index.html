@@ -1097,9 +1097,20 @@ document.getElementById("camin").addEventListener("change", function(){
 function importarExcel(){
   closeMenu();
   if(typeof XLSX==="undefined"){ toast("No se pudo cargar el lector de Excel (revise internet)"); return; }
+  window.__excelMode = "importar";
   document.getElementById("sheet").innerHTML = '<div class="grip"></div><h3>📥 Importar bienes desde Excel</h3>'
-    +'<div class="note">El archivo debe tener columnas con <b>No. de Inventario</b>, <b>Descripción</b> y opcionalmente <b>Valor</b>. No importa el nombre exacto de la columna ni el orden, la app las reconoce sola. Los bienes se crean <b>sin responsable</b> — después los asigna con 🧍 Nueva toma.</div>'
+    +'<div class="note">El archivo debe tener columnas con <b>No. de Inventario</b>, <b>Descripción</b> y opcionalmente <b>Valor</b>. No importa el nombre exacto de la columna ni el orden, la app las reconoce sola. Los bienes se crean <b>sin responsable</b> — después los asigna con 🧍 Nueva toma. Esta opción solo AGREGA, nunca elimina nada.</div>'
     +'<button class="act p" onclick="document.getElementById(\'excelin\').click()">📎 Elegir archivo Excel</button>'
+    +'<button class="act o" onclick="closeMenu()">Cancelar</button>';
+  showSheet();
+}
+function sincronizarExcel(){
+  closeMenu();
+  if(typeof XLSX==="undefined"){ toast("No se pudo cargar el lector de Excel (revise internet)"); return; }
+  window.__excelMode = "sincronizar";
+  document.getElementById("sheet").innerHTML = '<div class="grip"></div><h3>🔄 Sincronizar con Excel oficial</h3>'
+    +'<div class="note">Use esto cuando tenga el listado OFICIAL completo (por ejemplo, el reporte de SICOIN). La app va a: <b>agregar</b> los bienes del archivo que no estén en el sistema, y <b>eliminar</b> del sistema los que ya NO aparezcan en el archivo. Antes de borrar nada le muestro la lista completa para que la revise.</div>'
+    +'<button class="act p" onclick="document.getElementById(\'excelin\').click()">📎 Elegir archivo Excel oficial</button>'
     +'<button class="act o" onclick="closeMenu()">Cancelar</button>';
   showSheet();
 }
@@ -1112,7 +1123,8 @@ document.getElementById("excelin").addEventListener("change", function(){
       const wb = XLSX.read(e.target.result, {type:"array"});
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, {defval:""});
-      procesarFilasImportadas(rows);
+      if(window.__excelMode==="sincronizar") procesarSincronizacion(rows, f.name);
+      else procesarFilasImportadas(rows);
     }catch(err){ toast("No se pudo leer el archivo: "+(err.message||err)); }
     self.value="";
   };
@@ -1126,12 +1138,16 @@ function hallarColumna(row, claves){
   }
   return null;
 }
-function procesarFilasImportadas(rows){
-  if(!rows.length){ toast("El archivo no tiene filas de datos"); return; }
+function leerColumnas(rows){
   const first = rows[0];
   const colCod = hallarColumna(first, ["INVENTARIO","CÓDIGO","CODIGO","NO.","NUM"]);
   const colDesc = hallarColumna(first, ["DESCRIP"]);
   const colVal = hallarColumna(first, ["VALOR","PRECIO","COSTO"]);
+  return {colCod, colDesc, colVal};
+}
+function procesarFilasImportadas(rows){
+  if(!rows.length){ toast("El archivo no tiene filas de datos"); return; }
+  const {colCod, colDesc, colVal} = leerColumnas(rows);
   if(!colCod){ toast("No encontré una columna de No. de Inventario en el archivo"); return; }
   const nuevos = []; let vacios=0, existentes=0;
   const vistos = {};
@@ -1179,6 +1195,94 @@ function confirmarImportacion(){
     });
     i++;
     batch.commit().then(next).catch(function(e){ toast("Error al importar: "+(e.message||e)); });
+  }
+  next();
+}
+
+/* ================= SINCRONIZAR (agregar + eliminar) ================= */
+function procesarSincronizacion(rows, nombreArchivo){
+  if(!rows.length){ toast("El archivo no tiene filas de datos"); return; }
+  const {colCod, colDesc, colVal} = leerColumnas(rows);
+  if(!colCod){ toast("No encontré una columna de No. de Inventario en el archivo"); return; }
+  const enArchivo = {}; const nuevos = []; let vacios=0;
+  rows.forEach(function(r){
+    const cod = String(r[colCod]==null?"":r[colCod]).trim();
+    if(!cod){ vacios++; return; }
+    const id = bienDocId(cod);
+    if(enArchivo[id]) return;
+    enArchivo[id] = true;
+    if(!BIENES[id]){
+      nuevos.push({ id:id, codigo:cod, descripcion: colDesc? String(r[colDesc]==null?"":r[colDesc]).trim() : "", valor: colVal? (Number(r[colVal])||0) : 0 });
+    }
+  });
+  const sobran = Object.values(BIENES).filter(function(b){ return !enArchivo[b.id]; });
+
+  let h = '<div class="grip"></div><h3>🔄 Confirmar sincronización</h3>'
+    +'<div class="note">Archivo: <b>'+esc(nombreArchivo||"")+'</b> · '+Object.keys(enArchivo).length+' bienes.</div>'
+    +'<div class="note" style="background:#EAF6EC;border-color:#BFE3C6">✓ <b>'+nuevos.length+'</b> bien(es) nuevo(s) del archivo se agregarán como pendientes de asignar.</div>';
+  if(sobran.length){
+    h += '<div class="warnbox" style="font-size:13px">⚠️ <b>'+sobran.length+'</b> bien(es) que están en el sistema NO aparecen en este archivo y se ELIMINARÁN por completo (se borra el registro; queda una nota en Movimientos por auditoría, pero ya no se podrá ver ni editar el bien).</div>'
+      +'<div style="max-height:220px;overflow:auto;border:1px solid #E2E6EC;border-radius:9px;margin-top:8px">'
+      + sobran.slice(0,40).map(function(b){ return '<div style="padding:8px 10px;border-bottom:1px solid #F0F2F6;font-size:13px"><b>'+esc(b.codigo)+'</b> — '+esc(b.descripcion||"")+' <span style="color:#8A929C">('+esc(b.responsable||"sin asignar")+')</span></div>'; }).join("")
+      + (sobran.length>40?('<div style="padding:8px 10px;font-size:12px;color:#8A929C">…y '+(sobran.length-40)+' más</div>'):'')
+      +'</div>'
+      +'<label style="margin-top:10px">Para confirmar el borrado, escriba ELIMINAR</label>'
+      +'<input type="text" id="syncConfirmTxt" placeholder="ELIMINAR" style="width:100%;padding:11px;border:1.4px solid #E2E6EC;border-radius:9px;font-size:15px;text-transform:uppercase">';
+  } else {
+    h += '<div class="note">No hay bienes de más — no se eliminará nada.</div>';
+  }
+  h += '<button class="act g" style="margin-top:12px" onclick="confirmarSincronizacion()">✓ Aplicar sincronización</button>'
+    +'<button class="act o" onclick="closeMenu()">Cancelar</button>';
+  document.getElementById("sheet").innerHTML = h;
+  window.__syncPend = {nuevos: nuevos, sobran: sobran, archivo: nombreArchivo||""};
+  showSheet();
+}
+function confirmarSincronizacion(){
+  const s = window.__syncPend; if(!s) return;
+  if(s.sobran.length){
+    const txt = (document.getElementById("syncConfirmTxt")||{}).value || "";
+    if(txt.trim().toUpperCase()!=="ELIMINAR"){ toast('Escriba la palabra ELIMINAR para confirmar el borrado'); return; }
+    if(!confirm("Última confirmación: se eliminarán "+s.sobran.length+" bienes que no están en el archivo. Esto no se puede deshacer. ¿Continuar?")) return;
+  }
+  closeMenu();
+  toast("Sincronizando…");
+  function chunk(arr,n){ const out=[]; for(let i=0;i<arr.length;i+=n) out.push(arr.slice(i,i+n)); return out; }
+  const nowTxt = today();
+  const pasos = [];
+  chunk(s.nuevos,300).forEach(function(grp){ pasos.push({tipo:"add", grp:grp}); });
+  chunk(s.sobran,300).forEach(function(grp){ pasos.push({tipo:"del", grp:grp}); });
+  let i=0;
+  function next(){
+    if(i>=pasos.length){
+      toast("✓ Sincronización completa: "+s.nuevos.length+" agregados, "+s.sobran.length+" eliminados");
+      window.__syncPend=null; goHome(); return;
+    }
+    const paso = pasos[i]; const batch = db.batch();
+    if(paso.tipo==="add"){
+      paso.grp.forEach(function(n){
+        batch.set(db.collection("bienes").doc(n.id), {
+          codigo:n.codigo, descripcion:n.descripcion||n.codigo, valor:n.valor||0,
+          tarjetaId:null, tarjetaNumero:"", responsable:"",
+          tipo:"INDIVIDUAL", ubicacion:"", estado:"", existe:"", fechaVerificacion:"", verificadoPor:"",
+          esNuevo:true, observaciones:"", notaDuplicado:"", fotoBien:0,
+          actualizado: firebase.firestore.FieldValue.serverTimestamp()
+        }, {merge:true});
+      });
+    } else {
+      paso.grp.forEach(function(b){
+        batch.delete(db.collection("bienes").doc(b.id));
+        const movRef = db.collection("movimientos").doc();
+        batch.set(movRef, { codigo:b.codigo, tipoMovimiento:"BAJA_SINCRONIZACION",
+          tarjetaAnteriorNumero: b.tarjetaNumero||"", responsableAnterior: b.responsable||"",
+          tarjetaNuevaNumero:"", responsableNuevo:"",
+          estado:b.estado||"", ubicacion:b.ubicacion||"",
+          observaciones:"Eliminado por no aparecer en el archivo oficial: "+(s.archivo||""),
+          fecha: firebase.firestore.FieldValue.serverTimestamp(), fechaTxt: nowTxt, capturadoPor: META.by||"" });
+        fotoDel("B"+b.id);
+      });
+    }
+    i++;
+    batch.commit().then(next).catch(function(e){ toast("Error en la sincronización: "+(e.message||e)); });
   }
   next();
 }
@@ -1312,6 +1416,7 @@ function openMenu(){
     +'<div class="mitem" onclick="openExportBackup()"><span class="ic">⬇️</span><div><b>Respaldo CSV (opcional)</b><small>Exportar una copia de lo verificado hasta ahora</small></div></div>'
     +'<div class="mitem" onclick="generarExcel()"><span class="ic">📊</span><div><b>Generar Excel (todos los movimientos)</b><small>Libro con bienes, movimientos, hallazgos y tarjetas</small></div></div>'
     +'<div class="mitem" onclick="importarExcel()"><span class="ic">📥</span><div><b>Importar bienes nuevos desde Excel</b><small>Los crea como pendientes de asignar</small></div></div>'
+    +'<div class="mitem" onclick="sincronizarExcel()"><span class="ic">🔄</span><div><b>Sincronizar con Excel oficial</b><small>Agrega los que faltan y elimina los que no están en el archivo</small></div></div>'
     +'<div class="mitem" onclick="cerrarSesion()"><span class="ic">🚪</span><div><b>Cerrar sesión</b><small>'+esc(firebase.auth().currentUser?firebase.auth().currentUser.email:"")+'</small></div></div>'
     +'<div class="note">Los datos viven en la nube (Firestore) y se sincronizan solos entre dispositivos, aunque cierre la app. No hace falta exportar para no perderlos — el respaldo es solo un extra.</div>';
   showSheet();
