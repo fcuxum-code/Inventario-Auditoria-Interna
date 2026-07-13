@@ -1133,6 +1133,7 @@ document.getElementById("excelin").addEventListener("change", function(){
       if(window.__excelMode==="sincronizar") procesarSincronizacion(elegida.rows, f.name, elegida.nombre, wb.SheetNames.length);
       else if(window.__excelMode==="reconstruir") procesarReconstruccion(elegida.rows, f.name, elegida.nombre, wb.SheetNames.length);
       else if(window.__excelMode==="reiniciar") procesarReinicio(elegida.rows, f.name, elegida.nombre, wb.SheetNames.length);
+      else if(window.__excelMode==="valores") procesarActualizarValores(elegida.rows, f.name, elegida.nombre, wb.SheetNames.length);
       else procesarFilasImportadas(elegida.rows, elegida.nombre, wb.SheetNames.length);
     }catch(err){ toast("No se pudo leer el archivo: "+(err.message||err)); }
     self.value="";
@@ -1448,6 +1449,73 @@ function confirmarReconstruccion(){
 }
 
 /* ================= REINICIAR TODO (borra absolutamente todo y carga solo el archivo) ================= */
+/* ================= ACTUALIZAR SOLO VALORES (no toca asignación ni verificación) ================= */
+function actualizarValores(){
+  closeMenu();
+  if(typeof XLSX==="undefined"){ toast("No se pudo cargar el lector de Excel (revise internet)"); return; }
+  window.__excelMode = "valores";
+  document.getElementById("sheet").innerHTML = '<div class="grip"></div><h3>💲 Actualizar solo valores</h3>'
+    +'<div class="note">Sube el mismo archivo oficial. Esto SOLO corrige el campo Valor (y el SIGES/descripción si vienen) de los bienes que ya existen, por número de inventario. No toca tarjeta, responsable, verificación ni fotos.</div>'
+    +'<button class="act p" onclick="document.getElementById(\'excelin\').click()">📎 Elegir archivo Excel</button>'
+    +'<button class="act o" onclick="closeMenu()">Cancelar</button>';
+  showSheet();
+}
+function procesarActualizarValores(rows, nombreArchivo, nombreHoja, totalHojas){
+  if(!rows.length){ toast("El archivo no tiene filas de datos"); return; }
+  const {colCod, colDesc, colVal, colSiges} = leerColumnas(rows);
+  if(!colCod){ toast("No encontré una columna de No. de Inventario en el archivo"); return; }
+  if(!colVal){ toast("No encontré una columna de Valor/Monto en el archivo — nada que actualizar."); return; }
+  const cambios = []; let sinCoincidir=0;
+  const vistos = {};
+  rows.forEach(function(r){
+    const cod = String(r[colCod]==null?"":r[colCod]).trim();
+    if(!cod || !esCodigoValido(cod)) return;
+    const id = bienDocId(cod);
+    if(vistos[id]) return; vistos[id]=1;
+    if(!BIENES[id]){ sinCoincidir++; return; }
+    const nuevoValor = Number(r[colVal])||0;
+    cambios.push({
+      id:id, codigo:cod, valorAnterior: Number(BIENES[id].valor||0), valorNuevo: nuevoValor,
+      codigoSiges: colSiges? String(r[colSiges]==null?"":r[colSiges]).trim() : BIENES[id].codigoSiges||"",
+      descripcion: colDesc? String(r[colDesc]==null?"":r[colDesc]).trim() : BIENES[id].descripcion||""
+    });
+  });
+  if(cambios.length===0){ toast("Ningún código del archivo coincide con bienes del sistema."); return; }
+  const totalAntes = cambios.reduce(function(s,c){return s+c.valorAnterior;},0);
+  const totalDespues = cambios.reduce(function(s,c){return s+c.valorNuevo;},0);
+  let h = '<div class="grip"></div><h3>💲 Confirmar actualización de valores</h3>'
+    +(totalHojas>1?'<div class="note">Se leyó la hoja "<b>'+esc(nombreHoja)+'</b>".</div>':'')
+    +'<div class="note">Se actualizará el valor de <b>'+cambios.length+'</b> bien(es) que ya están en el sistema.'
+    +(sinCoincidir?('<br>'+sinCoincidir+' código(s) del archivo no coinciden con ningún bien actual.'):'')+'</div>'
+    +'<div class="note" style="background:#EAF6EC;border-color:#BFE3C6">Total actual en el sistema: Q'+totalAntes.toLocaleString("es-GT",{minimumFractionDigits:2})+'<br>Total según el archivo: Q'+totalDespues.toLocaleString("es-GT",{minimumFractionDigits:2})+'</div>'
+    +'<button class="act g" style="margin-top:12px" onclick="confirmarActualizarValores()">✓ Actualizar '+cambios.length+' valor(es)</button>'
+    +'<button class="act o" onclick="closeMenu()">Cancelar</button>';
+  document.getElementById("sheet").innerHTML = h;
+  window.__valPend = cambios;
+  showSheet();
+}
+function confirmarActualizarValores(){
+  const cambios = window.__valPend||[];
+  if(!cambios.length) return;
+  closeMenu();
+  toast("Actualizando valores…");
+  function chunk(arr,n){ const out=[]; for(let i=0;i<arr.length;i+=n) out.push(arr.slice(i,i+n)); return out; }
+  const chunks = chunk(cambios,400);
+  let i=0;
+  function next(){
+    if(i>=chunks.length){ toast("✓ Valores actualizados en "+cambios.length+" bien(es)"); window.__valPend=null; goHome(); return; }
+    const batch = db.batch();
+    chunks[i].forEach(function(c){
+      batch.update(db.collection("bienes").doc(c.id), {
+        valor: c.valorNuevo, codigoSiges: c.codigoSiges||"", descripcion: c.descripcion||"",
+        actualizado: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    i++;
+    batch.commit().then(next).catch(function(e){ toast("Error actualizando: "+(e.message||e)); });
+  }
+  next();
+}
 function reiniciarTotal(){
   closeMenu();
   if(typeof XLSX==="undefined"){ toast("No se pudo cargar el lector de Excel (revise internet)"); return; }
@@ -1699,6 +1767,7 @@ function openMenu(){
     +'<div class="mitem" onclick="generarExcel()"><span class="ic">📊</span><div><b>Generar Excel (todos los movimientos)</b><small>Libro con bienes, movimientos, hallazgos y tarjetas</small></div></div>'
     +'<div class="mitem" onclick="importarExcel()"><span class="ic">📥</span><div><b>Importar bienes nuevos desde Excel</b><small>Los crea como pendientes de asignar</small></div></div>'
     +'<div class="mitem" onclick="reconstruirExcel()"><span class="ic">🏗️</span><div><b>Reconstruir desde Excel oficial</b><small>Crea/corrige bienes CON su tarjeta y responsable (no borra nada)</small></div></div>'
+    +'<div class="mitem" onclick="actualizarValores()"><span class="ic">💲</span><div><b>Actualizar solo valores</b><small>Corrige el Valor de los bienes que ya existen, nada más</small></div></div>'
     +'<div class="mitem" onclick="reiniciarTotal()"><span class="ic">🧹</span><div><b style="color:#B33A3A">Reiniciar todo</b><small>Borra TODO y deja solo lo del Excel — empezar de cero</small></div></div>'
     +'<div class="mitem" onclick="sincronizarExcel()"><span class="ic">🔄</span><div><b>Sincronizar con Excel oficial</b><small>Agrega los que faltan y elimina los que no están en el archivo</small></div></div>'
     +'<div class="mitem" onclick="cerrarSesion()"><span class="ic">🚪</span><div><b>Cerrar sesión</b><small>'+esc(firebase.auth().currentUser?firebase.auth().currentUser.email:"")+'</small></div></div>'
