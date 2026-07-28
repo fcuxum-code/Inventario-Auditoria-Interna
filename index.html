@@ -2016,83 +2016,105 @@ button{ font-family:inherit !important; }
 /* Herramientas panel polish */
 #__herrPanel > div{ box-shadow:var(--shadow-lg) !important; border-radius:20px !important; }
 
+
+
+/* --- Ajustes: modal Hallazgo/pickers y bot\u00f3n Herramientas --- */
+#__herrBtn{ z-index:90 !important; }
+#overlay.show, .overlay.show{ background:rgba(12,18,32,.62) !important; backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px); }
+#sheet, .sheet{ box-shadow:0 -14px 40px rgba(10,15,30,.28) !important; border-top-left-radius:20px !important; border-top-right-radius:20px !important; }
+
 </style>
 <script id="ui-redesign-js">
 (function(){
+  function sheetOpen(){
+    var o=document.getElementById('overlay'), s=document.getElementById('sheet');
+    return (o&&o.classList.contains('show'))||(s&&s.classList.contains('show'));
+  }
   function onHome(){ var view=document.getElementById('view'); if(!view) return false; return view.querySelector('.prow')!==null; }
-  function apply(){ var btn=document.getElementById('__herrBtn'); if(!btn) return; var show=onHome(); btn.style.display=show?'block':'none'; if(!show){ var p=document.getElementById('__herrPanel'); if(p) p.style.display='none'; } }
+  function apply(){
+    var btn=document.getElementById('__herrBtn'); if(!btn) return;
+    var show = onHome() && !sheetOpen();
+    btn.style.display = show?'block':'none';
+    if(!show){ var p=document.getElementById('__herrPanel'); if(p&&!sheetOpen()) p.style.display='none'; }
+  }
   window.__applyHerrVisibility=apply;
-  function attach(){ var view=document.getElementById('view'); if(!view){ setTimeout(attach,300); return; } if(window.__herrMO) return; var mo=new MutationObserver(function(){apply();}); mo.observe(view,{childList:true,subtree:false}); window.__herrMO=mo; apply(); }
+  function attach(){
+    var view=document.getElementById('view'); if(!view){ setTimeout(attach,300); return; }
+    if(!window.__herrMO){ var mo=new MutationObserver(apply); mo.observe(view,{childList:true,subtree:false}); window.__herrMO=mo; }
+    var o=document.getElementById('overlay'); if(o&&!o.__mo){ var mo2=new MutationObserver(apply); mo2.observe(o,{attributes:true,attributeFilter:['class']}); o.__mo=mo2; }
+    var s=document.getElementById('sheet'); if(s&&!s.__mo){ var mo3=new MutationObserver(apply); mo3.observe(s,{attributes:true,attributeFilter:['class']}); s.__mo=mo3; }
+    apply();
+  }
   if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded',attach); } else { attach(); }
-  setTimeout(attach, 1200);
+  setTimeout(attach,1200);
 })();
 </script>
 <script id="voice-search-module">
 (function(){
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  // Convert Spanish number words + digits to a clean digit string
-  var WORD = {cero:'0',uno:'1',una:'1',dos:'2',tres:'3',cuatro:'4',cinco:'5',seis:'6',siete:'7',ocho:'8',nueve:'9',
-    diez:'10',once:'11',doce:'12',trece:'13',catorce:'14',quince:'15',veinte:'20',treinta:'30',cuarenta:'40',cincuenta:'50',sesenta:'60',setenta:'70',ochenta:'80',noventa:'90',cien:'100',mil:'1000'};
-  function toDigits(txt){
+  var NUM = {cero:'0',uno:'1',una:'1',dos:'2',tres:'3',cuatro:'4',cinco:'5',seis:'6',siete:'7',ocho:'8',nueve:'9',
+    diez:'10',once:'11',doce:'12',trece:'13',catorce:'14',quince:'15',dieciseis:'16',diecisiete:'17',dieciocho:'18',diecinueve:'19',veinte:'20',treinta:'30',cuarenta:'40',cincuenta:'50',sesenta:'60',setenta:'70',ochenta:'80',noventa:'90',cien:'100',mil:'1000'};
+  var LET = {a:'A',be:'B',ve:'V',uve:'V',ce:'C',se:'C',de:'D',e:'E',efe:'F',ge:'G',je:'G',hache:'H',i:'I',jota:'J',ka:'K',ele:'L',eme:'M',ene:'N',o:'O',pe:'P',cu:'Q',ku:'Q',ere:'R',erre:'R',ese:'S',te:'T',u:'U',equis:'X',ye:'Y',zeta:'Z'};
+  function normWord(w){ return w.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+  function convert(txt){
     if(!txt) return '';
-    var t = txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    // if it already contains digits, keep only digits
-    var direct = t.replace(/[^0-9]/g,'');
-    if(direct.length>=2) return direct;
-    // else map words
+    var raw = txt.trim();
+    var compact = raw.replace(/\s+/g,'');
+    if(/^[a-zA-Z0-9]{3,}$/.test(compact) && !/\s/.test(raw)) return compact.toUpperCase();
     var out='';
-    t.split(/[\s,\.\-]+/).forEach(function(w){ if(WORD[w]!==undefined) out+=WORD[w]; else if(/^[0-9]+$/.test(w)) out+=w; });
-    return out || direct;
+    raw.split(/[\s,\.\-]+/).forEach(function(w0){
+      if(!w0) return;
+      var w=normWord(w0);
+      if(NUM[w]!==undefined){ out+=NUM[w]; return; }
+      if(LET[w]!==undefined){ out+=LET[w]; return; }
+      if(/^[a-z0-9]+$/.test(w)){ out+=w.toUpperCase(); return; }
+      if(w.length===1 && /[a-z]/.test(w)){ out+=w.toUpperCase(); }
+    });
+    return out || compact.toUpperCase();
   }
+  window.__voiceConvert=convert;
   function makeMic(title){
     var b=document.createElement('button');
-    b.type='button'; b.className='__voiceMic'; b.title=title||'Dictar por voz'; b.textContent='🎙️';
-    b.style.cssText='flex:none;width:46px;height:46px;border:1px solid #e6eaf1;background:#fff;border-radius:12px;font-size:19px;cursor:pointer;box-shadow:0 1px 2px rgba(20,30,60,.05);transition:transform .14s,background .18s,box-shadow .18s;';
+    b.type='button'; b.className='__voiceMic'; b.title=title||'Dictar por voz'; b.textContent='\uD83C\uDF99\uFE0F';
+    b.style.cssText='flex:none;width:46px;height:46px;border:1px solid #e6eaf1;background:#fff;border-radius:12px;font-size:19px;cursor:pointer;box-shadow:0 1px 2px rgba(20,30,60,.05);transition:transform .14s,background .18s;';
     return b;
   }
+  function fire(el){ ['input','keyup','change'].forEach(function(ev){ el.dispatchEvent(new Event(ev,{bubbles:true})); }); }
   function listen(btn, onResult){
-    if(!SR){ alert('Tu navegador no permite dictado por voz. Usa Chrome en el celular o la computadora.'); return; }
-    var rec=new SR(); rec.lang='es-GT'; rec.interimResults=false; rec.maxAlternatives=3;
-    var old=btn.textContent; btn.textContent='🔴'; btn.style.background='#fdecec'; btn.classList.add('__listening');
-    var done=function(){ btn.textContent=old; btn.style.background='#fff'; btn.classList.remove('__listening'); };
-    rec.onresult=function(e){ var best=''; for(var i=0;i<e.results[0].length;i++){ var d=toDigits(e.results[0][i].transcript); if(d.length>best.length) best=d; } onResult(best, e.results[0][0].transcript); };
-    rec.onerror=function(){ done(); };
-    rec.onend=done;
-    try{ rec.start(); }catch(err){ done(); }
+    if(!SR){ alert('Tu navegador no permite dictado por voz. Usa Chrome (celular o computadora).'); return; }
+    var rec=new SR(); rec.lang='es-GT'; rec.interimResults=false; rec.maxAlternatives=4; rec.continuous=false;
+    var old=btn.textContent; btn.textContent='\uD83D\uDD34'; btn.style.background='#fdecec';
+    var reset=function(){ btn.textContent=old; btn.style.background='#fff'; };
+    rec.onresult=function(e){
+      var alts=e.results[0]; var best='';
+      for(var i=0;i<alts.length;i++){ var c=convert(alts[i].transcript); if(c.length>best.length) best=c; }
+      onResult(best, alts[0].transcript);
+    };
+    rec.onerror=reset; rec.onend=reset;
+    try{ rec.start(); }catch(err){ reset(); }
   }
-  function fire(el){ el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('keyup',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); }
-
-  // 1) Mic on main search
   function attachSearch(){
     var s=document.getElementById('search'); if(!s) return;
     if(document.getElementById('__searchMic')) return;
-    // wrap search in a flex row
     var wrap=document.createElement('div'); wrap.id='__searchWrap'; wrap.style.cssText='display:flex;gap:8px;align-items:center;';
-    s.parentNode.insertBefore(wrap, s); wrap.appendChild(s); s.style.flex='1';
-    var mic=makeMic('Dictar número de bien'); mic.id='__searchMic';
-    wrap.appendChild(mic);
-    mic.onclick=function(){ listen(mic,function(dig,raw){ if(dig){ s.value=dig; s.focus(); fire(s); } }); };
+    s.parentNode.insertBefore(wrap,s); wrap.appendChild(s); s.style.flex='1'; s.style.width='auto';
+    var mic=makeMic('Dictar No. de bien o codigo'); mic.id='__searchMic'; wrap.appendChild(mic);
+    mic.onclick=function(){ listen(mic,function(v){ if(v){ s.value=v; s.focus(); fire(s); } }); };
   }
-
-  // 2) Mic on "Números de bien" input in Nueva toma (dynamic screen)
   function attachToma(){
-    // find the input by its placeholder text
-    var inputs=[].slice.call(document.querySelectorAll('#view input[type=text],#view input:not([type])'));
+    var inputs=[].slice.call(document.querySelectorAll('#view input[type=text],#view input:not([type]),#sheet input[type=text],#sheet input:not([type])'));
     var target=inputs.filter(function(i){ return /l\u00e9alo del bien|numero de bien|n\u00famero de bien/i.test((i.placeholder||'')); })[0];
     if(!target) return;
     if(target.parentNode.querySelector('.__voiceMic')) return;
-    var mic=makeMic('Dictar número de bien'); mic.style.marginLeft='6px';
-    // place after the input (before Agregar button if present)
+    var mic=makeMic('Dictar No. de bien'); mic.style.marginLeft='6px';
     target.insertAdjacentElement('afterend', mic);
-    mic.onclick=function(){ listen(mic,function(dig){ if(dig){ target.value=dig; target.focus(); fire(target); } }); };
+    mic.onclick=function(){ listen(mic,function(v){ if(v){ target.value=v; target.focus(); fire(target); } }); };
   }
-
-  function tick(){ attachSearch(); attachToma(); }
+  function tick(){ try{ attachSearch(); attachToma(); }catch(e){} }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick); else tick();
-  var view=document.getElementById('view');
-  if(view){ var mo=new MutationObserver(tick); mo.observe(view,{childList:true,subtree:true}); }
-  setInterval(tick, 1500);
-  window.__voiceToDigits=toDigits;
+  var view=document.getElementById('view'); if(view){ new MutationObserver(tick).observe(view,{childList:true,subtree:true}); }
+  var sheet=document.getElementById('sheet'); if(sheet){ new MutationObserver(tick).observe(sheet,{childList:true,subtree:true,attributes:true}); }
+  setInterval(tick,1500);
 })();
 </script>
 </body>
