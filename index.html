@@ -102,6 +102,7 @@
   .moretog{font-size:12.5px; color:var(--azul2); font-weight:600;}
   .fotobtn{border:1.6px dashed #B8C4D4; background:#F7FAFE; color:var(--azul2); font-size:12.5px; font-weight:700;
     padding:8px 12px; border-radius:9px;}
+    .drivefoto{border:1.6px solid var(--verdeb); background:var(--verdebg); color:var(--verde); font-size:12.5px; font-weight:700; padding:8px 12px; border-radius:9px; text-decoration:none; display:inline-block;}
   .fotobtn.has{border-style:solid; background:var(--verdebg); border-color:var(--verdeb); color:var(--verde);}
   .thumb{width:44px; height:44px; border-radius:8px; object-fit:cover; border:1.5px solid var(--linea);}
   .extra{display:none; margin-top:9px;}
@@ -631,6 +632,7 @@ function itemCard(b, showOwner){
     +'<div class="tools">'
       +'<button class="fotobtn" id="fb_B'+id+'" onclick="takePhoto(\'B'+id+'\')">📷 Foto</button>'
       +'<img class="thumb" id="th_B'+id+'" style="display:none" onclick="viewPhoto(\'B'+id+'\')">'
+       +(b.fotoUrl?'<a class="drivefoto" href="'+b.fotoUrl+'" target="_blank" rel="noopener">🖼️ Ver foto</a>':'')
       +'<span class="moretog" onclick="toggleExtra(\''+id+'\')">＋ Ubicación / observación</span>'
       +(b.esNuevo?'<span class="moretog" style="color:var(--rojo)" onclick="borrarBien(\''+id+'\')">🗑 Borrar</span>':'')
     +'</div>'
@@ -979,6 +981,7 @@ function sesItemCard(it){
     +'</div>'
     +'<div class="tools"><button class="fotobtn" id="fb_A'+it.iid+'" onclick="takePhoto(\'A'+it.iid+'\')">📷 Foto</button>'
       +'<img class="thumb" id="th_A'+it.iid+'" style="display:none" onclick="viewPhoto(\'A'+it.iid+'\')">'
+       +(it.fotoUrl?'<a class="drivefoto" href="'+it.fotoUrl+'" target="_blank" rel="noopener">🖼️ Ver foto</a>':'')
       +'<span class="moretog" style="color:var(--rojo)" onclick="delSesItem(\''+it.iid+'\')">🗑 Quitar</span></div>'
     +'<div class="extra open" style="margin-top:8px"><input type="text" value="'+esc(it.obs||"")+'" oninput="sesItemObs(\''+it.iid+'\',this.value)" placeholder="Observación (opcional)"></div>'
   +'</div>';
