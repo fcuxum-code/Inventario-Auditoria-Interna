@@ -579,6 +579,37 @@ function verHistorial(id){
     const box = document.getElementById("histBody"); if(box) box.innerHTML = '<div class="hint">No se pudo cargar: '+esc(e.message||e)+'</div>';
   });
 }
+/* ================= ACTIVIDAD RECIENTE (todos los bienes) ================= */
+function abrirActividadReciente(){
+  document.getElementById("sheet").innerHTML =
+    '<div class="grip"></div><h3>'+icon('clock',18,'margin-right:6px;vertical-align:-3px')+'Actividad reciente</h3>'
+    +'<div class="hint" style="margin-top:-8px">Últimos movimientos registrados en toda la auditoría. Toque uno para ver el historial completo de ese bien.</div>'
+    +'<div id="actBody"><div class="hint">Cargando…</div></div>'
+    +'<button class="act o" onclick="closeMenu()">Cerrar</button>';
+  showSheet();
+  db.collection("movimientos").get().then(function(snap){
+    const movs = snap.docs.map(function(d){ return d.data(); });
+    movs.sort(function(a,b){
+      const ta = (a.fecha && a.fecha.toMillis) ? a.fecha.toMillis() : 0;
+      const tb = (b.fecha && b.fecha.toMillis) ? b.fecha.toMillis() : 0;
+      return tb - ta;
+    });
+    const box = document.getElementById("actBody"); if(!box) return;
+    if(!movs.length){ box.innerHTML = emptyState("Aún no hay actividad registrada", "Se anotará cada verificación, reasignación o descargo a partir de ahora"); return; }
+    box.innerHTML = movs.slice(0,60).map(actividadRow).join("");
+  }).catch(function(e){
+    const box = document.getElementById("actBody"); if(box) box.innerHTML = '<div class="hint">No se pudo cargar: '+esc(e.message||e)+'</div>';
+  });
+}
+function actividadRow(m){
+  const tipoTxt = TIPO_MOV_TXT[m.tipoMovimiento] || m.tipoMovimiento || "Movimiento";
+  const quien = m.responsableNuevo || m.responsable || m.responsableAnterior || "—";
+  return '<div class="tlist-item" style="display:block" onclick="verHistorial(\''+esc(bienDocId(m.codigo||""))+'\')">'
+    +'<div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(tipoTxt)+'</b><small style="flex:none">'+esc(m.fechaTxt||"")+'</small></div>'
+    +'<div class="powner">Bien '+esc(m.codigo||"")+' · '+esc(quien)+(m.ubicacion?" · "+esc(m.ubicacion):"")+'</div>'
+    +(m.capturadoPor?'<div class="stamp">Registrado por '+esc(m.capturadoPor)+'</div>':'')
+  +'</div>';
+}
 function editCorreoTarjeta(id){
   if(!requiereEdicion()) return;
   const t = TARJETAS[id]; if(!t) return;
@@ -1415,6 +1446,7 @@ function openMenu(){
     +'<div class="mitem" onclick="abrirFusion()"><span class="ic">'+icon('refreshCw',20)+'</span><div><b>Fusionar tarjetas duplicadas</b><small>Si la misma persona quedó con dos tarjetas</small></div></div>'
     +'<div class="mitem" onclick="abrirAvanceUbicacion()"><span class="ic">'+icon('mapPin',20)+'</span><div><b>Avance por ubicación</b><small>Cuánto falta por verificar en cada lugar</small></div></div>'
     +'<div class="mitem" onclick="abrirDiscrepancias()"><span class="ic">'+icon('alertTriangle',20)+'</span><div><b>Discrepancias</b><small>Todos los NO / NO UBICADO en un solo lugar</small></div></div>'
+    +'<div class="mitem" onclick="abrirActividadReciente()"><span class="ic">'+icon('clock',20)+'</span><div><b>Actividad reciente</b><small>Últimos movimientos de todos los bienes</small></div></div>'
     +'<div class="mitem" onclick="generarExcel()"><span class="ic">'+icon('barChart',20)+'</span><div><b>Generar Excel (todos los movimientos)</b><small>Libro con bienes, movimientos, hallazgos y tarjetas</small></div></div>'
     +'<div class="mitem" onclick="importarExcel()"><span class="ic">'+icon('upload',20)+'</span><div><b>Importar bienes nuevos desde Excel</b><small>Los crea como pendientes de asignar</small></div></div>'
 
