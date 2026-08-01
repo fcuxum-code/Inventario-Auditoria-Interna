@@ -190,3 +190,24 @@
 .migoverlay{position:fixed;inset:0;background:#1F3864;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;padding:30px;}
 .migoverlay .spin{width:38px;height:38px;border:4px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin 0.9s linear infinite;margin-bottom:18px;}
 @keyframes spin{to{transform:rotate(360deg);}}
+
+/* ======= Constancia de responsabilidad (imprimir / PDF) ======= */
+#printArea{display:none;}
+.pdhead{text-align:center;margin-bottom:14px;}
+.pdtitle{font-size:15px;font-weight:800;color:#1F3864;}
+.pdsub{font-size:13px;color:#333;margin-top:2px;}
+.pdinfo{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:14px;}
+.pdinfo td{padding:4px 0;}
+.pdtabla{width:100%;border-collapse:collapse;font-size:11.5px;}
+.pdtabla th,.pdtabla td{border:1px solid #999;padding:5px 7px;text-align:left;}
+.pdtabla th{background:#EAEEF4;}
+.pdtabla .pdnum{text-align:right;}
+.pdfirmas{display:flex;justify-content:space-between;margin-top:60px;gap:40px;}
+.pdfirma{flex:1;text-align:center;font-size:11.5px;color:#333;}
+.pdline{border-top:1px solid #333;margin-bottom:6px;height:1px;}
+.pdnota{margin-top:30px;font-size:9.5px;color:#888;text-align:center;}
+@media print{
+  body *{visibility:hidden;}
+  #printArea, #printArea *{visibility:visible;}
+  #printArea{display:block;position:absolute;left:0;top:0;width:100%;padding:20px;}
+}

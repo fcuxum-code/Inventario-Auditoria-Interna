@@ -289,7 +289,8 @@ function renderPerson(v){
   let h='<button class="backbtn" onclick="goHome()">‹ Responsables</button>';
   h+='<div style="margin:6px 2px 2px"><div style="font-size:18px;font-weight:800;color:#17202e">'+esc(t.responsable||"(sin nombre)")+'</div>'
     +'<div style="font-size:12.5px;color:#8A929C;margin-top:2px">Tarjeta '+esc(t.numero||"(pendiente)")+' · '+esc(t.puesto||"")+' '+chipTipo(t.tipo)+'</div>'
-    +'<div style="margin-top:4px"><span class="moretog" onclick="editCorreoTarjeta(\''+t.id+'\')">✉️ '+(t.correo?esc(t.correo):"agregar correo")+'</span></div></div>';
+    +'<div style="margin-top:4px"><span class="moretog" onclick="editCorreoTarjeta(\''+t.id+'\')">✉️ '+(t.correo?esc(t.correo):"agregar correo")+'</span>'
+    +' <span class="moretog" onclick="imprimirConstancia(\''+t.id+'\')">'+icon('download',13)+' Constancia (PDF)</span></div></div>';
   h+='<div class="filters">'
     +'<div class="fp '+(mode.filter==="todos"?"on":"")+'" onclick="setFilter(\'todos\')">Todos ('+n+')</div>'
     +'<div class="fp '+(mode.filter==="pend"?"on":"")+'" onclick="setFilter(\'pend\')">Pendientes ('+(n-d)+')</div>'
@@ -330,6 +331,39 @@ function borrarTarjetaDefinitiva(id){
     .catch(function(){ toast("Error al eliminar"); });
 }
 function setFilter(f){ mode.filter=f; render(); }
+
+/* ================= CONSTANCIA DE RESPONSABILIDAD (imprimir / PDF) ================= */
+function imprimirConstancia(tarjetaId){
+  const t = TARJETAS[tarjetaId]; if(!t) return;
+  const list = bienesDe(t.id).slice().sort(function(a,b){ return (a.codigo||"").localeCompare(b.codigo||""); });
+  const totalValor = list.reduce(function(s,b){ return s+Number(b.valor||0); },0);
+  const filas = list.map(function(b){
+    return '<tr>'
+      +'<td>'+esc(b.codigo)+'</td>'
+      +'<td>'+esc(b.descripcion||"")+'</td>'
+      +'<td class="pdnum">'+money(b.valor)+'</td>'
+      +'<td>'+esc(b.estado||"")+'</td>'
+      +'</tr>';
+  }).join("");
+  const html = '<div class="pdhead">'
+      +'<div class="pdtitle">Instituto Guatemalteco de Seguridad Social — Auditoría Interna</div>'
+      +'<div class="pdsub">Constancia de responsabilidad de bienes</div>'
+    +'</div>'
+    +'<table class="pdinfo"><tr><td><b>Responsable:</b> '+esc(t.responsable||"")+'</td><td><b>Tarjeta No.:</b> '+esc(t.numero||"(pendiente)")+'</td></tr>'
+      +'<tr><td><b>Puesto:</b> '+esc(t.puesto||"—")+'</td><td><b>Correo:</b> '+esc(t.correo||"—")+'</td></tr>'
+      +'<tr><td colspan="2"><b>Fecha de emisión:</b> '+today()+'</td></tr></table>'
+    +'<table class="pdtabla"><thead><tr><th>No. Inventario</th><th>Descripción</th><th>Valor</th><th>Estado</th></tr></thead>'
+      +'<tbody>'+(filas||'<tr><td colspan="4">Sin bienes registrados en esta tarjeta.</td></tr>')+'</tbody>'
+      +'<tfoot><tr><td colspan="2"><b>Total ('+list.length+' bien(es))</b></td><td class="pdnum"><b>'+money(totalValor)+'</b></td><td></td></tr></tfoot>'
+    +'</table>'
+    +'<div class="pdfirmas">'
+      +'<div class="pdfirma"><div class="pdline"></div>Firma del responsable</div>'
+      +'<div class="pdfirma"><div class="pdline"></div>Firma de Auditoría Interna</div>'
+    +'</div>'
+    +'<div class="pdnota">Revise el texto de esta constancia antes de usarla como documento oficial — el formato es un punto de partida, no un modelo institucional certificado.</div>';
+  document.getElementById("printArea").innerHTML = html;
+  setTimeout(function(){ window.print(); }, 80);
+}
 
 /* ================= TARJETA DE BIEN ================= */
 function itemCard(b, showOwner, extraChip){
