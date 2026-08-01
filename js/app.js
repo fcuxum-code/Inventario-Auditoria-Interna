@@ -200,11 +200,11 @@ function render(){
   if(mode.view==="pend") return renderPendientes(v);
   const tarjs = tarjetasActivas();
   const pend = bienesPendientes();
-  let h='<div class="hzrow" onclick="openHall()"><span class="ic">📸</span>'
-    +'<div style="flex:1"><b>Hallazgos: bienes encontrados sin tarjeta</b><small>Toque ➕ Hallazgo para anotar uno</small></div>'
+  let h='<div class="hzrow" onclick="openHall()"><span class="ic">'+icon('camera',22)+'</span>'
+    +'<div style="flex:1"><b>Hallazgos: bienes encontrados sin tarjeta</b><small>Toque Hallazgo para anotar uno</small></div>'
     +'<div style="color:#C99B62;font-size:20px">›</div></div>';
   if(pend.length){
-    h+='<div class="hzrow" style="background:linear-gradient(135deg,#EAF1FB,#DCE8F8);border-color:#B9CDE8" onclick="openPendientes()"><span class="ic">📦</span>'
+    h+='<div class="hzrow" style="background:linear-gradient(135deg,#EAF1FB,#DCE8F8);border-color:#B9CDE8" onclick="openPendientes()"><span class="ic">'+icon('package',22)+'</span>'
       +'<div style="flex:1"><b style="color:#1F3864">Bienes nuevos pendientes de asignar</b><small style="color:#5E7196">'+pend.length+' bien(es) esperando responsable</small></div>'
       +'<div style="color:#9FB0CC;font-size:20px">›</div></div>';
   }
@@ -1097,19 +1097,19 @@ const GS_CODE =
 function openMenu(){
   document.getElementById("sheet").innerHTML =
     '<div class="grip"></div><h3>Menú</h3>'
-    +'<div class="fld"><label>👤 ¿Quién realiza el inventario? (se anota en cada bien)</label>'
+    +'<div class="fld"><label>'+icon('user',14)+' ¿Quién realiza el inventario? (se anota en cada bien)</label>'
       +'<input id="byin" type="text" value="'+esc(META.by||"")+'" placeholder="Su nombre" oninput="META.by=this.value; saveMeta();"></div>'
-    +'<div class="fld" style="margin-top:14px"><label>✉️ URL de Apps Script (correos y fotos a Drive)</label>'
+    +'<div class="fld" style="margin-top:14px"><label>'+icon('mail',14)+' URL de Apps Script (correos y fotos a Drive)</label>'
       +'<input id="gsin" type="url" value="'+esc(META.gsUrl||"")+'" placeholder="https://script.google.com/macros/s/…/exec" oninput="META.gsUrl=this.value; saveMeta();"></div>'
-    +'<div class="mitem" onclick="verCodigoGS()"><span class="ic">📋</span><div><b>Ver código para Apps Script</b><small>Cópielo y péguelo una sola vez</small></div></div>'
-    +'<div class="mitem" onclick="probarGS()"><span class="ic">🔌</span><div><b>Probar conexión de correo/fotos</b><small>'+(META.gsUrl?"Configurado":"Sin configurar")+'</small></div></div>'
-    +'<div class="mitem" onclick="enviarCorreoPrueba()"><span class="ic">📧</span><div><b>Enviar correo de prueba (con foto)</b><small>Para confirmar que la foto sí llega adjunta</small></div></div>'
-    +'<div class="mitem" onclick="abrirFusion()"><span class="ic">🔀</span><div><b>Fusionar tarjetas duplicadas</b><small>Si la misma persona quedó con dos tarjetas</small></div></div>'
-    +'<div class="mitem" onclick="openExportBackup()"><span class="ic">⬇️</span><div><b>Respaldo CSV (opcional)</b><small>Exportar una copia de lo verificado hasta ahora</small></div></div>'
-    +'<div class="mitem" onclick="generarExcel()"><span class="ic">📊</span><div><b>Generar Excel (todos los movimientos)</b><small>Libro con bienes, movimientos, hallazgos y tarjetas</small></div></div>'
-    +'<div class="mitem" onclick="importarExcel()"><span class="ic">📥</span><div><b>Importar bienes nuevos desde Excel</b><small>Los crea como pendientes de asignar</small></div></div>'
+    +'<div class="mitem" onclick="verCodigoGS()"><span class="ic">'+icon('code',20)+'</span><div><b>Ver código para Apps Script</b><small>Cópielo y péguelo una sola vez</small></div></div>'
+    +'<div class="mitem" onclick="probarGS()"><span class="ic">'+icon('zap',20)+'</span><div><b>Probar conexión de correo/fotos</b><small>'+(META.gsUrl?"Configurado":"Sin configurar")+'</small></div></div>'
+    +'<div class="mitem" onclick="enviarCorreoPrueba()"><span class="ic">'+icon('mail',20)+'</span><div><b>Enviar correo de prueba (con foto)</b><small>Para confirmar que la foto sí llega adjunta</small></div></div>'
+    +'<div class="mitem" onclick="abrirFusion()"><span class="ic">'+icon('refreshCw',20)+'</span><div><b>Fusionar tarjetas duplicadas</b><small>Si la misma persona quedó con dos tarjetas</small></div></div>'
+    +'<div class="mitem" onclick="openExportBackup()"><span class="ic">'+icon('download',20)+'</span><div><b>Respaldo CSV (opcional)</b><small>Exportar una copia de lo verificado hasta ahora</small></div></div>'
+    +'<div class="mitem" onclick="generarExcel()"><span class="ic">'+icon('barChart',20)+'</span><div><b>Generar Excel (todos los movimientos)</b><small>Libro con bienes, movimientos, hallazgos y tarjetas</small></div></div>'
+    +'<div class="mitem" onclick="importarExcel()"><span class="ic">'+icon('upload',20)+'</span><div><b>Importar bienes nuevos desde Excel</b><small>Los crea como pendientes de asignar</small></div></div>'
 
-    +'<div class="mitem" onclick="cerrarSesion()"><span class="ic">🚪</span><div><b>Cerrar sesión</b><small>'+esc(firebase.auth().currentUser?firebase.auth().currentUser.email:"")+'</small></div></div>'
+    +'<div class="mitem" onclick="cerrarSesion()"><span class="ic">'+icon('logOut',20)+'</span><div><b>Cerrar sesión</b><small>'+esc(firebase.auth().currentUser?firebase.auth().currentUser.email:"")+'</small></div></div>'
     +'<div class="note">Los datos viven en la nube (Firestore) y se sincronizan solos entre dispositivos, aunque cierre la app. No hace falta exportar para no perderlos — el respaldo es solo un extra.</div>';
   showSheet();
 }

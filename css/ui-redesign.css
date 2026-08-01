@@ -92,24 +92,5 @@ header .htitle small{ opacity:.85 !important; font-weight:500 !important; }
 /* Generic buttons harmony */
 button{ font-family:inherit !important; }
 
-/* Herramientas floating button — refined */
-#__herrBtn{
-  background:linear-gradient(120deg,#1b3159,#2f5496) !important;
-  box-shadow:0 8px 22px rgba(27,49,89,.34) !important;
-  border-radius:999px !important;
-  padding:13px 20px !important;
-  font-weight:700 !important;
-  letter-spacing:.2px;
-  transition:transform .16s ease, box-shadow .16s ease, opacity .2s ease;
-}
-#__herrBtn:hover{ transform:translateY(-2px); box-shadow:0 12px 28px rgba(27,49,89,.42) !important; }
-
-/* Herramientas panel polish */
-#__herrPanel > div{ box-shadow:var(--shadow-lg) !important; border-radius:20px !important; }
-
-
-
-/* --- Ajustes: modal Hallazgo/pickers y bot\u00f3n Herramientas --- */
-#__herrBtn{ z-index:90 !important; }
-#overlay.show, .overlay.show{ background:rgba(12,18,32,.62) !important; backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px); }
+/* --- Ajustes: modal Hallazgo/pickers --- */
 #sheet, .sheet{ box-shadow:0 -14px 40px rgba(10,15,30,.28) !important; border-top-left-radius:20px !important; border-top-right-radius:20px !important; }

@@ -1,7 +1,11 @@
 (function(){
-  if(document.getElementById('__herrBtn')) return;
+  "use strict";
+  // Herramientas de administración: ver bienes por ubicación y asignar tarjeta en lote.
+  // Se integran como dos entradas más del menú ☰ (mismo look que el resto de la app),
+  // en vez de un botón flotante con un panel propio.
   var norm=function(s){return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();};
-  var esc=function(s){return (s||'').toString().replace(/[&<>"]/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]);});};
+  var UBIC = ["Oficinas Centrales","Anexo C.C. z.4","Anexo Torre Café","Archivo General"];
+
   var H={
     cache:null,
     getBienes:async function(force){
@@ -32,37 +36,105 @@
     }
   };
   window.__HERR=H;
-  var btn=document.createElement('button');btn.id='__herrBtn';btn.textContent='🔧 Herramientas';
-  btn.style.cssText='position:fixed;bottom:70px;right:14px;z-index:99998;background:#6d28d9;color:#fff;border:none;border-radius:24px;padding:12px 18px;font-size:15px;font-weight:700;box-shadow:0 3px 10px rgba(0,0,0,.3);cursor:pointer;';
-  document.body.appendChild(btn);
-  var panel=document.createElement('div');panel.id='__herrPanel';
-  panel.style.cssText='display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);overflow:auto;';
-  panel.innerHTML='<div style="max-width:820px;margin:24px auto;background:#fff;border-radius:14px;padding:18px;font-family:system-ui">'+
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h2 style="margin:0;font-size:20px;color:#1e293b">🔧 Herramientas</h2><button id="__herrClose" style="background:#e2e8f0;border:none;border-radius:8px;padding:8px 14px;font-size:16px;cursor:pointer">✕ Cerrar</button></div>'+
-    '<div style="display:flex;gap:8px;margin-bottom:14px"><button class="__herrTab" data-t="ubic" style="flex:1;padding:10px;border:none;border-radius:8px;background:#6d28d9;color:#fff;font-weight:700;cursor:pointer">📍 Ver por ubicación</button><button class="__herrTab" data-t="pers" style="flex:1;padding:10px;border:none;border-radius:8px;background:#e2e8f0;color:#334155;font-weight:700;cursor:pointer">🎫 Asignar tarjeta en lote</button></div>'+
-    '<div id="__herrUbic"><p style="color:#64748b;margin:0 0 10px">Elige una ubicación para ver todos los bienes que están allí:</p><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">'+
-    '<button class="__ubicBtn" data-u="Oficinas Centrales" style="padding:9px 14px;border:1px solid #6d28d9;background:#fff;color:#6d28d9;border-radius:8px;cursor:pointer;font-weight:600">🏢 Oficinas Centrales</button>'+
-    '<button class="__ubicBtn" data-u="Anexo C.C. z.4" style="padding:9px 14px;border:1px solid #6d28d9;background:#fff;color:#6d28d9;border-radius:8px;cursor:pointer;font-weight:600">🏬 Anexo C.C. z.4</button>'+
-    '<button class="__ubicBtn" data-u="Anexo Torre Café" style="padding:9px 14px;border:1px solid #6d28d9;background:#fff;color:#6d28d9;border-radius:8px;cursor:pointer;font-weight:600">☕ Anexo Torre Café</button>'+
-    '<button class="__ubicBtn" data-u="Archivo General" style="padding:9px 14px;border:1px solid #6d28d9;background:#fff;color:#6d28d9;border-radius:8px;cursor:pointer;font-weight:600">🗄️ Archivo General</button>'+
-    '</div><div id="__ubicResult" style="max-height:52vh;overflow:auto"></div></div>'+
-    '<div id="__herrPers" style="display:none"><p style="color:#64748b;margin:0 0 10px">Busca por <b>empleado</b> o <b>número de tarjeta</b>. Marca los bienes y asigna un número de tarjeta a todos de una vez:</p>'+
-    '<div style="display:flex;gap:8px;margin-bottom:10px"><input id="__persQ" placeholder="Nombre de empleado o No. de tarjeta" style="flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px"><button id="__persSearch" style="padding:10px 16px;border:none;border-radius:8px;background:#6d28d9;color:#fff;font-weight:700;cursor:pointer">Buscar</button></div>'+
-    '<div id="__persResult" style="max-height:38vh;overflow:auto;margin-bottom:10px"></div>'+
-    '<div id="__persAssign" style="display:none;border-top:1px solid #e2e8f0;padding-top:10px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">'+
-    '<div><label style="font-size:12px;color:#64748b">No. de tarjeta *</label><br><input id="__asgNum" style="padding:9px;border:1px solid #cbd5e1;border-radius:8px;width:150px"></div>'+
-    '<div><label style="font-size:12px;color:#64748b">Responsable (opcional)</label><br><input id="__asgResp" style="padding:9px;border:1px solid #cbd5e1;border-radius:8px;width:280px"></div>'+
-    '<button id="__asgBtn" style="padding:11px 18px;border:none;border-radius:8px;background:#16a34a;color:#fff;font-weight:700;cursor:pointer">✔ Asignar a seleccionados</button></div>'+
-    '<div id="__asgMsg" style="margin-top:8px;font-weight:600"></div></div></div></div>';
-  document.body.appendChild(panel);
-  btn.onclick=function(){panel.style.display='block';};
-  panel.querySelector('#__herrClose').onclick=function(){panel.style.display='none';};
-  panel.onclick=function(e){if(e.target===panel)panel.style.display='none';};
-  panel.querySelectorAll('.__herrTab').forEach(function(tb){tb.onclick=function(){var t=tb.dataset.t;panel.querySelectorAll('.__herrTab').forEach(function(x){x.style.background='#e2e8f0';x.style.color='#334155';});tb.style.background='#6d28d9';tb.style.color='#fff';panel.querySelector('#__herrUbic').style.display=t==='ubic'?'block':'none';panel.querySelector('#__herrPers').style.display=t==='pers'?'block':'none';};});
-  panel.querySelectorAll('.__ubicBtn').forEach(function(ub){ub.onclick=async function(){var u=ub.dataset.u;var box=panel.querySelector('#__ubicResult');box.innerHTML='<p style="color:#64748b">Cargando…</p>';var list=await H.byUbic(u);box.innerHTML='<p style="font-weight:700;color:#1e293b">'+esc(u)+': '+list.length+' bien(es)</p>'+(list.length?'<table style="width:100%;border-collapse:collapse;font-size:13px"><tr style="background:#f1f5f9;text-align:left"><th style="padding:6px">Bien</th><th style="padding:6px">Descripción</th><th style="padding:6px">Responsable</th><th style="padding:6px">Tarjeta</th></tr>'+list.map(function(b){return '<tr style="border-bottom:1px solid #eee"><td style="padding:6px">'+esc(b.id)+'</td><td style="padding:6px">'+esc((b.descripcion||'').slice(0,40))+'</td><td style="padding:6px">'+esc(b.responsable)+'</td><td style="padding:6px">'+esc(b.tarjetaNumero||'—')+'</td></tr>';}).join('')+'</table>':'<p style="color:#94a3b8">Sin bienes en esta ubicación.</p>');};});
-  var lastResults=[];
-  async function doSearch(){var q=panel.querySelector('#__persQ').value;var box=panel.querySelector('#__persResult');var asg=panel.querySelector('#__persAssign');if(!q.trim()){box.innerHTML='<p style="color:#94a3b8">Escribe un nombre o número.</p>';asg.style.display='none';return;}box.innerHTML='<p style="color:#64748b">Buscando…</p>';var list=await H.findByPerson(q);lastResults=list;if(!list.length){box.innerHTML='<p style="color:#94a3b8">Sin resultados.</p>';asg.style.display='none';return;}box.innerHTML='<p style="font-weight:700">'+list.length+' bien(es) encontrados <label style="font-weight:400;font-size:13px;margin-left:10px"><input type="checkbox" id="__selAll" checked> Seleccionar todos</label></p><table style="width:100%;border-collapse:collapse;font-size:13px"><tr style="background:#f1f5f9;text-align:left"><th style="padding:6px">✓</th><th style="padding:6px">Bien</th><th style="padding:6px">Responsable</th><th style="padding:6px">Colaborador</th><th style="padding:6px">Tarjeta actual</th><th style="padding:6px">Ubicación</th></tr>'+list.map(function(b){return '<tr style="border-bottom:1px solid #eee"><td style="padding:6px"><input type="checkbox" class="__bchk" data-id="'+esc(b.id)+'" checked></td><td style="padding:6px">'+esc(b.id)+'</td><td style="padding:6px">'+esc(b.responsable)+'</td><td style="padding:6px">'+esc(b.colaborador||'—')+'</td><td style="padding:6px">'+esc(b.tarjetaNumero||'—')+'</td><td style="padding:6px">'+esc(b.ubicacion||'—')+'</td></tr>';}).join('')+'</table>';asg.style.display='block';var selAll=box.querySelector('#__selAll');selAll.onchange=function(){box.querySelectorAll('.__bchk').forEach(function(c){c.checked=selAll.checked;});};var cnt={};list.forEach(function(b){if(b.responsable)cnt[b.responsable]=(cnt[b.responsable]||0)+1;});var top=Object.entries(cnt).sort(function(a,b){return b[1]-a[1];})[0];if(top)panel.querySelector('#__asgResp').value=top[0];}
-  panel.querySelector('#__persSearch').onclick=doSearch;
-  panel.querySelector('#__persQ').addEventListener('keydown',function(e){if(e.key==='Enter')doSearch();});
-  panel.querySelector('#__asgBtn').onclick=async function(){var num=panel.querySelector('#__asgNum').value.trim();var resp=panel.querySelector('#__asgResp').value.trim();var msg=panel.querySelector('#__asgMsg');var ids=Array.prototype.slice.call(panel.querySelectorAll('.__bchk')).filter(function(c){return c.checked;}).map(function(c){return c.dataset.id;});if(!num){msg.style.color='#dc2626';msg.textContent='Escribe el número de tarjeta.';return;}if(!ids.length){msg.style.color='#dc2626';msg.textContent='Selecciona al menos un bien.';return;}if(!confirm('¿Asignar la tarjeta '+num+' a '+ids.length+' bien(es)?'))return;msg.style.color='#64748b';msg.textContent='Asignando…';try{var n=await H.assignTarjeta(ids,num,resp);msg.style.color='#16a34a';msg.textContent='✔ Tarjeta '+num+' asignada a '+n+' bien(es).';doSearch();}catch(e){msg.style.color='#dc2626';msg.textContent='Error: '+e.message;}};
+
+  /* ---------- Ver bienes por ubicación ---------- */
+  window.herrAbrirUbicacion=function(){
+    var h='<div class="grip"></div><h3>Bienes por ubicación</h3>'
+      +'<div class="note">Elige una ubicación para ver los bienes registrados ahí.</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0">'
+      + UBIC.map(function(u){ return '<button type="button" class="herrUbicBtn btn" style="flex:0 0 auto;padding:9px 14px" data-u="'+u.replace(/"/g,'&quot;')+'">'+u+'</button>'; }).join('')
+      +'</div>'
+      +'<div id="herrUbicResult"></div>'
+      +'<button class="act o" onclick="closeMenu()">Cerrar</button>';
+    document.getElementById('sheet').innerHTML=h;
+    showSheet();
+    document.querySelectorAll('.herrUbicBtn').forEach(function(btn){
+      btn.addEventListener('click', function(){ herrVerUbicacion(btn.dataset.u); });
+    });
+  };
+  window.herrVerUbicacion=async function(u){
+    var box=document.getElementById('herrUbicResult'); if(!box) return;
+    box.innerHTML='<div class="hint">Cargando…</div>';
+    var list=await H.byUbic(u);
+    if(!list.length){ box.innerHTML='<div class="hint">'+esc(u)+'</div>'+emptyState('Sin bienes en esta ubicación'); return; }
+    box.innerHTML='<div class="hint">'+esc(u)+' · '+list.length+' bien(es)</div>'
+      + list.map(function(b){
+          return '<div class="tlist-item"><div><b>'+esc(b.id)+'</b><small>'+esc((b.descripcion||'').slice(0,50))+' · '+esc(b.responsable||'—')+'</small></div>'
+            +'<span style="color:#8A929C;font-size:12px;flex:none">Tarj. '+esc(b.tarjetaNumero||'—')+'</span></div>';
+        }).join('');
+  };
+
+  /* ---------- Asignar tarjeta en lote ---------- */
+  window.herrAbrirAsignarLote=function(){
+    var h='<div class="grip"></div><h3>Asignar tarjeta en lote</h3>'
+      +'<div class="note">Busca por empleado o número de tarjeta, marca los bienes y asígnales un número de tarjeta a todos de una vez.</div>'
+      +'<div class="fld"><input id="herrPersQ" type="text" placeholder="Nombre de empleado o No. de tarjeta"></div>'
+      +'<button class="act p" onclick="herrBuscarLote()">Buscar</button>'
+      +'<div id="herrPersResult" style="margin-top:8px"></div>'
+      +'<div id="herrPersAssign" style="display:none;border-top:1px solid var(--linea);padding-top:10px;margin-top:10px">'
+        +'<label>No. de tarjeta *</label><input id="herrAsgNum" type="text" style="width:100%;padding:10px;border:1.4px solid var(--linea);border-radius:9px;margin-bottom:8px">'
+        +'<label>Responsable (opcional)</label><input id="herrAsgResp" type="text" style="width:100%;padding:10px;border:1.4px solid var(--linea);border-radius:9px;margin-bottom:10px">'
+        +'<button class="act g" onclick="herrConfirmarLote()">Asignar a seleccionados</button>'
+        +'<div id="herrAsgMsg" style="margin-top:8px;font-weight:600;font-size:13px"></div>'
+      +'</div>'
+      +'<button class="act o" onclick="closeMenu()">Cerrar</button>';
+    document.getElementById('sheet').innerHTML=h;
+    showSheet();
+    setTimeout(function(){
+      var q=document.getElementById('herrPersQ');
+      if(q){ q.focus(); q.addEventListener('keydown',function(e){ if(e.key==='Enter') herrBuscarLote(); }); }
+    },150);
+  };
+  window.herrBuscarLote=async function(){
+    var q=document.getElementById('herrPersQ').value;
+    var box=document.getElementById('herrPersResult');
+    var asg=document.getElementById('herrPersAssign');
+    if(!q.trim()){ box.innerHTML='<div class="hint">Escribe un nombre o número.</div>'; asg.style.display='none'; return; }
+    box.innerHTML='<div class="hint">Buscando…</div>';
+    var list=await H.findByPerson(q);
+    if(!list.length){ box.innerHTML=emptyState('Sin resultados'); asg.style.display='none'; return; }
+    box.innerHTML='<div class="hint">'+list.length+' bien(es) encontrados</div>'
+      +'<label style="display:flex;align-items:center;gap:6px;font-size:13px;margin:4px 0 8px"><input type="checkbox" id="herrSelAll" checked> Seleccionar todos</label>'
+      + list.map(function(b){
+          return '<label class="tlist-item" style="cursor:pointer"><span style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">'
+            +'<input type="checkbox" class="herrBchk" data-id="'+esc(b.id)+'" checked>'
+            +'<span style="min-width:0"><b>'+esc(b.id)+'</b><small style="display:block">'+esc(b.responsable||'—')+' · Tarj. '+esc(b.tarjetaNumero||'—')+(b.ubicacion?' · '+esc(b.ubicacion):'')+'</small></span></span></label>';
+        }).join('');
+    asg.style.display='block';
+    var selAll=document.getElementById('herrSelAll');
+    selAll.onchange=function(){ document.querySelectorAll('.herrBchk').forEach(function(c){c.checked=selAll.checked;}); };
+    var cnt={}; list.forEach(function(b){ if(b.responsable) cnt[b.responsable]=(cnt[b.responsable]||0)+1; });
+    var top=Object.entries(cnt).sort(function(a,b){return b[1]-a[1];})[0];
+    if(top) document.getElementById('herrAsgResp').value=top[0];
+  };
+  window.herrConfirmarLote=async function(){
+    var num=document.getElementById('herrAsgNum').value.trim();
+    var resp=document.getElementById('herrAsgResp').value.trim();
+    var msg=document.getElementById('herrAsgMsg');
+    var ids=Array.prototype.slice.call(document.querySelectorAll('.herrBchk')).filter(function(c){return c.checked;}).map(function(c){return c.dataset.id;});
+    if(!num){ msg.style.color='var(--rojo)'; msg.textContent='Escribe el número de tarjeta.'; return; }
+    if(!ids.length){ msg.style.color='var(--rojo)'; msg.textContent='Selecciona al menos un bien.'; return; }
+    if(!confirm('¿Asignar la tarjeta '+num+' a '+ids.length+' bien(es)?')) return;
+    msg.style.color='var(--gris)'; msg.textContent='Asignando…';
+    try{
+      var n=await H.assignTarjeta(ids,num,resp);
+      msg.style.color='var(--verde)'; msg.textContent='✓ Tarjeta '+num+' asignada a '+n+' bien(es).';
+      herrBuscarLote();
+    }catch(e){ msg.style.color='var(--rojo)'; msg.textContent='Error: '+e.message; }
+  };
+
+  /* ---------- Inyectar entradas en el menú ☰ ---------- */
+  var origOpenMenu=window.openMenu;
+  if(typeof origOpenMenu==='function'){
+    window.openMenu=function(){
+      origOpenMenu.apply(this,arguments);
+      var sheet=document.getElementById('sheet'); if(!sheet) return;
+      if(sheet.querySelector('#herrMenuMarker')) return;
+      var anchor=sheet.querySelector('[onclick="abrirFusion()"]');
+      var html='<div class="mitem" onclick="herrAbrirUbicacion()"><span class="ic">'+icon('mapPin',20)+'</span><div><b id="herrMenuMarker">Ver bienes por ubicación</b><small>Buscar todo lo que hay en un lugar</small></div></div>'
+        +'<div class="mitem" onclick="herrAbrirAsignarLote()"><span class="ic">'+icon('layers',20)+'</span><div><b>Asignar tarjeta en lote</b><small>Por empleado o No. de tarjeta, varios bienes a la vez</small></div></div>';
+      if(anchor) anchor.insertAdjacentHTML('afterend', html);
+      else sheet.insertAdjacentHTML('beforeend', html);
+    };
+  }
 })();
