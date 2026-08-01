@@ -604,6 +604,11 @@ function addInv(){
   const el = document.getElementById("invin"); const raw = (el?el.value:"").trim(); if(!raw) return;
   const existing = buscarBienPorCodigoOSiges(raw);
   const cn = existing ? existing.id : bienDocId(raw);
+  if(curSes.items.some(function(it){ return bienDocId(it.codigo)===cn; })){
+    toast("Ese bien ya está en la lista de esta toma");
+    el.value=""; el.focus();
+    return;
+  }
   const item = { iid: "i"+Date.now()+Math.random().toString(36).slice(2,6), codigo: existing? existing.codigo : raw,
     desc: existing? existing.descripcion : "", valor: existing? existing.valor:0,
     esNuevo: !existing,
@@ -776,7 +781,10 @@ function notificarPersona(s, numeroReal){
       ubicacion:s.loc, fecha: today(), capturadoPor: META.by||"", detalle: detalle, items: itemsMail,
       fotos: fotos.filter(Boolean) };
     return fetch(META.gsUrl, {method:"POST", body: JSON.stringify(payload)});
-  }).then(function(){
+  }).then(function(r){
+    return r.json().catch(function(){ return null; });
+  }).then(function(j){
+    if(j && j.ok===false){ toast("⚠️ Los bienes SÍ se guardaron, pero Apps Script no pudo enviar el correo: "+(j.error||"error desconocido")); return; }
     toast("✉️ Correo enviado a "+s.correo+(conFoto?" con "+conFoto+" foto(s)":""));
   }).catch(function(e){
     toast("⚠️ Los bienes SÍ se guardaron, pero el correo no se pudo enviar (revise conexión/Apps Script)");

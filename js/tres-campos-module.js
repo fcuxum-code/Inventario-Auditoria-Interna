@@ -2,21 +2,9 @@
   "use strict";
   // Módulo: 3 campos por bien -> Ubicación física (4 botones), Colaborador actual (editable), Observaciones.
   // Aditivo: usa markCampo() de la app para guardar. No borra nada.
+  // El valor inicial de "Colaborador" se lee de BIENES (ya sincronizado en vivo por app.js),
+  // en vez de una consulta propia a Firestore, para no duplicar lecturas ni quedar desactualizado.
   var UBIC = ["Oficinas Centrales","Anexo C.C. z.4","Anexo Torre Café","Archivo General"];
-  var COLAB = {};
-  var loaded = false;
-
-  function db(){ try { return firebase.firestore(); } catch(e){ return null; } }
-
-  async function loadColab(){
-    var d = db(); if(!d) return;
-    try {
-      var snap = await d.collection('bienes').get();
-      var m = {};
-      snap.forEach(function(doc){ var c=(doc.data().colaborador||'').toString().trim(); if(c) m[doc.id]=c; });
-      COLAB = m; loaded = true;
-    } catch(e){}
-  }
 
   function fUbic(card){ return Array.prototype.slice.call(card.querySelectorAll('input')).find(function(el){ return /ubicacion/.test(el.getAttribute('onchange')||''); }); }
   function fObs(card){ return Array.prototype.slice.call(card.querySelectorAll('input')).find(function(el){ return /observaciones/.test(el.getAttribute('onchange')||''); }); }
@@ -62,10 +50,11 @@
         lbl.textContent='Colaborador actual (el que lo tiene)';
         lbl.style.cssText='font-size:12px;color:#586470;margin-bottom:2px;';
         var inp = document.createElement('input');
-        inp.type='text'; inp.value = COLAB[id]||''; inp.placeholder='Ej. Nombre del colaborador';
+        var actual = (typeof BIENES==='object' && BIENES[id] && BIENES[id].colaborador) || '';
+        inp.type='text'; inp.value = actual; inp.placeholder='Ej. Nombre del colaborador';
         inp.style.cssText='width:100%;padding:8px 10px;border:1px solid #E2E6EC;border-radius:8px;font-size:14px;';
         (function(id,inp){
-          inp.addEventListener('change', function(){ if(typeof markCampo==='function') markCampo(id,'colaborador', inp.value.trim()); COLAB[id]=inp.value.trim(); });
+          inp.addEventListener('change', function(){ if(typeof markCampo==='function') markCampo(id,'colaborador', inp.value.trim()); });
         })(id,inp);
         box.appendChild(lbl); box.appendChild(inp);
         if(obs){
@@ -78,14 +67,13 @@
     }
   }
 
-  var mo = new MutationObserver(function(){ if(loaded) enhance(); });
+  var mo = new MutationObserver(enhance);
 
-  async function start(){
-    await loadColab();
+  function start(){
     try { mo.observe(document.body, {childList:true, subtree:true}); } catch(e){}
     enhance();
-    var tries=0;
-    var iv=setInterval(function(){ tries++; if(!loaded){ loadColab(); } enhance(); if(tries>20) clearInterval(iv); }, 1500);
+    // Respaldo liviano por si algún cambio no dispara el MutationObserver (ya no hace red, es barato)
+    setInterval(enhance, 2000);
   }
 
   if(document.readyState==='complete' || document.readyState==='interactive'){ setTimeout(start,900); }
