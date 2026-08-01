@@ -238,12 +238,33 @@ function renderPanelMetricas(){
     + '<div class="kpicard kpi-valor static"><div class="kpinum">'+money(s.valorTotal)+'</div><div class="kpilbl">Valor total</div><div class="kpisub">'+s.tarjetas+' responsable(s)</div></div>'
     + '</div>';
 }
+/* ================= FILTROS DE BÚSQUEDA ================= */
+let searchFiltros = { ubic:"", estado:"", tipo:"" };
+let mostrarFiltros = false;
+function filtrosActivos(){ return !!(searchFiltros.ubic || searchFiltros.estado || searchFiltros.tipo); }
+function resetFiltrosBusqueda(){ searchFiltros={ubic:"",estado:"",tipo:""}; mostrarFiltros=false; }
+function toggleFiltrosBusqueda(){ mostrarFiltros=!mostrarFiltros; render(); }
+function setFiltroBusqueda(campo,val){ searchFiltros[campo]=val; render(); }
+function limpiarFiltrosBusqueda(){ resetFiltrosBusqueda(); render(); }
+function tipoCategoria(tp){
+  tp = tp||"";
+  if(tp.indexOf("MPUTO")>=0) return "COMPUTO";
+  if(tp.indexOf("BODEGA")>=0 || tp.indexOf("GENERAL")>=0) return "BODEGA";
+  return "INDIVIDUAL";
+}
+function bienCoincideFiltros(b){
+  if(searchFiltros.ubic && b.ubicacion!==searchFiltros.ubic) return false;
+  if(searchFiltros.estado && b.estado!==searchFiltros.estado) return false;
+  if(searchFiltros.tipo && tipoCategoria(b.tipo)!==searchFiltros.tipo) return false;
+  return true;
+}
 /* ================= NAVEGACIÓN / RENDER ================= */
-function goHome(){ mode={view:"home",tarjetaId:null,filter:"todos",q:""}; document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
+function goHome(){ mode={view:"home",tarjetaId:null,filter:"todos",q:""}; resetFiltrosBusqueda(); document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
 function render(){
   if(!firstSyncDone) return;
   const v=document.getElementById("view");
-  if(mode.q) return renderSearch(v);
+  const fbtn = document.getElementById("filterbtn"); if(fbtn) fbtn.classList.toggle("on", filtrosActivos()||mostrarFiltros);
+  if(mode.q || filtrosActivos() || mostrarFiltros) return renderSearch(v);
   if(mode.view==="person") return renderPerson(v);
   if(mode.view==="hall") return renderHall(v);
   if(mode.view==="ses") return renderSession(v);
@@ -274,7 +295,7 @@ function chipPendienteViejo(b){
   if(dias===null || dias<UMBRAL_DIAS_PENDIENTE) return "";
   return '<span class="chip c-old">'+icon('clock',10,'margin-right:2px')+dias+' días sin asignar</span>';
 }
-function openPendientes(){ mode={view:"pend",tarjetaId:null,filter:"todos",q:""}; document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
+function openPendientes(){ mode={view:"pend",tarjetaId:null,filter:"todos",q:""}; resetFiltrosBusqueda(); document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
 function renderPendientes(v){
   const pend = bienesPendientes().sort(function(a,b){
     const da=diasPendiente(a), db2=diasPendiente(b);
@@ -292,7 +313,7 @@ function renderPendientes(v){
   h += pend.map(function(b){ return itemCard(b, false, chipPendienteViejo(b)); }).join("");
   v.innerHTML=h; loadThumbs();
 }
-function openPerson(id){ mode={view:"person",tarjetaId:id,filter:"todos",q:""}; document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
+function openPerson(id){ mode={view:"person",tarjetaId:id,filter:"todos",q:""}; resetFiltrosBusqueda(); document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
 function renderPerson(v){
   const t = TARJETAS[mode.tarjetaId];
   if(!t){ goHome(); return; }
@@ -569,26 +590,46 @@ function editCorreoTarjeta(id){
 
 /* ================= BÚSQUEDA ================= */
 function onSearch(q){ mode.q=q.trim(); render(); }
+function renderBarraFiltros(){
+  const ESTADOS = [['BUENO','Bueno'],['REGULAR','Regular'],['MALO','Malo'],['PARA BAJA','Para baja']];
+  const TIPOS = [['INDIVIDUAL','Individual'],['BODEGA','Bodega/General'],['COMPUTO','Cómputo']];
+  let h = '<div class="filtrobar '+(mostrarFiltros||filtrosActivos()?"":"oculto")+'">';
+  h += '<select onchange="setFiltroBusqueda(\'ubic\',this.value)"><option value="">Ubicación (todas)</option>'
+     + LOCS.map(function(l){ return '<option value="'+esc(l)+'" '+(searchFiltros.ubic===l?"selected":"")+'>'+esc(l)+'</option>'; }).join("")
+     + '</select>';
+  h += '<select onchange="setFiltroBusqueda(\'estado\',this.value)"><option value="">Estado (todos)</option>'
+     + ESTADOS.map(function(e){ return '<option value="'+e[0]+'" '+(searchFiltros.estado===e[0]?"selected":"")+'>'+e[1]+'</option>'; }).join("")
+     + '</select>';
+  h += '<select onchange="setFiltroBusqueda(\'tipo\',this.value)"><option value="">Tipo (todos)</option>'
+     + TIPOS.map(function(t){ return '<option value="'+t[0]+'" '+(searchFiltros.tipo===t[0]?"selected":"")+'>'+t[1]+'</option>'; }).join("")
+     + '</select>';
+  if(filtrosActivos()) h += '<span class="moretog" onclick="limpiarFiltrosBusqueda()">'+icon('x',12)+' Limpiar filtros</span>';
+  h += '</div>';
+  return h;
+}
 function renderSearch(v){
   const q = mode.q.toLowerCase();
   const ids = Object.keys(BIENES).filter(function(id){
     const b=BIENES[id];
+    if(!bienCoincideFiltros(b)) return false;
+    if(!q) return true;
     return String(b.codigo).toLowerCase().indexOf(q)>=0 || (b.descripcion||"").toLowerCase().indexOf(q)>=0
       || (b.responsable||"").toLowerCase().indexOf(q)>=0 || String(b.tarjetaNumero||"").toLowerCase().indexOf(q)>=0
       || String(b.codigoSiges||"").toLowerCase().indexOf(q)>=0;
   });
-  const hz = Object.values(HALLAZGOS).filter(function(z){
+  const hz = q ? Object.values(HALLAZGOS).filter(function(z){
     return (z.inv||"").toLowerCase().indexOf(q)>=0 || (z.desc||"").toLowerCase().indexOf(q)>=0;
-  });
-  let h = '<div class="hint">'+(ids.length+hz.length)+' resultado(s) para "'+esc(mode.q)+'".</div>';
+  }) : [];
+  let h = renderBarraFiltros();
+  h += '<div class="hint">'+(ids.length+hz.length)+' resultado(s)'+(q?' para "'+esc(mode.q)+'"':(filtrosActivos()?' con estos filtros':''))+'.</div>';
   if(hz.length) h += hz.map(hallCard).join("");
-  if(ids.length===0 && hz.length===0) h += emptyState('Sin coincidencias', 'Si el bien no está en el listado, use Nueva toma o Hallazgo');
+  if(ids.length===0 && hz.length===0) h += emptyState('Sin coincidencias', q?'Si el bien no está en el listado, use Nueva toma o Hallazgo':'Pruebe con otros filtros');
   else h += ids.slice(0,200).map(function(id){ return itemCard(BIENES[id], true); }).join("");
   v.innerHTML = h; loadThumbs();
 }
 
 /* ================= HALLAZGOS ================= */
-function openHall(){ mode={view:"hall",tarjetaId:null,filter:"todos",q:""}; document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
+function openHall(){ mode={view:"hall",tarjetaId:null,filter:"todos",q:""}; resetFiltrosBusqueda(); document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
 function renderHall(v){
   const list = Object.values(HALLAZGOS).sort(function(a,b){ return (b.creadoTs||0)-(a.creadoTs||0); });
   let h='<button class="backbtn" onclick="goHome()">‹ Responsables</button>';
@@ -664,7 +705,7 @@ function newSession(){
   if(!requiereEdicion()) return;
   fotoDel("Lses");
   curSes = { tipo:"existente", tarjetaId:null, numero:"", persona:"", empleado:"", correo:"", loc:"", foto:0, items:[], firmaB64:null };
-  mode.view="ses"; mode.q=""; document.getElementById("search").value=""; render(); window.scrollTo(0,0);
+  mode.view="ses"; mode.q=""; resetFiltrosBusqueda(); document.getElementById("search").value=""; render(); window.scrollTo(0,0);
 }
 function cancelSession(){ fotoDel("Lses"); curSes=null; goHome(); }
 function sesSetTipo(t){ curSes.tipo=t; if(t==="nueva"){ curSes.tarjetaId=null; } render(); }
