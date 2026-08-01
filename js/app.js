@@ -319,6 +319,7 @@ function itemCard(b, showOwner){
        +(b.fotoUrl?'<a class="drivefoto" href="'+b.fotoUrl+'" target="_blank" rel="noopener"><img class="dthumb" src="'+driveThumbUrl(b.fotoUrl)+'" loading="lazy" alt="foto">🖼️ Ver foto</a>':'')
       +'<span class="moretog" onclick="toggleExtra(\''+id+'\')">＋ Ubicación / observación</span>'
       +'<span class="moretog" onclick="verHistorial(\''+id+'\')">'+icon('clock',13)+' Historial</span>'
+      +(b.existe==="NO" && b.tarjetaId?'<span class="moretog" style="color:var(--naranja)" onclick="descargarBien(\''+id+'\')">'+icon('logOut',13)+' Quitar de la tarjeta</span>':'')
       +(b.esNuevo?'<span class="moretog" style="color:var(--rojo)" onclick="borrarBien(\''+id+'\')">'+icon('trash',13)+' Borrar</span>':'')
     +'</div>'
     +'<div class="extra" id="ex_'+id+'">'
@@ -365,8 +366,27 @@ const TIPO_MOV_TXT = {
   VERIFICACION: "Verificación de inventario",
   REASIGNACION: "Reasignado a otra persona",
   FUSION_TARJETAS: "Fusión de tarjetas duplicadas",
-  HALLAZGO_ASIGNADO: "Asignado (era un hallazgo)"
+  HALLAZGO_ASIGNADO: "Asignado (era un hallazgo)",
+  DESCARGADO: "Retirado de la tarjeta (ya no lo tenía)"
 };
+function descargarBien(id){
+  const b = BIENES[id]; if(!b || !b.tarjetaId) return;
+  if(!confirm('¿Quitar "'+b.codigo+'" de la tarjeta de '+(b.responsable||"esta persona")+'? Pasará a Bienes pendientes de asignar, y queda el registro de dónde salió.')) return;
+  const tarjetaAnteriorNumero = b.tarjetaNumero||"", responsableAnterior = b.responsable||"";
+  db.collection("bienes").doc(id).update({
+    tarjetaId: null, tarjetaNumero: "", responsable: "", existe: "",
+    tarjetaAnteriorNumero: tarjetaAnteriorNumero, responsableAnterior: responsableAnterior,
+    actualizado: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(){ toast("Retirado de la tarjeta ✓ — pasó a pendientes de asignar"); })
+    .catch(function(){ toast("No se pudo guardar (revise conexión)"); });
+  db.collection("movimientos").add({
+    codigo: b.codigo, tipoMovimiento: "DESCARGADO",
+    tarjetaAnteriorNumero: tarjetaAnteriorNumero, responsableAnterior: responsableAnterior,
+    tarjetaNuevaNumero: "", responsableNuevo: "",
+    estado: b.estado||"", ubicacion: b.ubicacion||"", observaciones: "Ya no lo tenía físicamente",
+    fecha: firebase.firestore.FieldValue.serverTimestamp(), fechaTxt: today(), capturadoPor: META.by||""
+  }).catch(function(){});
+}
 function verHistorial(id){
   const b = BIENES[id];
   const codigo = b ? b.codigo : id;
@@ -389,7 +409,7 @@ function verHistorial(id){
       const tipoTxt = TIPO_MOV_TXT[m.tipoMovimiento] || m.tipoMovimiento || "Movimiento";
       const cambioResp = (m.responsableAnterior && m.responsableNuevo && m.responsableAnterior!==m.responsableNuevo)
         ? (esc(m.responsableAnterior)+' → <b>'+esc(m.responsableNuevo)+'</b>')
-        : ('<b>'+esc(m.responsableNuevo||m.responsableAnterior||"—")+'</b>');
+        : ('<b>'+esc(m.responsableNuevo||m.responsable||m.responsableAnterior||"—")+'</b>');
       return '<div class="tlist-item" style="display:block">'
         +'<div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(tipoTxt)+'</b><small style="flex:none">'+esc(m.fechaTxt||"")+'</small></div>'
         +'<div class="powner">'+cambioResp+'</div>'
