@@ -4,7 +4,9 @@
   // Aditivo: usa markCampo() de la app para guardar. No borra nada.
   // El valor inicial de "Colaborador" se lee de BIENES (ya sincronizado en vivo por app.js),
   // en vez de una consulta propia a Firestore, para no duplicar lecturas ni quedar desactualizado.
-  var UBIC = ["Oficinas Centrales","Anexo C.C. z.4","Anexo Torre Café","Archivo General"];
+  // Usa la misma lista LOCS que "Nueva toma" (definida en app.js) para que ambas
+  // pantallas guarden la ubicación con el mismo nombre exacto.
+  var UBIC = (typeof LOCS!=='undefined') ? LOCS : ["Oficinas Centrales","Anexo C.C. z.4","Anexo Torre Café","Archivo General"];
   var COLAB_DATALIST_ID = '__colabPersonalList';
 
   function fUbic(card){ return Array.prototype.slice.call(card.querySelectorAll('input')).find(function(el){ return /ubicacion/.test(el.getAttribute('onchange')||''); }); }

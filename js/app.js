@@ -1,4 +1,10 @@
-const LOCS = ["A.I. EDIFICIO OFICINAS CENTRALES","ANEXO CENTRO COMERCIAL","TORRE CAFÉ"];
+const LOCS = ["Oficinas Centrales","Anexo C.C. z.4","Anexo Torre Café","Archivo General"];
+// Ubicaciones con nombre viejo (de antes de unificar "Nueva toma" con el campo rápido de cada bien) -> nombre nuevo
+const LOC_ALIASES = {
+  "A.I. EDIFICIO OFICINAS CENTRALES": "Oficinas Centrales",
+  "ANEXO CENTRO COMERCIAL": "Anexo C.C. z.4",
+  "TORRE CAFÉ": "Anexo Torre Café"
+};
 
 /* ================= FIREBASE ================= */
 const firebaseConfig = {
@@ -1242,10 +1248,33 @@ function enviarCorreoPrueba(){
   });
 }
 /* ================= AVANCE POR UBICACIÓN ================= */
+function repararUbicaciones(){
+  const updates = [];
+  Object.values(BIENES).forEach(function(b){
+    const raw = (b.ubicacion||"").trim();
+    if(LOC_ALIASES[raw]) updates.push({id:b.id, nueva:LOC_ALIASES[raw]});
+  });
+  if(!updates.length){ toast("No había ubicaciones antiguas que corregir"); return; }
+  if(!confirm('¿Actualizar la ubicación de '+updates.length+' bien(es) al nombre nuevo? (por ejemplo, "A.I. EDIFICIO OFICINAS CENTRALES" → "Oficinas Centrales")')) return;
+  function chunk(arr,n){ const out=[]; for(let i=0;i<arr.length;i+=n) out.push(arr.slice(i,i+n)); return out; }
+  const chunks = chunk(updates,400);
+  let i=0;
+  function next(){
+    if(i>=chunks.length){ toast("✓ "+updates.length+" ubicación(es) actualizadas"); abrirAvanceUbicacion(); return; }
+    const batch = db.batch();
+    chunks[i].forEach(function(u){ batch.update(db.collection("bienes").doc(u.id), {ubicacion:u.nueva, actualizado: firebase.firestore.FieldValue.serverTimestamp()}); });
+    i++;
+    batch.commit().then(next).catch(function(e){ toast("Error: "+(e.message||e)); });
+  }
+  next();
+}
 function abrirAvanceUbicacion(){
   const groups = {};
+  let hayAliasViejos = false;
   Object.values(BIENES).forEach(function(b){
-    const label = (b.ubicacion||"").trim() || "Sin ubicación registrada";
+    const raw = (b.ubicacion||"").trim();
+    if(LOC_ALIASES[raw]) hayAliasViejos = true;
+    const label = raw || "Sin ubicación registrada";
     if(!groups[label]) groups[label] = { total:0, si:0, no:0, nu:0 };
     const g = groups[label];
     g.total++;
@@ -1259,7 +1288,8 @@ function abrirAvanceUbicacion(){
     return groups[b].total - groups[a].total;
   });
   let h = '<div class="grip"></div><h3>Avance por ubicación</h3>'
-    + '<div class="note">Según el campo "Ubicación física real" de cada bien — se llena al abrir "＋ Ubicación / observación" en la tarjeta, o automáticamente al hacer una Nueva toma.</div>';
+    + '<div class="note">Según el campo "Ubicación física real" de cada bien — se llena al abrir "＋ Ubicación / observación" en la tarjeta, o automáticamente al hacer una Nueva toma.</div>'
+    + (hayAliasViejos ? '<button class="act n" onclick="repararUbicaciones()">Unificar nombres antiguos de ubicación</button>' : '');
   if(!keys.length){
     h += emptyState("Todavía no hay bienes registrados");
   } else {
