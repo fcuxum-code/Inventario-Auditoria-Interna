@@ -14,6 +14,12 @@
       lastLoad=Date.now(); if(cb)cb(); marcarAlarmas(); actualizarResumen();
     }).catch(function(e){ console.error(e); if(window.toast)toast('Error al cargar personal'); }); }
 
+  // Expuesto para que otros módulos (p.ej. el campo "Colaborador actual") puedan
+  // sugerir nombres de empleados sin depender de su propia consulta a Firestore.
+  window.listaNombresPersonal=function(){
+    return PERSONAL.filter(function(p){return p.activo!==false;}).map(function(p){return p.nombre;}).filter(Boolean);
+  };
+
   window.openPersonal=function(){ var view=document.getElementById('view'); if(!view)return;
     view.innerHTML='<div style="padding:8px 2px"><button class="backbtn" onclick="goHome()">&lsaquo; Volver</button>'
       +'<h2 id="perTitulo" style="margin:10px 2px 6px;color:#1F3864">Personal</h2>'

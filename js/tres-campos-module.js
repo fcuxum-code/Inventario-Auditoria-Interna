@@ -5,11 +5,31 @@
   // El valor inicial de "Colaborador" se lee de BIENES (ya sincronizado en vivo por app.js),
   // en vez de una consulta propia a Firestore, para no duplicar lecturas ni quedar desactualizado.
   var UBIC = ["Oficinas Centrales","Anexo C.C. z.4","Anexo Torre Café","Archivo General"];
+  var COLAB_DATALIST_ID = '__colabPersonalList';
 
   function fUbic(card){ return Array.prototype.slice.call(card.querySelectorAll('input')).find(function(el){ return /ubicacion/.test(el.getAttribute('onchange')||''); }); }
   function fObs(card){ return Array.prototype.slice.call(card.querySelectorAll('input')).find(function(el){ return /observaciones/.test(el.getAttribute('onchange')||''); }); }
 
+  function refrescarDatalistPersonal(){
+    var dl = document.getElementById(COLAB_DATALIST_ID);
+    if(!dl){
+      dl = document.createElement('datalist');
+      dl.id = COLAB_DATALIST_ID;
+      document.body.appendChild(dl);
+    }
+    var nombres = (typeof listaNombresPersonal==='function') ? listaNombresPersonal() : [];
+    var actuales = Array.prototype.map.call(dl.options, function(o){ return o.value; });
+    if(actuales.length===nombres.length && actuales.every(function(v,i){return v===nombres[i];})) return; // sin cambios
+    dl.innerHTML = '';
+    nombres.forEach(function(n){
+      var opt = document.createElement('option');
+      opt.value = n;
+      dl.appendChild(opt);
+    });
+  }
+
   function enhance(){
+    refrescarDatalistPersonal();
     var cards = document.querySelectorAll('div.item[id^="it_"]');
     for(var k=0;k<cards.length;k++){
       var card = cards[k];
@@ -52,6 +72,7 @@
         var inp = document.createElement('input');
         var actual = (typeof BIENES==='object' && BIENES[id] && BIENES[id].colaborador) || '';
         inp.type='text'; inp.value = actual; inp.placeholder='Ej. Nombre del colaborador';
+        inp.setAttribute('list', COLAB_DATALIST_ID);
         inp.style.cssText='width:100%;padding:8px 10px;border:1px solid #E2E6EC;border-radius:8px;font-size:14px;';
         (function(id,inp){
           inp.addEventListener('change', function(){ if(typeof markCampo==='function') markCampo(id,'colaborador', inp.value.trim()); });
