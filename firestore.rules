@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() { return request.auth != null; }
+    function esEditor() {
+      return autenticado() && (
+        !exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'editor'
+      );
+    }
+
+    match /usuarios/{uid} {
+      allow read: if autenticado();
+      allow write: if esEditor();
+    }
+    match /bienes/{id} {
+      allow read: if autenticado();
+      allow write: if esEditor();
+    }
+    match /tarjetas/{id} {
+      allow read: if autenticado();
+      allow write: if esEditor();
+    }
+    match /hallazgos/{id} {
+      allow read: if autenticado();
+      allow write: if esEditor();
+    }
+    match /movimientos/{id} {
+      allow read: if autenticado();
+      allow write: if esEditor();
+    }
+    match /personal/{id} {
+      allow read: if autenticado();
+      allow write: if esEditor();
+    }
+  }
+}
