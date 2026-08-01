@@ -23,6 +23,11 @@ loadMeta();
 /* ================= HELPERS ================= */
 function esc(s){ return (s==null?"":String(s)).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
 function money(v){ return "Q"+Number(v||0).toLocaleString("es-GT",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function emptyState(title, sub){
+  return '<div class="empty">'+icon('inbox',40,'opacity:.45;margin-bottom:10px')
+    +'<div class="emptytitle">'+esc(title)+'</div>'
+    +(sub?'<div class="emptysub">'+esc(sub)+'</div>':'')+'</div>';
+}
 function norm(s){ return String(s==null?"":s).replace(/\s/g,"").toUpperCase(); }
 function bienDocId(raw){ return norm(raw).replace(/\//g,"_").slice(0,300); }
 function today(){ const d=new Date(); return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear(); }
@@ -222,7 +227,7 @@ function renderPendientes(v){
   let h='<button class="backbtn" onclick="goHome()">‹ Responsables</button>';
   h+='<div style="margin:6px 2px 8px"><div style="font-size:18px;font-weight:800;color:#1F3864">📦 Bienes pendientes de asignar</div>'
     +'<div style="font-size:12.5px;color:#8A929C;margin-top:2px">Bienes ya ingresados al sistema (por ejemplo, importados de Excel) que todavía no tienen responsable. Asígnelos con 🧍 Nueva toma cuando visite a la persona.</div></div>';
-  if(pend.length===0){ h+='<div class="empty">No hay bienes pendientes de asignar.</div>'; v.innerHTML=h; return; }
+  if(pend.length===0){ h+=emptyState('No hay bienes pendientes de asignar'); v.innerHTML=h; return; }
   h += pend.map(function(b){ return itemCard(b); }).join("");
   v.innerHTML=h; loadThumbs();
 }
@@ -247,7 +252,7 @@ function renderPerson(v){
   if(n===0){
     h+='<button class="act o" style="margin-bottom:12px" onclick="borrarTarjetaDefinitiva(\''+t.id+'\')">🗑️ Borrar este responsable (tarjeta vacía)</button>';
   }
-  if(show.length===0){ h+='<div class="empty">No hay bienes en este filtro.</div>'; v.innerHTML=h; loadThumbs(); return; }
+  if(show.length===0){ h+=emptyState('No hay bienes en este filtro'); v.innerHTML=h; loadThumbs(); return; }
   if(mode.filter!=="list" && (n-d)>1){
     h+='<button class="act o" style="margin-bottom:12px" onclick="marcarPendientesNo(\''+t.id+'\')">🚫 Ninguno de los pendientes está aquí (marcar todos NO)</button>';
   }
@@ -300,20 +305,20 @@ function itemCard(b, showOwner){
     +owner
     +asignarBtn
     +'<div class="bgrp">'
-      +'<button class="btn b-si '+(b.existe==="SÍ"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'SÍ\')">✓ SÍ<small>existe</small></button>'
-      +'<button class="btn b-no '+(b.existe==="NO"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'NO\')">✗ NO<small>no está</small></button>'
-      +'<button class="btn b-nu '+(b.existe==="NO UBICADO"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'NO UBICADO\')">? NO<small>ubicado</small></button>'
+      +'<button class="btn b-si '+(b.existe==="SÍ"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'SÍ\')">'+icon('check',16)+' SÍ<small>existe</small></button>'
+      +'<button class="btn b-no '+(b.existe==="NO"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'NO\')">'+icon('x',16)+' NO<small>no está</small></button>'
+      +'<button class="btn b-nu '+(b.existe==="NO UBICADO"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'NO UBICADO\')">'+icon('helpCircle',16)+' NO<small>ubicado</small></button>'
     +'</div>'
     +'<div class="bgrp estado" style="'+(b.existe==="SÍ"?"":"display:none")+'">'
       +['BUENO','REGULAR','MALO','PARA BAJA'].map(function(e){ const cl=e==="PARA BAJA"?"baja":e.toLowerCase();
         return '<button class="btn est e-'+cl+' '+(b.estado===e?"sel":"")+'" onclick="markEstado(\''+id+'\',\''+e+'\')">'+(e==="PARA BAJA"?"Baja":e.charAt(0)+e.slice(1).toLowerCase())+'</button>'; }).join("")
     +'</div>'
     +'<div class="tools">'
-      +'<button class="fotobtn" id="fb_B'+id+'" onclick="takePhoto(\'B'+id+'\')">📷 Foto</button>'
+      +'<button class="fotobtn" id="fb_B'+id+'" onclick="takePhoto(\'B'+id+'\')">'+icon('camera',15)+' Foto</button>'
       +'<img class="thumb" id="th_B'+id+'" style="display:none" onclick="viewPhoto(\'B'+id+'\')">'
        +(b.fotoUrl?'<a class="drivefoto" href="'+b.fotoUrl+'" target="_blank" rel="noopener"><img class="dthumb" src="'+driveThumbUrl(b.fotoUrl)+'" loading="lazy" alt="foto">🖼️ Ver foto</a>':'')
       +'<span class="moretog" onclick="toggleExtra(\''+id+'\')">＋ Ubicación / observación</span>'
-      +(b.esNuevo?'<span class="moretog" style="color:var(--rojo)" onclick="borrarBien(\''+id+'\')">🗑 Borrar</span>':'')
+      +(b.esNuevo?'<span class="moretog" style="color:var(--rojo)" onclick="borrarBien(\''+id+'\')">'+icon('trash',13)+' Borrar</span>':'')
     +'</div>'
     +'<div class="extra" id="ex_'+id+'">'
       +'<label>Ubicación física real</label><input type="text" value="'+esc(b.ubicacion||"")+'" onchange="markCampo(\''+id+'\',\'ubicacion\',this.value)" placeholder="Ej. Oficina 3">'
@@ -376,7 +381,7 @@ function renderSearch(v){
   });
   let h = '<div class="hint">'+(ids.length+hz.length)+' resultado(s) para "'+esc(mode.q)+'".</div>';
   if(hz.length) h += hz.map(hallCard).join("");
-  if(ids.length===0 && hz.length===0) h += '<div class="empty">Sin coincidencias.<br><br>Si el bien no está en el listado,<br>use 🧍 Nueva toma o ➕ Hallazgo.</div>';
+  if(ids.length===0 && hz.length===0) h += emptyState('Sin coincidencias', 'Si el bien no está en el listado, use Nueva toma o Hallazgo');
   else h += ids.slice(0,200).map(function(id){ return itemCard(BIENES[id], true); }).join("");
   v.innerHTML = h; loadThumbs();
 }
@@ -389,7 +394,7 @@ function renderHall(v){
   h+='<div style="margin:6px 2px 8px"><div style="font-size:18px;font-weight:800;color:#7A4508">📸 Hallazgos</div>'
     +'<div style="font-size:12.5px;color:#8A929C;margin-top:2px">Bienes encontrados que NO están en ninguna tarjeta.</div></div>';
   h+='<button class="act n" style="margin:4px 0 14px" onclick="newHallazgo()">➕ Agregar bien encontrado</button>';
-  if(list.length===0) h+='<div class="empty">Aún no hay hallazgos anotados.</div>';
+  if(list.length===0) h+=emptyState('Aún no hay hallazgos anotados');
   else h+=list.map(hallCard).join("");
   v.innerHTML=h; loadThumbs();
 }
@@ -400,10 +405,10 @@ function hallCard(z){
     +'<div class="desc">'+esc(z.desc)+(z.cant>1?"  ×"+z.cant:"")+'</div>'
     +'<div class="powner">'+(z.resp?"Con: "+esc(z.resp):"")+(z.ubi?" · "+esc(z.ubi):"")+(z.est?" · "+esc(z.est):"")+'</div>'
     +(z.obs?'<div class="powner">Obs: '+esc(z.obs)+'</div>':'')
-    +'<div class="tools"><button class="fotobtn" id="fb_H'+z.id+'" onclick="takePhoto(\'H'+z.id+'\')">📷 Foto</button>'
+    +'<div class="tools"><button class="fotobtn" id="fb_H'+z.id+'" onclick="takePhoto(\'H'+z.id+'\')">'+icon('camera',15)+' Foto</button>'
       +'<img class="thumb" id="th_H'+z.id+'" style="display:none" onclick="viewPhoto(\'H'+z.id+'\')">'
       +'<span class="moretog" onclick="editHallazgo(\''+z.id+'\')">✏️ Editar</span>'
-      +'<span class="moretog" style="color:var(--rojo)" onclick="delHallazgo(\''+z.id+'\')">🗑 Borrar</span></div>'
+      +'<span class="moretog" style="color:var(--rojo)" onclick="delHallazgo(\''+z.id+'\')">'+icon('trash',13)+' Borrar</span></div>'
     +'<div class="stamp">Anotado '+esc(z.f||"")+(z.by?" · "+esc(z.by):"")+'</div>'
   +'</div>';
 }
@@ -500,7 +505,7 @@ function renderSession(v){
   h += '<label>Ubicación *</label><div class="bgrp" style="flex-direction:column;gap:7px">';
   LOCS.forEach(function(L){ h+='<button class="btn '+(s.loc===L?"b-si sel":"")+'" style="text-align:left;font-size:13px" onclick="sesSetLoc(\''+esc(L)+'\')">'+(s.loc===L?"✓ ":"")+esc(L)+'</button>'; });
   h += '</div>';
-  h += '<div class="tools" style="margin-top:10px"><button class="fotobtn" id="fb_Lses" onclick="takePhoto(\'Lses\')">📷 Foto del lugar</button>'
+  h += '<div class="tools" style="margin-top:10px"><button class="fotobtn" id="fb_Lses" onclick="takePhoto(\'Lses\')">'+icon('camera',15)+' Foto del lugar</button>'
      + '<img class="thumb" id="th_Lses" style="display:none" onclick="viewPhoto(\'Lses\')"></div>';
   h += '</div></div>';
   h += '<div class="item"><label style="font-size:12px;color:#5B6470;font-weight:700">Números de bien que tiene esta persona</label>'
@@ -663,10 +668,10 @@ function sesItemCard(it){
       +['BUENO','REGULAR','MALO','PARA BAJA'].map(function(e){ const cl=e==="PARA BAJA"?"baja":e.toLowerCase();
         return '<button class="btn est e-'+cl+' '+(it.estado===e?"sel":"")+'" onclick="sesItemEstado(\''+it.iid+'\',\''+e+'\')">'+(e==="PARA BAJA"?"Baja":e.charAt(0)+e.slice(1).toLowerCase())+'</button>'; }).join("")
     +'</div>'
-    +'<div class="tools"><button class="fotobtn" id="fb_A'+it.iid+'" onclick="takePhoto(\'A'+it.iid+'\')">📷 Foto</button>'
+    +'<div class="tools"><button class="fotobtn" id="fb_A'+it.iid+'" onclick="takePhoto(\'A'+it.iid+'\')">'+icon('camera',15)+' Foto</button>'
       +'<img class="thumb" id="th_A'+it.iid+'" style="display:none" onclick="viewPhoto(\'A'+it.iid+'\')">'
        +(it.fotoUrl?'<a class="drivefoto" href="'+it.fotoUrl+'" target="_blank" rel="noopener"><img class="dthumb" src="'+driveThumbUrl(it.fotoUrl)+'" loading="lazy" alt="foto">🖼️ Ver foto</a>':'')
-      +'<span class="moretog" style="color:var(--rojo)" onclick="delSesItem(\''+it.iid+'\')">🗑 Quitar</span></div>'
+      +'<span class="moretog" style="color:var(--rojo)" onclick="delSesItem(\''+it.iid+'\')">'+icon('trash',13)+' Quitar</span></div>'
     +'<div class="extra open" style="margin-top:8px"><input type="text" value="'+esc(it.obs||"")+'" oninput="sesItemObs(\''+it.iid+'\',this.value)" placeholder="Observación (opcional)"></div>'
   +'</div>';
 }
@@ -990,7 +995,7 @@ function driveThumbUrl(u){ if(!u) return ""; var m=String(u).match(/[-\w]{25,}/)
     function refreshFotoUI(k){
   fotoGet(k).then(function(r){
     const btn=document.getElementById("fb_"+k), th=document.getElementById("th_"+k);
-    if(btn){ btn.classList.toggle("has",!!r); btn.textContent=r?"📷 ✓":"📷 Foto"; }
+    if(btn){ btn.classList.toggle("has",!!r); btn.innerHTML=icon('camera',15)+(r?' '+icon('check',13,'margin-left:2px'):' Foto'); }
     if(th){ if(r){ th.src="data:image/jpeg;base64,"+r.b64; th.style.display=""; } else th.style.display="none"; }
   });
 }

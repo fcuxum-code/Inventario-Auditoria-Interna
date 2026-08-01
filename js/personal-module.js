@@ -104,7 +104,8 @@
   window.togglePersonal=function(id,a){ db().collection('personal').doc(id).set({activo:!a,actualizado:new Date().toISOString()},{merge:true}).then(function(){toast(a?'Marcado inactivo':'Reactivado');cargarPersonal(openPersonal);}).catch(function(e){console.error(e);}); };
 
   function addBtn(){ var bar=document.querySelector('.fabbar'); if(!bar||document.getElementById('fb-personal'))return;
-    var b=document.createElement('button'); b.id='fb-personal'; b.className='fb-home'; b.style.background='#3B4E6B'; b.style.color='#fff'; b.innerHTML='&#128100; Personal'; b.onclick=function(){openPersonal();}; bar.appendChild(b); }
+    var b=document.createElement('button'); b.id='fb-personal'; b.className='fb-home'; b.style.background='#3B4E6B'; b.style.color='#fff';
+    b.innerHTML=(typeof icon==='function'?icon('user',20):'')+'<span>Personal</span>'; b.onclick=function(){openPersonal();}; bar.appendChild(b); }
 
   function marcarAlarmas(){ if(typeof TARJETAS==='undefined'||!PACTIVOS)return;
     document.querySelectorAll('#view .prow').forEach(function(row){ var old=row.querySelector('.alarma-badge'); if(old)old.remove(); row.style.background=''; row.style.border='';
