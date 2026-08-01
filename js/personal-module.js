@@ -29,7 +29,7 @@
         +'<div class="perTab" data-f="activos" onclick="perSetFiltro(\'activos\')" style="flex:1;text-align:center;padding:8px;border-radius:9px;background:#EAEEF4;color:#1F3864;font-weight:700;font-size:13px;cursor:pointer">Activos</div>'
         +'<div class="perTab" data-f="inactivos" onclick="perSetFiltro(\'inactivos\')" style="flex:1;text-align:center;padding:8px;border-radius:9px;background:#EAEEF4;color:#1F3864;font-weight:700;font-size:13px;cursor:pointer">Inactivos</div>'
       +'</div>'
-      +'<button onclick="editarPersonal(null)" style="width:100%;padding:12px;border:none;border-radius:10px;background:#2E7D32;color:#fff;font-weight:700;margin-bottom:10px">&#65291; Agregar empleado</button>'
+      +((typeof puedeEditar!=='function'||puedeEditar())?'<button onclick="editarPersonal(null)" style="width:100%;padding:12px;border:none;border-radius:10px;background:#2E7D32;color:#fff;font-weight:700;margin-bottom:10px">&#65291; Agregar empleado</button>':'')
       +'<div id="perList"></div></div>';
     if(Date.now()-lastLoad>4000||!PERSONAL.length){ cargarPersonal(pintarPersonal); } else { pintarPersonal(); } };
   window.perSetFiltro=function(f){ perFiltro=f; document.querySelectorAll('.perTab').forEach(function(el){ var on=el.getAttribute('data-f')===f; el.style.background=on?'#1F3864':'#EAEEF4'; el.style.color=on?'#fff':'#1F3864'; }); pintarPersonal(); };
@@ -95,13 +95,15 @@
       +(id?'<button onclick="togglePersonal(\''+id+'\','+(p.activo!==false)+')" style="width:100%;padding:11px;border:1px solid #cdd6e4;border-radius:10px;background:#fff;color:#c0392b;font-weight:700;margin-top:8px">'+(p.activo!==false?'Marcar INACTIVO (ya no labora)':'Reactivar empleado')+'</button>':'')
       +(id?'<div style="margin-top:18px;border-top:1px solid #e6e9f0;padding-top:14px"><h3 style="margin:0 0 8px;color:#1F3864;font-size:16px">📦 Bienes asignados</h3>'+bienesAsignadosHtml(p)+'</div>':'')
       +'</div>'; };
-  window.guardarPersonal=function(id){ var g=function(k){var el=document.getElementById('pf_'+k);return el?el.value.trim():'';};
+  window.guardarPersonal=function(id){ if(typeof requiereEdicion==='function' && !requiereEdicion())return;
+    var g=function(k){var el=document.getElementById('pf_'+k);return el?el.value.trim():'';};
     var noEmp=g('noEmpleado'),nom=g('nombre'); if(!nom){toast('El nombre es obligatorio');return;} if(!noEmp){toast('El No. de empleado es obligatorio');return;}
     var dup=PERSONAL.find(function(x){return x.noEmpleado===noEmp&&x.__id!==id;}); if(dup){toast('Ya existe un empleado con ese No.: '+dup.nombre);return;}
     var data={nombre:nom,noEmpleado:noEmp,renglon:g('renglon'),cargo:g('cargo'),dpi:g('dpi'),correo:g('correo'),activo:document.getElementById('pf_activo').checked,actualizado:new Date().toISOString()};
     var docId=id||noEmp.replace(/[^\w-]/g,'_'); if(!id)data.creado=new Date().toISOString();
     db().collection('personal').doc(docId).set(data,{merge:true}).then(function(){toast('Empleado guardado');cargarPersonal(openPersonal);}).catch(function(e){toast('Error al guardar');console.error(e);}); };
-  window.togglePersonal=function(id,a){ db().collection('personal').doc(id).set({activo:!a,actualizado:new Date().toISOString()},{merge:true}).then(function(){toast(a?'Marcado inactivo':'Reactivado');cargarPersonal(openPersonal);}).catch(function(e){console.error(e);}); };
+  window.togglePersonal=function(id,a){ if(typeof requiereEdicion==='function' && !requiereEdicion())return;
+    db().collection('personal').doc(id).set({activo:!a,actualizado:new Date().toISOString()},{merge:true}).then(function(){toast(a?'Marcado inactivo':'Reactivado');cargarPersonal(openPersonal);}).catch(function(e){console.error(e);}); };
 
   function addBtn(){ var bar=document.querySelector('.fabbar'); if(!bar||document.getElementById('fb-personal'))return;
     var b=document.createElement('button'); b.id='fb-personal'; b.className='fb-home'; b.style.background='#3B4E6B'; b.style.color='#fff';

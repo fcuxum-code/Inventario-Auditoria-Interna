@@ -74,6 +74,27 @@ let ready = {t:false, b:false};
 let mode = {view:"home", tarjetaId:null, filter:"todos", q:""};
 let curSes = null;
 
+/* ================= ROL DEL USUARIO (editor / lector) ================= */
+let MI_ROL = "editor";
+function puedeEditar(){ return MI_ROL !== "lector"; }
+function requiereEdicion(){
+  if(!puedeEditar()){ toast("Su cuenta es de solo lectura — no puede hacer cambios"); return false; }
+  return true;
+}
+function cargarMiRol(uid){
+  return db.collection("usuarios").doc(uid).get().then(function(snap){
+    MI_ROL = (snap.exists && snap.data().rol) ? snap.data().rol : "editor";
+  }).catch(function(){ MI_ROL = "editor"; }).then(function(){ aplicarModoSoloLectura(); });
+}
+function aplicarModoSoloLectura(){
+  const soloLectura = !puedeEditar();
+  const fbses=document.getElementById("fbses"), fbhall=document.getElementById("fbhall");
+  if(fbses) fbses.style.display = soloLectura? "none":"";
+  if(fbhall) fbhall.style.display = soloLectura? "none":"";
+  const dot=document.getElementById("rolDot");
+  if(dot) dot.style.display = soloLectura? "inline-block":"none";
+}
+
 function setSync(state, txt){
   const dot=document.getElementById("syncdot"); const t=document.getElementById("synctxt");
   if(dot) dot.className="syncdot "+(state||"");
@@ -88,11 +109,12 @@ firebase.auth().onAuthStateChanged(function(user){
     if(lo) lo.style.display="none";
     const mo=document.getElementById("migoverlay"); if(mo) mo.style.display="flex";
     setSync("busy","Conectando…");
+    cargarMiRol(user.uid);
     arrancar();
   } else {
     detenerListeners();
     firstSyncDone = false; ready = {t:false,b:false};
-    TARJETAS={}; BIENES={}; HALLAZGOS={}; curSes=null;
+    TARJETAS={}; BIENES={}; HALLAZGOS={}; curSes=null; MI_ROL="editor";
     const mo=document.getElementById("migoverlay"); if(mo) mo.style.display="none";
     if(lo) lo.style.display="flex";
     setSync("off","Sin iniciar sesión");
@@ -266,6 +288,7 @@ function renderPerson(v){
   v.innerHTML=h; loadThumbs();
 }
 function marcarPendientesNo(tarjetaId){
+  if(!requiereEdicion()) return;
   const pend = bienesDe(tarjetaId).filter(function(b){ return !b.existe; });
   if(pend.length===0) return;
   if(!confirm("¿Marcar los "+pend.length+" bienes pendientes de esta tarjeta como NO (no están aquí)?")) return;
@@ -281,6 +304,7 @@ function marcarPendientesNo(tarjetaId){
   batch.commit().then(function(){ toast(pend.length+" bienes marcados como NO ✓"); }).catch(function(){ toast("No se pudo guardar"); });
 }
 function borrarTarjetaDefinitiva(id){
+  if(!requiereEdicion()) return;
   const t = TARJETAS[id];
   if(!t) return;
   if(!confirm("¿Seguro que desea eliminar el registro de "+(t.responsable||"esta persona")+"? Esta acción no se puede deshacer.")){ return; }
@@ -298,10 +322,23 @@ function itemCard(b, showOwner){
   const pendChip = !b.tarjetaId?'<span class="chip c-dup">SIN ASIGNAR</span>':'';
   const owner = (showOwner && b.tarjetaId)?'<div class="powner">'+esc(b.responsable||"")+' · Tarj. '+esc(b.tarjetaNumero||"")+'</div>':'';
   const id = b.id;
-  const descField = b.esNuevo
+  const soloLectura = typeof puedeEditar==='function' && !puedeEditar();
+  const descField = (b.esNuevo && !soloLectura)
     ? '<input type="text" value="'+esc(b.descripcion||"")+'" onchange="markCampo(\''+id+'\',\'descripcion\',this.value)" placeholder="Descripción del bien" style="width:100%;padding:9px 11px;border:1.4px solid #E2E6EC;border-radius:9px;font-size:14px;margin:4px 0 2px">'
     : '<div class="desc">'+esc(b.descripcion||"")+'</div>';
-  const asignarBtn = !b.tarjetaId ? '<button class="act p" style="margin:8px 0 0" onclick="asignarPendiente(\''+id+'\')">🧍 Asignar a una persona</button>' : '';
+  const asignarBtn = (!b.tarjetaId && !soloLectura) ? '<button class="act p" style="margin:8px 0 0" onclick="asignarPendiente(\''+id+'\')">🧍 Asignar a una persona</button>' : '';
+  const estadoActualTxt = {BUENO:"Bueno",REGULAR:"Regular",MALO:"Malo","PARA BAJA":"Para baja"}[b.estado] || "";
+  const accionesExiste = soloLectura
+    ? '<div class="powner" style="margin-top:6px">'+(b.existe?('Estado: <b>'+esc(b.existe)+'</b>'+(estadoActualTxt?" · "+esc(estadoActualTxt):"")):"Sin verificar todavía")+'</div>'
+    : '<div class="bgrp">'
+        +'<button class="btn b-si '+(b.existe==="SÍ"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'SÍ\')">'+icon('check',16)+' SÍ<small>existe</small></button>'
+        +'<button class="btn b-no '+(b.existe==="NO"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'NO\')">'+icon('x',16)+' NO<small>no está</small></button>'
+        +'<button class="btn b-nu '+(b.existe==="NO UBICADO"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'NO UBICADO\')">'+icon('helpCircle',16)+' NO<small>ubicado</small></button>'
+      +'</div>'
+      +'<div class="bgrp estado" style="'+(b.existe==="SÍ"?"":"display:none")+'">'
+        +['BUENO','REGULAR','MALO','PARA BAJA'].map(function(e){ const cl=e==="PARA BAJA"?"baja":e.toLowerCase();
+          return '<button class="btn est e-'+cl+' '+(b.estado===e?"sel":"")+'" onclick="markEstado(\''+id+'\',\''+e+'\')">'+(e==="PARA BAJA"?"Baja":e.charAt(0)+e.slice(1).toLowerCase())+'</button>'; }).join("")
+      +'</div>';
   return '<div class="item '+cls+'" id="it_'+id+'">'
     +'<div class="itop"><span class="inv">'+esc(b.codigo)+(b.codigoSiges?' <small style="font-weight:600;color:#8A929C">· SIGES '+esc(b.codigoSiges)+'</small>':'')+'</span><span class="val">'+money(b.valor)+'</span></div>'
     +'<div class="ochips">'+chipTipo(b.tipo)+nuevo+pendChip+dup+'</div>'
@@ -310,32 +347,25 @@ function itemCard(b, showOwner){
     +(b.tarjetaAnteriorNumero?'<div class="warnbox">↩ Descargado de tarjeta '+esc(b.tarjetaAnteriorNumero)+' ('+esc(b.responsableAnterior||"")+')</div>':'')
     +owner
     +asignarBtn
-    +'<div class="bgrp">'
-      +'<button class="btn b-si '+(b.existe==="SÍ"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'SÍ\')">'+icon('check',16)+' SÍ<small>existe</small></button>'
-      +'<button class="btn b-no '+(b.existe==="NO"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'NO\')">'+icon('x',16)+' NO<small>no está</small></button>'
-      +'<button class="btn b-nu '+(b.existe==="NO UBICADO"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'NO UBICADO\')">'+icon('helpCircle',16)+' NO<small>ubicado</small></button>'
-    +'</div>'
-    +'<div class="bgrp estado" style="'+(b.existe==="SÍ"?"":"display:none")+'">'
-      +['BUENO','REGULAR','MALO','PARA BAJA'].map(function(e){ const cl=e==="PARA BAJA"?"baja":e.toLowerCase();
-        return '<button class="btn est e-'+cl+' '+(b.estado===e?"sel":"")+'" onclick="markEstado(\''+id+'\',\''+e+'\')">'+(e==="PARA BAJA"?"Baja":e.charAt(0)+e.slice(1).toLowerCase())+'</button>'; }).join("")
-    +'</div>'
+    +accionesExiste
     +'<div class="tools">'
-      +'<button class="fotobtn" id="fb_B'+id+'" onclick="takePhoto(\'B'+id+'\')">'+icon('camera',15)+' Foto</button>'
+      +(soloLectura?'':'<button class="fotobtn" id="fb_B'+id+'" onclick="takePhoto(\'B'+id+'\')">'+icon('camera',15)+' Foto</button>')
       +'<img class="thumb" id="th_B'+id+'" style="display:none" onclick="viewPhoto(\'B'+id+'\')">'
        +(b.fotoUrl?'<a class="drivefoto" href="'+b.fotoUrl+'" target="_blank" rel="noopener"><img class="dthumb" src="'+driveThumbUrl(b.fotoUrl)+'" loading="lazy" alt="foto">🖼️ Ver foto</a>':'')
       +'<span class="moretog" onclick="toggleExtra(\''+id+'\')">＋ Ubicación / observación</span>'
       +'<span class="moretog" onclick="verHistorial(\''+id+'\')">'+icon('clock',13)+' Historial</span>'
-      +(b.existe==="NO" && b.tarjetaId?'<span class="moretog" style="color:var(--naranja)" onclick="descargarBien(\''+id+'\')">'+icon('logOut',13)+' Quitar de la tarjeta</span>':'')
-      +(b.esNuevo?'<span class="moretog" style="color:var(--rojo)" onclick="borrarBien(\''+id+'\')">'+icon('trash',13)+' Borrar</span>':'')
+      +(!soloLectura && b.existe==="NO" && b.tarjetaId?'<span class="moretog" style="color:var(--naranja)" onclick="descargarBien(\''+id+'\')">'+icon('logOut',13)+' Quitar de la tarjeta</span>':'')
+      +(!soloLectura && b.esNuevo?'<span class="moretog" style="color:var(--rojo)" onclick="borrarBien(\''+id+'\')">'+icon('trash',13)+' Borrar</span>':'')
     +'</div>'
     +'<div class="extra" id="ex_'+id+'">'
-      +'<label>Ubicación física real</label><input type="text" value="'+esc(b.ubicacion||"")+'" onchange="markCampo(\''+id+'\',\'ubicacion\',this.value)" placeholder="Ej. Oficina 3">'
-      +'<label>Observaciones</label><input type="text" value="'+esc(b.observaciones||"")+'" onchange="markCampo(\''+id+'\',\'observaciones\',this.value)" placeholder="Ej. sin serie visible">'
+      +'<label>Ubicación física real</label><input type="text" value="'+esc(b.ubicacion||"")+'" '+(soloLectura?'readonly':'onchange="markCampo(\''+id+'\',\'ubicacion\',this.value)"')+' placeholder="Ej. Oficina 3">'
+      +'<label>Observaciones</label><input type="text" value="'+esc(b.observaciones||"")+'" '+(soloLectura?'readonly':'onchange="markCampo(\''+id+'\',\'observaciones\',this.value)"')+' placeholder="Ej. sin serie visible">'
     +'</div>'
     +(b.fechaVerificacion?'<div class="stamp">✓ '+esc(b.fechaVerificacion)+(b.verificadoPor?" · "+esc(b.verificadoPor):"")+'</div>':'')
   +'</div>';
 }
 function borrarBien(id){
+  if(!requiereEdicion()) return;
   const b = BIENES[id]; if(!b) return;
   if(!confirm('¿Borrar el registro "'+b.codigo+'" ('+(b.descripcion||"sin descripción")+')? No se puede deshacer.')) return;
   fotoDel("B"+id);
@@ -343,6 +373,7 @@ function borrarBien(id){
 }
 function toggleExtra(id){ const e=document.getElementById("ex_"+id); if(e) e.classList.toggle("open"); }
 function markExiste(id,val){
+  if(!requiereEdicion()) return;
   const b = BIENES[id]; if(!b) return;
   const nuevo = b.existe===val ? "" : val;
   const patch = { existe: nuevo, actualizado: firebase.firestore.FieldValue.serverTimestamp() };
@@ -351,11 +382,13 @@ function markExiste(id,val){
   logMovimiento(b, {tipoMovimiento:"VERIFICACION", estado:b.estado||"", existe:nuevo, ubicacion:b.ubicacion||"", observaciones:b.observaciones||""});
 }
 function markEstado(id,val){
+  if(!requiereEdicion()) return;
   const b = BIENES[id]; if(!b) return;
   const nuevo = b.estado===val? "" : val;
   db.collection("bienes").doc(id).update({estado:nuevo, actualizado: firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){ toast("No se pudo guardar"); });
 }
 function markCampo(id,campo,val){
+  if(!requiereEdicion()) return;
   const patch={actualizado: firebase.firestore.FieldValue.serverTimestamp()}; patch[campo]=val;
   db.collection("bienes").doc(id).update(patch).catch(function(){ toast("No se pudo guardar"); });
 }
@@ -376,6 +409,7 @@ const TIPO_MOV_TXT = {
   DESCARGADO: "Retirado de la tarjeta (ya no lo tenía)"
 };
 function descargarBien(id){
+  if(!requiereEdicion()) return;
   const b = BIENES[id]; if(!b || !b.tarjetaId) return;
   if(!confirm('¿Quitar "'+b.codigo+'" de la tarjeta de '+(b.responsable||"esta persona")+'? Pasará a Bienes pendientes de asignar, y queda el registro de dónde salió.')) return;
   const tarjetaAnteriorNumero = b.tarjetaNumero||"", responsableAnterior = b.responsable||"";
@@ -429,6 +463,7 @@ function verHistorial(id){
   });
 }
 function editCorreoTarjeta(id){
+  if(!requiereEdicion()) return;
   const t = TARJETAS[id]; if(!t) return;
   pedirTexto("Correo electrónico", "Correo de "+(t.responsable||"esta persona"), t.correo||"", "email", function(val){
     db.collection("tarjetas").doc(id).update({correo:val.trim(), actualizada: firebase.firestore.FieldValue.serverTimestamp()})
@@ -482,7 +517,7 @@ function hallCard(z){
     +'<div class="stamp">Anotado '+esc(z.f||"")+(z.by?" · "+esc(z.by):"")+'</div>'
   +'</div>';
 }
-function newHallazgo(){ hallForm(null); }
+function newHallazgo(){ if(!requiereEdicion()) return; hallForm(null); }
 function editHallazgo(id){ hallForm(HALLAZGOS[id]||null); }
 function hallForm(z){
   document.getElementById("sheet").innerHTML =
@@ -510,6 +545,7 @@ function hfEst(btn,val){
   window.__hfEst=val; c.querySelectorAll(".btn").forEach(function(b){b.classList.remove("sel");}); btn.classList.add("sel");
 }
 function saveHallazgo(id){
+  if(!requiereEdicion()) return;
   const g=function(x){return document.getElementById(x).value.trim();};
   const desc=g("hf_desc"); if(!desc){ toast("Escriba la descripción"); return; }
   const rec = { inv:g("hf_inv"), desc:desc, cant:Math.max(1,parseInt(g("hf_cant")||"1")||1),
@@ -521,6 +557,7 @@ function saveHallazgo(id){
   }).catch(function(){ toast("No se pudo guardar (revise conexión)"); });
 }
 function delHallazgo(id){
+  if(!requiereEdicion()) return;
   if(!confirm("¿Borrar este hallazgo?")) return;
   fotoDel("H"+id);
   db.collection("hallazgos").doc(id).delete().then(function(){ toast("Borrado"); }).catch(function(){ toast("No se pudo borrar"); });
@@ -528,6 +565,7 @@ function delHallazgo(id){
 
 /* ================= NUEVA TOMA (levantar por persona / reasignar) ================= */
 function newSession(){
+  if(!requiereEdicion()) return;
   fotoDel("Lses");
   curSes = { tipo:"existente", tarjetaId:null, numero:"", persona:"", empleado:"", correo:"", loc:"", foto:0, items:[] };
   mode.view="ses"; mode.q=""; document.getElementById("search").value=""; render(); window.scrollTo(0,0);
@@ -622,7 +660,7 @@ function pickTarjeta(id){
 
 /* ================= FUSIONAR TARJETAS DUPLICADAS ================= */
 let _fusion = {origen:null, destino:null};
-function abrirFusion(){ _fusion = {origen:null, destino:null}; renderFusionSheet(); }
+function abrirFusion(){ if(!requiereEdicion()) return; _fusion = {origen:null, destino:null}; renderFusionSheet(); }
 function renderFusionSheet(){
   const list = tarjetasActivas();
   function rowFor(t, campo){
@@ -647,6 +685,7 @@ function renderFusionSheet(){
 }
 function fusionElegir(campo,id){ _fusion[campo]=id; renderFusionSheet(); }
 function confirmarFusion(){
+  if(!requiereEdicion()) return;
   const origen = TARJETAS[_fusion.origen], destino = TARJETAS[_fusion.destino];
   if(!origen || !destino) return;
   if(!confirm('¿Mover todos los bienes de "'+origen.responsable+'" (Tarj. '+(origen.numero||"pendiente")+') a "'+destino.responsable+'" (Tarj. '+(destino.numero||"pendiente")+')? No se puede deshacer.')) return;
@@ -777,6 +816,7 @@ function resolverTarjetaDestino(s){
   }, {merge:true}).then(function(){ return {id:ref.id, numero:numeroFinal}; });
 }
 function saveSession(){
+  if(!requiereEdicion()) return;
   const s = curSes;
   if(!s.persona || !s.persona.trim()){ toast("Escriba el nombre del responsable"); return; }
   if(!s.loc){ toast("Elija la ubicación"); return; }
@@ -882,7 +922,7 @@ function fotoGet(k){ return openIDB().then(function(d2){ return new Promise(func
 function fotoDel(k){ return openIDB().then(function(d2){ return new Promise(function(res,rej){
   const tx=d2.transaction("fotos","readwrite"); tx.objectStore("fotos").delete(k); tx.oncomplete=res; tx.onerror=rej; }); }); }
 let camTarget=null;
-function takePhoto(k){ camTarget=k; const c=document.getElementById("camin"); c.value=""; c.click(); }
+function takePhoto(k){ if(!requiereEdicion()) return; camTarget=k; const c=document.getElementById("camin"); c.value=""; c.click(); }
 document.getElementById("camin").addEventListener("change", function(){
   const f=this.files&&this.files[0]; if(!f||!camTarget) return;
   const tgt = camTarget;
@@ -998,6 +1038,7 @@ function procesarFilasImportadas(rows, nombreHoja, totalHojas){
   showSheet();
 }
 function confirmarImportacion(){
+  if(!requiereEdicion()) return;
   const nuevos = window.__importPend||[];
   if(!nuevos.length) return;
   closeMenu();
@@ -1024,6 +1065,7 @@ function confirmarImportacion(){
 }
 function importarExcel(){
   closeMenu();
+  if(!requiereEdicion()) return;
   if(typeof XLSX==="undefined"){ toast("No se pudo cargar el lector de Excel (revise internet)"); return; }
   window.__excelMode = "importar";
   document.getElementById("sheet").innerHTML = '<div class="grip"></div><h3>📥 Importar bienes desde Excel</h3>'
@@ -1076,7 +1118,7 @@ function viewPhoto(k){ photoKey=k; fotoGet(k).then(function(r){ if(!r) return;
   document.getElementById("pmodal").classList.add("show"); }); }
 function closePhoto(){ document.getElementById("pmodal").classList.remove("show"); }
 function retakePhoto(){ closePhoto(); if(photoKey) takePhoto(photoKey); }
-function deletePhoto(){ if(!photoKey) return;
+function deletePhoto(){ if(!requiereEdicion()) return; if(!photoKey) return;
   fotoDel(photoKey).then(function(){ closePhoto(); refreshFotoUI(photoKey); toast("Foto eliminada"); }); }
 function subirFoto(name,b64){
   if(!META.gsUrl) return Promise.resolve(null);
@@ -1249,6 +1291,7 @@ function enviarCorreoPrueba(){
 }
 /* ================= AVANCE POR UBICACIÓN ================= */
 function repararUbicaciones(){
+  if(!requiereEdicion()) return;
   const updates = [];
   Object.values(BIENES).forEach(function(b){
     const raw = (b.ubicacion||"").trim();

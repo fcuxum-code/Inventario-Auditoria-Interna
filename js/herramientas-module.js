@@ -66,6 +66,7 @@
 
   /* ---------- Asignar tarjeta en lote ---------- */
   window.herrAbrirAsignarLote=function(){
+    if(typeof requiereEdicion==='function' && !requiereEdicion()) return;
     var h='<div class="grip"></div><h3>Asignar tarjeta en lote</h3>'
       +'<div class="note">Busca por empleado o número de tarjeta, marca los bienes y asígnales un número de tarjeta a todos de una vez.</div>'
       +'<div class="fld"><input id="herrPersQ" type="text" placeholder="Nombre de empleado o No. de tarjeta"></div>'
@@ -108,6 +109,7 @@
     if(top) document.getElementById('herrAsgResp').value=top[0];
   };
   window.herrConfirmarLote=async function(){
+    if(typeof requiereEdicion==='function' && !requiereEdicion()) return;
     var num=document.getElementById('herrAsgNum').value.trim();
     var resp=document.getElementById('herrAsgResp').value.trim();
     var msg=document.getElementById('herrAsgMsg');
