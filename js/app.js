@@ -216,6 +216,28 @@ function tarjetasActivas(){
 function bienesDe(tarjetaId){ return Object.values(BIENES).filter(function(b){ return b.tarjetaId===tarjetaId; }); }
 function doneCount(list){ return list.filter(function(b){return b.existe;}).length; }
 
+/* ================= PANEL DE MÉTRICAS (inicio) ================= */
+function statsGlobales(){
+  const lista = Object.values(BIENES);
+  const total = lista.length;
+  const done = totalDone();
+  const pct = total? Math.round(done/total*100):0;
+  const disc = lista.filter(function(b){ return b.existe==="NO" || b.existe==="NO UBICADO"; }).length;
+  const pend = bienesPendientes();
+  const pendViejos = pend.filter(function(b){ return chipPendienteViejo(b); }).length;
+  const valorTotal = lista.reduce(function(s,b){ return s+Number(b.valor||0); },0);
+  return { total:total, done:done, pct:pct, disc:disc, pendCount:pend.length, pendViejos:pendViejos,
+    valorTotal:valorTotal, tarjetas: tarjetasActivas().length };
+}
+function renderPanelMetricas(){
+  const s = statsGlobales();
+  return '<div class="kpigrid">'
+    + '<div class="kpicard static"><div class="kpinum">'+s.pct+'%</div><div class="kpilbl">Avance de verificación</div><div class="kpisub">'+s.done+' / '+s.total+' bienes</div></div>'
+    + '<div class="kpicard kpi-disc" onclick="abrirDiscrepancias()"><div class="kpinum">'+s.disc+'</div><div class="kpilbl">Discrepancias</div><div class="kpisub">NO / NO UBICADO</div></div>'
+    + '<div class="kpicard kpi-pend" onclick="openPendientes()"><div class="kpinum">'+s.pendCount+'</div><div class="kpilbl">Pendientes de asignar</div><div class="kpisub">'+(s.pendViejos?s.pendViejos+' con '+UMBRAL_DIAS_PENDIENTE+'+ días':'Sin atrasos')+'</div></div>'
+    + '<div class="kpicard kpi-valor static"><div class="kpinum">'+money(s.valorTotal)+'</div><div class="kpilbl">Valor total</div><div class="kpisub">'+s.tarjetas+' responsable(s)</div></div>'
+    + '</div>';
+}
 /* ================= NAVEGACIÓN / RENDER ================= */
 function goHome(){ mode={view:"home",tarjetaId:null,filter:"todos",q:""}; document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
 function render(){
@@ -227,16 +249,10 @@ function render(){
   if(mode.view==="ses") return renderSession(v);
   if(mode.view==="pend") return renderPendientes(v);
   const tarjs = tarjetasActivas();
-  const pend = bienesPendientes();
-  let h='<div class="hzrow" onclick="openHall()"><span class="ic">'+icon('camera',22)+'</span>'
+  let h = renderPanelMetricas();
+  h+='<div class="hzrow" onclick="openHall()"><span class="ic">'+icon('camera',22)+'</span>'
     +'<div style="flex:1"><b>Hallazgos: bienes encontrados sin tarjeta</b><small>Toque Hallazgo para anotar uno</small></div>'
     +'<div style="color:#C99B62;font-size:20px">›</div></div>';
-  if(pend.length){
-    const pendViejos = pend.filter(function(b){ return chipPendienteViejo(b); }).length;
-    h+='<div class="hzrow" style="background:linear-gradient(135deg,#EAF1FB,#DCE8F8);border-color:#B9CDE8" onclick="openPendientes()"><span class="ic">'+icon('package',22)+'</span>'
-      +'<div style="flex:1"><b style="color:#1F3864">Bienes nuevos pendientes de asignar</b><small style="color:#5E7196">'+pend.length+' bien(es) esperando responsable'+(pendViejos?' · '+pendViejos+' con '+UMBRAL_DIAS_PENDIENTE+'+ días':'')+'</small></div>'
-      +'<div style="color:#9FB0CC;font-size:20px">›</div></div>';
-  }
   h+='<div class="hint">Toque un responsable para verificar sus bienes. '+tarjs.length+' tarjetas · '+Object.keys(BIENES).length+' bienes.</div>';
   tarjs.forEach(function(t){
     const list = bienesDe(t.id); const d=doneCount(list); const n=list.length; const p=n?Math.round(d/n*100):0;
@@ -1358,7 +1374,6 @@ function openMenu(){
     +'<div class="mitem" onclick="abrirFusion()"><span class="ic">'+icon('refreshCw',20)+'</span><div><b>Fusionar tarjetas duplicadas</b><small>Si la misma persona quedó con dos tarjetas</small></div></div>'
     +'<div class="mitem" onclick="abrirAvanceUbicacion()"><span class="ic">'+icon('mapPin',20)+'</span><div><b>Avance por ubicación</b><small>Cuánto falta por verificar en cada lugar</small></div></div>'
     +'<div class="mitem" onclick="abrirDiscrepancias()"><span class="ic">'+icon('alertTriangle',20)+'</span><div><b>Discrepancias</b><small>Todos los NO / NO UBICADO en un solo lugar</small></div></div>'
-    +'<div class="mitem" onclick="openExportBackup()"><span class="ic">'+icon('download',20)+'</span><div><b>Respaldo CSV (opcional)</b><small>Exportar una copia de lo verificado hasta ahora</small></div></div>'
     +'<div class="mitem" onclick="generarExcel()"><span class="ic">'+icon('barChart',20)+'</span><div><b>Generar Excel (todos los movimientos)</b><small>Libro con bienes, movimientos, hallazgos y tarjetas</small></div></div>'
     +'<div class="mitem" onclick="importarExcel()"><span class="ic">'+icon('upload',20)+'</span><div><b>Importar bienes nuevos desde Excel</b><small>Los crea como pendientes de asignar</small></div></div>'
 
@@ -1547,23 +1562,6 @@ function abrirAvanceUbicacion(){
   h += '<button class="act o" onclick="closeMenu()">Cerrar</button>';
   document.getElementById("sheet").innerHTML = h;
   showSheet();
-}
-
-function openExportBackup(){
-  closeMenu();
-  const head=["No. INVENTARIO","No. TARJETA","RESPONSABLE","EXISTE","ESTADO","UBICACION","OBSERVACIONES","FECHA","VERIFICADO POR"];
-  function q(s){ s=(s==null?"":String(s)); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
-  const rows=[head.map(q).join(",")];
-  Object.values(BIENES).forEach(function(b){
-    rows.push([b.codigo,b.tarjetaNumero,b.responsable,b.existe||"",b.estado||"",b.ubicacion||"",b.observaciones||"",b.fechaVerificacion||"",b.verificadoPor||""].map(q).join(","));
-  });
-  const csv = "\uFEFF"+rows.join("\r\n");
-  const blob = new Blob([csv],{type:"text/csv;charset=utf-8;"});
-  const url = URL.createObjectURL(blob); const a=document.createElement("a");
-  a.href=url; a.download="respaldo_inventario_"+new Date().toISOString().slice(0,10)+".csv";
-  document.body.appendChild(a); a.click();
-  setTimeout(function(){URL.revokeObjectURL(url); a.remove();},1500);
-  toast("Respaldo descargado ✓");
 }
 
 /* ================= GENERAR EXCEL (libro completo) ================= */
