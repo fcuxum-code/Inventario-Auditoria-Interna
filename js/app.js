@@ -318,6 +318,7 @@ function itemCard(b, showOwner){
       +'<img class="thumb" id="th_B'+id+'" style="display:none" onclick="viewPhoto(\'B'+id+'\')">'
        +(b.fotoUrl?'<a class="drivefoto" href="'+b.fotoUrl+'" target="_blank" rel="noopener"><img class="dthumb" src="'+driveThumbUrl(b.fotoUrl)+'" loading="lazy" alt="foto">🖼️ Ver foto</a>':'')
       +'<span class="moretog" onclick="toggleExtra(\''+id+'\')">＋ Ubicación / observación</span>'
+      +'<span class="moretog" onclick="verHistorial(\''+id+'\')">'+icon('clock',13)+' Historial</span>'
       +(b.esNuevo?'<span class="moretog" style="color:var(--rojo)" onclick="borrarBien(\''+id+'\')">'+icon('trash',13)+' Borrar</span>':'')
     +'</div>'
     +'<div class="extra" id="ex_'+id+'">'
@@ -357,6 +358,49 @@ function logMovimiento(b, extra){
     fecha: firebase.firestore.FieldValue.serverTimestamp(), fechaTxt: today(), capturadoPor: META.by||""
   }, extra);
   db.collection("movimientos").add(rec).catch(function(){});
+}
+
+/* ================= HISTORIAL DE RESPONSABLES POR BIEN ================= */
+const TIPO_MOV_TXT = {
+  VERIFICACION: "Verificación de inventario",
+  REASIGNACION: "Reasignado a otra persona",
+  FUSION_TARJETAS: "Fusión de tarjetas duplicadas",
+  HALLAZGO_ASIGNADO: "Asignado (era un hallazgo)"
+};
+function verHistorial(id){
+  const b = BIENES[id];
+  const codigo = b ? b.codigo : id;
+  document.getElementById("sheet").innerHTML =
+    '<div class="grip"></div><h3>Historial · '+esc(codigo)+'</h3>'
+    +(b&&b.descripcion?'<div class="hint" style="margin-top:-8px">'+esc(b.descripcion)+'</div>':'')
+    +'<div id="histBody"><div class="hint">Cargando…</div></div>'
+    +'<button class="act o" onclick="closeMenu()">Cerrar</button>';
+  showSheet();
+  db.collection("movimientos").where("codigo","==",codigo).get().then(function(snap){
+    const movs = snap.docs.map(function(d){ return d.data(); });
+    movs.sort(function(a,b2){
+      const ta = (a.fecha && a.fecha.toMillis) ? a.fecha.toMillis() : 0;
+      const tb = (b2.fecha && b2.fecha.toMillis) ? b2.fecha.toMillis() : 0;
+      return tb - ta;
+    });
+    const box = document.getElementById("histBody"); if(!box) return;
+    if(!movs.length){ box.innerHTML = emptyState("Sin movimientos registrados para este bien", "Se anotará cada verificación o reasignación a partir de ahora"); return; }
+    box.innerHTML = movs.map(function(m){
+      const tipoTxt = TIPO_MOV_TXT[m.tipoMovimiento] || m.tipoMovimiento || "Movimiento";
+      const cambioResp = (m.responsableAnterior && m.responsableNuevo && m.responsableAnterior!==m.responsableNuevo)
+        ? (esc(m.responsableAnterior)+' → <b>'+esc(m.responsableNuevo)+'</b>')
+        : ('<b>'+esc(m.responsableNuevo||m.responsableAnterior||"—")+'</b>');
+      return '<div class="tlist-item" style="display:block">'
+        +'<div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(tipoTxt)+'</b><small style="flex:none">'+esc(m.fechaTxt||"")+'</small></div>'
+        +'<div class="powner">'+cambioResp+'</div>'
+        +(m.existe?'<div class="powner">Estado: '+esc(m.existe)+(m.estado?" · "+esc(m.estado):"")+(m.ubicacion?" · "+esc(m.ubicacion):"")+'</div>':'')
+        +(m.observaciones?'<div class="powner">'+esc(m.observaciones)+'</div>':'')
+        +(m.capturadoPor?'<div class="stamp">Registrado por '+esc(m.capturadoPor)+'</div>':'')
+      +'</div>';
+    }).join("");
+  }).catch(function(e){
+    const box = document.getElementById("histBody"); if(box) box.innerHTML = '<div class="hint">No se pudo cargar: '+esc(e.message||e)+'</div>';
+  });
 }
 function editCorreoTarjeta(id){
   const t = TARJETAS[id]; if(!t) return;
