@@ -1169,6 +1169,7 @@ function openMenu(){
     +'<div class="mitem" onclick="probarGS()"><span class="ic">'+icon('zap',20)+'</span><div><b>Probar conexión de correo/fotos</b><small>'+(META.gsUrl?"Configurado":"Sin configurar")+'</small></div></div>'
     +'<div class="mitem" onclick="enviarCorreoPrueba()"><span class="ic">'+icon('mail',20)+'</span><div><b>Enviar correo de prueba (con foto)</b><small>Para confirmar que la foto sí llega adjunta</small></div></div>'
     +'<div class="mitem" onclick="abrirFusion()"><span class="ic">'+icon('refreshCw',20)+'</span><div><b>Fusionar tarjetas duplicadas</b><small>Si la misma persona quedó con dos tarjetas</small></div></div>'
+    +'<div class="mitem" onclick="abrirAvanceUbicacion()"><span class="ic">'+icon('mapPin',20)+'</span><div><b>Avance por ubicación</b><small>Cuánto falta por verificar en cada lugar</small></div></div>'
     +'<div class="mitem" onclick="openExportBackup()"><span class="ic">'+icon('download',20)+'</span><div><b>Respaldo CSV (opcional)</b><small>Exportar una copia de lo verificado hasta ahora</small></div></div>'
     +'<div class="mitem" onclick="generarExcel()"><span class="ic">'+icon('barChart',20)+'</span><div><b>Generar Excel (todos los movimientos)</b><small>Libro con bienes, movimientos, hallazgos y tarjetas</small></div></div>'
     +'<div class="mitem" onclick="importarExcel()"><span class="ic">'+icon('upload',20)+'</span><div><b>Importar bienes nuevos desde Excel</b><small>Los crea como pendientes de asignar</small></div></div>'
@@ -1240,6 +1241,53 @@ function enviarCorreoPrueba(){
     });
   });
 }
+/* ================= AVANCE POR UBICACIÓN ================= */
+function abrirAvanceUbicacion(){
+  const groups = {};
+  Object.values(BIENES).forEach(function(b){
+    const label = (b.ubicacion||"").trim() || "Sin ubicación registrada";
+    if(!groups[label]) groups[label] = { total:0, si:0, no:0, nu:0 };
+    const g = groups[label];
+    g.total++;
+    if(b.existe==="SÍ") g.si++;
+    else if(b.existe==="NO") g.no++;
+    else if(b.existe==="NO UBICADO") g.nu++;
+  });
+  const keys = Object.keys(groups).sort(function(a,b){
+    if(a==="Sin ubicación registrada") return 1;
+    if(b==="Sin ubicación registrada") return -1;
+    return groups[b].total - groups[a].total;
+  });
+  let h = '<div class="grip"></div><h3>Avance por ubicación</h3>'
+    + '<div class="note">Según el campo "Ubicación física real" de cada bien — se llena al abrir "＋ Ubicación / observación" en la tarjeta, o automáticamente al hacer una Nueva toma.</div>';
+  if(!keys.length){
+    h += emptyState("Todavía no hay bienes registrados");
+  } else {
+    h += keys.map(function(label){
+      const g = groups[label];
+      const pct = g.total ? Math.round(g.si/g.total*100) : 0;
+      const pend = g.total-g.si-g.no-g.nu;
+      const sub = [];
+      if(g.si) sub.push(g.si+" verificado(s)");
+      if(g.no) sub.push(g.no+" no está(n)");
+      if(g.nu) sub.push(g.nu+" no ubicado(s)");
+      if(pend) sub.push(pend+" pendiente(s)");
+      const esSinUbicar = label==="Sin ubicación registrada";
+      return '<div style="margin-bottom:16px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'
+          +'<b style="font-size:14px;color:'+(esSinUbicar?"var(--gris2)":"#17202e")+'">'+esc(label)+'</b>'
+          +'<span style="font-size:12px;color:var(--gris2);flex:none">'+g.si+' / '+g.total+' ('+pct+'%)</span>'
+        +'</div>'
+        +'<div class="locbarwrap"><div class="locbar" style="width:'+pct+'%"></div></div>'
+        +'<div style="font-size:11.5px;color:var(--gris2);margin-top:4px">'+sub.join(" · ")+'</div>'
+      +'</div>';
+    }).join("");
+  }
+  h += '<button class="act o" onclick="closeMenu()">Cerrar</button>';
+  document.getElementById("sheet").innerHTML = h;
+  showSheet();
+}
+
 function openExportBackup(){
   closeMenu();
   const head=["No. INVENTARIO","No. TARJETA","RESPONSABLE","EXISTE","ESTADO","UBICACION","OBSERVACIONES","FECHA","VERIFICADO POR"];
