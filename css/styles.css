@@ -55,6 +55,7 @@
   .c-dup{background:var(--naranjabg); color:var(--naranja); margin-left:5px;}
   .c-rev{background:var(--amarbg); color:var(--amar); margin-left:5px;}
   .c-hz{background:var(--naranjabg); color:var(--naranja);}
+  .c-old{background:var(--rojobg); color:var(--rojo); margin-left:5px;}
   /* fila especial hallazgos en home */
   .hzrow{background:linear-gradient(135deg,#FDF0E3,#FCEBDA); border:1.5px solid var(--naranjab);
     border-radius:12px; padding:13px; margin-bottom:11px; display:flex; align-items:center; gap:11px;}

@@ -232,8 +232,9 @@ function render(){
     +'<div style="flex:1"><b>Hallazgos: bienes encontrados sin tarjeta</b><small>Toque Hallazgo para anotar uno</small></div>'
     +'<div style="color:#C99B62;font-size:20px">›</div></div>';
   if(pend.length){
+    const pendViejos = pend.filter(function(b){ return chipPendienteViejo(b); }).length;
     h+='<div class="hzrow" style="background:linear-gradient(135deg,#EAF1FB,#DCE8F8);border-color:#B9CDE8" onclick="openPendientes()"><span class="ic">'+icon('package',22)+'</span>'
-      +'<div style="flex:1"><b style="color:#1F3864">Bienes nuevos pendientes de asignar</b><small style="color:#5E7196">'+pend.length+' bien(es) esperando responsable</small></div>'
+      +'<div style="flex:1"><b style="color:#1F3864">Bienes nuevos pendientes de asignar</b><small style="color:#5E7196">'+pend.length+' bien(es) esperando responsable'+(pendViejos?' · '+pendViejos+' con '+UMBRAL_DIAS_PENDIENTE+'+ días':'')+'</small></div>'
       +'<div style="color:#9FB0CC;font-size:20px">›</div></div>';
   }
   h+='<div class="hint">Toque un responsable para verificar sus bienes. '+tarjs.length+' tarjetas · '+Object.keys(BIENES).length+' bienes.</div>';
@@ -249,14 +250,30 @@ function render(){
   v.innerHTML=h;
 }
 function bienesPendientes(){ return Object.values(BIENES).filter(function(b){ return !b.tarjetaId; }); }
+const UMBRAL_DIAS_PENDIENTE = 7;
+function msActualizado(b){ return (b.actualizado && b.actualizado.toMillis) ? b.actualizado.toMillis() : null; }
+function diasPendiente(b){ const ms=msActualizado(b); return ms===null ? null : Math.floor((Date.now()-ms)/86400000); }
+function chipPendienteViejo(b){
+  const dias = diasPendiente(b);
+  if(dias===null || dias<UMBRAL_DIAS_PENDIENTE) return "";
+  return '<span class="chip c-old">'+icon('clock',10,'margin-right:2px')+dias+' días sin asignar</span>';
+}
 function openPendientes(){ mode={view:"pend",tarjetaId:null,filter:"todos",q:""}; document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
 function renderPendientes(v){
-  const pend = bienesPendientes().sort(function(a,b){ return (a.codigo||"").localeCompare(b.codigo||""); });
+  const pend = bienesPendientes().sort(function(a,b){
+    const da=diasPendiente(a), db2=diasPendiente(b);
+    if(da!==null && db2!==null && da!==db2) return db2-da; // el que lleva más tiempo, primero
+    if(da!==null && db2===null) return -1;
+    if(da===null && db2!==null) return 1;
+    return (a.codigo||"").localeCompare(b.codigo||"");
+  });
+  const viejos = pend.filter(function(b){ return chipPendienteViejo(b); }).length;
   let h='<button class="backbtn" onclick="goHome()">‹ Responsables</button>';
   h+='<div style="margin:6px 2px 8px"><div style="font-size:18px;font-weight:800;color:#1F3864">📦 Bienes pendientes de asignar</div>'
     +'<div style="font-size:12.5px;color:#8A929C;margin-top:2px">Bienes ya ingresados al sistema (por ejemplo, importados de Excel) que todavía no tienen responsable. Asígnelos con 🧍 Nueva toma cuando visite a la persona.</div></div>';
   if(pend.length===0){ h+=emptyState('No hay bienes pendientes de asignar'); v.innerHTML=h; return; }
-  h += pend.map(function(b){ return itemCard(b); }).join("");
+  if(viejos>0){ h+='<div class="warnbox">'+icon('alertTriangle',13,'margin-right:4px')+viejos+' bien(es) llevan '+UMBRAL_DIAS_PENDIENTE+' días o más sin asignar.</div>'; }
+  h += pend.map(function(b){ return itemCard(b, false, chipPendienteViejo(b)); }).join("");
   v.innerHTML=h; loadThumbs();
 }
 function openPerson(id){ mode={view:"person",tarjetaId:id,filter:"todos",q:""}; document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
@@ -315,7 +332,7 @@ function borrarTarjetaDefinitiva(id){
 function setFilter(f){ mode.filter=f; render(); }
 
 /* ================= TARJETA DE BIEN ================= */
-function itemCard(b, showOwner){
+function itemCard(b, showOwner, extraChip){
   const cls = b.existe==="SÍ"?"done-si":b.existe==="NO"?"done-no":b.existe==="NO UBICADO"?"done-nu":"";
   const dup = b.notaDuplicado?'<span class="chip c-dup">⚠ REVISAR</span>':'';
   const nuevo = b.esNuevo?'<span class="chip c-hz">NUEVO</span>':'';
@@ -341,7 +358,7 @@ function itemCard(b, showOwner){
       +'</div>';
   return '<div class="item '+cls+'" id="it_'+id+'">'
     +'<div class="itop"><span class="inv">'+esc(b.codigo)+(b.codigoSiges?' <small style="font-weight:600;color:#8A929C">· SIGES '+esc(b.codigoSiges)+'</small>':'')+'</span><span class="val">'+money(b.valor)+'</span></div>'
-    +'<div class="ochips">'+chipTipo(b.tipo)+nuevo+pendChip+dup+'</div>'
+    +'<div class="ochips">'+chipTipo(b.tipo)+nuevo+pendChip+dup+(extraChip||"")+'</div>'
     +descField
     +(b.notaDuplicado?'<div class="warnbox">'+esc(b.notaDuplicado)+'</div>':'')
     +(b.tarjetaAnteriorNumero?'<div class="warnbox">↩ Descargado de tarjeta '+esc(b.tarjetaAnteriorNumero)+' ('+esc(b.responsableAnterior||"")+')</div>':'')
@@ -1218,6 +1235,7 @@ function openMenu(){
     +'<div class="mitem" onclick="enviarCorreoPrueba()"><span class="ic">'+icon('mail',20)+'</span><div><b>Enviar correo de prueba (con foto)</b><small>Para confirmar que la foto sí llega adjunta</small></div></div>'
     +'<div class="mitem" onclick="abrirFusion()"><span class="ic">'+icon('refreshCw',20)+'</span><div><b>Fusionar tarjetas duplicadas</b><small>Si la misma persona quedó con dos tarjetas</small></div></div>'
     +'<div class="mitem" onclick="abrirAvanceUbicacion()"><span class="ic">'+icon('mapPin',20)+'</span><div><b>Avance por ubicación</b><small>Cuánto falta por verificar en cada lugar</small></div></div>'
+    +'<div class="mitem" onclick="abrirDiscrepancias()"><span class="ic">'+icon('alertTriangle',20)+'</span><div><b>Discrepancias</b><small>Todos los NO / NO UBICADO en un solo lugar</small></div></div>'
     +'<div class="mitem" onclick="openExportBackup()"><span class="ic">'+icon('download',20)+'</span><div><b>Respaldo CSV (opcional)</b><small>Exportar una copia de lo verificado hasta ahora</small></div></div>'
     +'<div class="mitem" onclick="generarExcel()"><span class="ic">'+icon('barChart',20)+'</span><div><b>Generar Excel (todos los movimientos)</b><small>Libro con bienes, movimientos, hallazgos y tarjetas</small></div></div>'
     +'<div class="mitem" onclick="importarExcel()"><span class="ic">'+icon('upload',20)+'</span><div><b>Importar bienes nuevos desde Excel</b><small>Los crea como pendientes de asignar</small></div></div>'
@@ -1310,6 +1328,54 @@ function repararUbicaciones(){
     batch.commit().then(next).catch(function(e){ toast("Error: "+(e.message||e)); });
   }
   next();
+}
+
+/* ================= DISCREPANCIAS (todo lo NO / NO UBICADO, en un solo lugar) ================= */
+function discrepancias(){
+  return Object.values(BIENES).filter(function(b){ return b.existe==="NO" || b.existe==="NO UBICADO"; })
+    .sort(function(a,b){
+      if(a.existe!==b.existe) return a.existe==="NO" ? -1 : 1;
+      return (a.responsable||"").localeCompare(b.responsable||"");
+    });
+}
+function abrirDiscrepancias(){
+  const items = discrepancias();
+  const totalValor = items.reduce(function(s,b){ return s+Number(b.valor||0); },0);
+  let h = '<div class="grip"></div><h3>Discrepancias</h3>'
+    + '<div class="note">Todos los bienes marcados NO o NO UBICADO en la auditoría completa, para revisar sin entrar tarjeta por tarjeta.</div>';
+  if(!items.length){
+    h += emptyState("No hay discrepancias registradas", "Todo lo verificado hasta ahora está en orden");
+  } else {
+    h += '<div class="hint">'+items.length+' bien(es) · '+money(totalValor)+' en total</div>';
+    h += items.map(function(b){
+      return '<div class="tlist-item" style="display:block">'
+        + '<div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(b.codigo)+'</b>'
+          + '<span style="font-weight:700;font-size:11.5px;color:'+(b.existe==="NO"?"var(--rojo)":"var(--naranja)")+'">'+esc(b.existe)+'</span></div>'
+        + '<div class="powner">'+esc(b.descripcion||"(sin descripción)")+'</div>'
+        + '<div class="powner">'+esc(b.responsable||"(sin responsable)")+(b.tarjetaNumero?" · Tarj. "+esc(b.tarjetaNumero):"")+' · '+money(b.valor)+'</div>'
+      +'</div>';
+    }).join("");
+  }
+  h += (items.length?'<button class="act p" onclick="exportarDiscrepancias()">Exportar discrepancias (CSV)</button>':"")
+    + '<button class="act o" onclick="closeMenu()">Cerrar</button>';
+  document.getElementById("sheet").innerHTML = h;
+  showSheet();
+}
+function exportarDiscrepancias(){
+  const items = discrepancias();
+  const head=["No. INVENTARIO","DESCRIPCION","RESPONSABLE","No. TARJETA","ESTADO","VALOR","UBICACION","FECHA VERIFICACION","VERIFICADO POR"];
+  function q(s){ s=(s==null?"":String(s)); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
+  const rows=[head.map(q).join(",")];
+  items.forEach(function(b){
+    rows.push([b.codigo,b.descripcion||"",b.responsable||"",b.tarjetaNumero||"",b.existe||"",b.valor||0,b.ubicacion||"",b.fechaVerificacion||"",b.verificadoPor||""].map(q).join(","));
+  });
+  const csv = "\uFEFF"+rows.join("\r\n");
+  const blob = new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=url; a.download="discrepancias_"+new Date().toISOString().slice(0,10)+".csv";
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){URL.revokeObjectURL(url); a.remove();},1500);
+  toast("Discrepancias exportadas ✓");
 }
 function abrirAvanceUbicacion(){
   const groups = {};
