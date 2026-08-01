@@ -3,6 +3,7 @@
   function db(){ return firebase.firestore(); }
   var PERSONAL=[], PACTIVOS=null, lastLoad=0, perFiltro='todos';
   function esc(x){ return (x==null?'':String(x)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function normNombre(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim().toUpperCase(); }
   var STOP={de:1,la:1,los:1,las:1,y:1,del:1,e:1};
   function tset(s){ var o={}; String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).forEach(function(w){ if(w&&!STOP[w])o[w]=1; }); return o; }
   function esActivo(nombre){ if(!PACTIVOS)return true; var ns=tset(nombre),ka=Object.keys(ns); if(!ka.length)return true;
@@ -38,6 +39,45 @@
         +'<div style="font-size:12.5px;color:#5E7196">No. '+esc(p.noEmpleado)+' &middot; '+esc(p.cargo||'-')+' &middot; Renglon '+esc(p.renglon||'-')+'</div>'
         +'<div style="font-size:12.5px;color:#5E7196">'+esc(p.correo||'sin correo')+(p.dpi?' &middot; DPI '+esc(p.dpi):'')+'</div></div>';
     }).join('')||'<div style="color:#5E7196;padding:10px">Sin resultados</div>'; }
+  function tarjetasDePersonal(p){
+    if(!p||typeof TARJETAS!=='object') return [];
+    var nn=normNombre(p.nombre);
+    return Object.values(TARJETAS).filter(function(t){
+      if(t.activa===false) return false;
+      if(p.noEmpleado&&t.empleado&&String(t.empleado).trim()===String(p.noEmpleado).trim()) return true;
+      return nn&&normNombre(t.responsable)===nn;
+    });
+  }
+  function bienesAsignadosHtml(p){
+    var tarjs=tarjetasDePersonal(p);
+    if(!tarjs.length){
+      return '<div style="color:#5E7196;font-size:13px;padding:8px 0">No se encontró ninguna tarjeta de responsabilidad a nombre de este empleado.</div>';
+    }
+    var totalBienes=0, totalQ=0;
+    var estColor={'SÍ':'#2E7D32','NO':'#B4232F','NO UBICADO':'#B5651D'};
+    var estTxt={'SÍ':'✓ verificado','NO':'✗ no encontrado','NO UBICADO':'? no ubicado'};
+    var bloques=tarjs.map(function(t){
+      var items=(typeof BIENES==='object'?Object.values(BIENES):[]).filter(function(b){return b.tarjetaId===t.id;})
+        .sort(function(a,b){return (a.codigo||'').localeCompare(b.codigo||'');});
+      totalBienes+=items.length;
+      items.forEach(function(b){ totalQ+=Number(b.valor||0); });
+      var head='<div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px">'
+        +'<b style="font-size:13px;color:#1F3864">Tarjeta '+esc(t.numero||'(pendiente)')+' &middot; '+items.length+' bien(es)</b>'
+        +'<span style="font-size:12px;color:#6d28d9;font-weight:700;cursor:pointer" onclick="openPerson(\''+t.id+'\')">Ver ficha &rsaquo;</span></div>';
+      var rows=items.length?items.map(function(b){
+        return '<div style="border:1px solid #e6e9f0;border-radius:10px;padding:9px 11px;margin-bottom:6px">'
+          +'<div style="display:flex;justify-content:space-between;gap:8px"><b style="color:#17202e">'+esc(b.codigo)+'</b>'
+          +'<span style="font-size:12px;font-weight:700;color:'+(estColor[b.existe]||'#8A929C')+'">'+(estTxt[b.existe]||'pendiente')+'</span></div>'
+          +(b.descripcion?'<div style="font-size:12.5px;color:#5B6470;margin-top:2px">'+esc(b.descripcion)+'</div>':'')
+          +'<div style="font-size:11.5px;color:#8A929C;margin-top:2px">'+(b.valor?'Q'+Number(b.valor).toLocaleString('es-GT',{minimumFractionDigits:2}):'')+'</div>'
+        +'</div>';
+      }).join(''):'<div style="color:#8A929C;font-size:12.5px">Tarjeta sin bienes cargados.</div>';
+      return head+rows;
+    }).join('');
+    var resumen='<div style="font-size:12.5px;color:#5E7196;margin-bottom:4px">'+totalBienes+' bien(es) en '+tarjs.length+' tarjeta(s)'
+      +(totalQ?' &middot; Q'+totalQ.toLocaleString('es-GT',{minimumFractionDigits:2})+' en total':'')+'</div>';
+    return resumen+bloques;
+  }
   window.editarPersonal=function(id){ var p=id?PERSONAL.find(function(x){return x.__id===id;}):{renglon:'011',cargo:'',noEmpleado:'',nombre:'',dpi:'',correo:'',activo:true}; if(!p)return;
     var view=document.getElementById('view');
     function f(l,k,val){ return '<label style="display:block;font-size:12.5px;color:#5E7196;margin-top:8px">'+l+'<input id="pf_'+k+'" value="'+esc(val||'')+'" style="width:100%;padding:10px;border:1px solid #cdd6e4;border-radius:9px;margin-top:3px"></label>'; }
@@ -46,7 +86,9 @@
       +f('Nombre completo','nombre',p.nombre)+f('No. de empleado','noEmpleado',p.noEmpleado)+f('Renglon','renglon',p.renglon)+f('Cargo nominal','cargo',p.cargo)+f('DPI','dpi',p.dpi)+f('Correo','correo',p.correo)
       +'<label style="display:block;margin-top:12px;font-size:13px;color:#1F3864"><input type="checkbox" id="pf_activo" '+(p.activo!==false?'checked':'')+'> Empleado activo</label>'
       +'<button onclick="guardarPersonal(\''+(id||'')+'\')" style="width:100%;padding:13px;border:none;border-radius:10px;background:#2E7D32;color:#fff;font-weight:700;margin-top:14px">Guardar</button>'
-      +(id?'<button onclick="togglePersonal(\''+id+'\','+(p.activo!==false)+')" style="width:100%;padding:11px;border:1px solid #cdd6e4;border-radius:10px;background:#fff;color:#c0392b;font-weight:700;margin-top:8px">'+(p.activo!==false?'Marcar INACTIVO (ya no labora)':'Reactivar empleado')+'</button>':'')+'</div>'; };
+      +(id?'<button onclick="togglePersonal(\''+id+'\','+(p.activo!==false)+')" style="width:100%;padding:11px;border:1px solid #cdd6e4;border-radius:10px;background:#fff;color:#c0392b;font-weight:700;margin-top:8px">'+(p.activo!==false?'Marcar INACTIVO (ya no labora)':'Reactivar empleado')+'</button>':'')
+      +(id?'<div style="margin-top:18px;border-top:1px solid #e6e9f0;padding-top:14px"><h3 style="margin:0 0 8px;color:#1F3864;font-size:16px">📦 Bienes asignados</h3>'+bienesAsignadosHtml(p)+'</div>':'')
+      +'</div>'; };
   window.guardarPersonal=function(id){ var g=function(k){var el=document.getElementById('pf_'+k);return el?el.value.trim():'';};
     var noEmp=g('noEmpleado'),nom=g('nombre'); if(!nom){toast('El nombre es obligatorio');return;} if(!noEmp){toast('El No. de empleado es obligatorio');return;}
     var dup=PERSONAL.find(function(x){return x.noEmpleado===noEmp&&x.__id!==id;}); if(dup){toast('Ya existe un empleado con ese No.: '+dup.nombre);return;}
