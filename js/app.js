@@ -290,7 +290,9 @@ function renderPerson(v){
   h+='<div style="margin:6px 2px 2px"><div style="font-size:18px;font-weight:800;color:#17202e">'+esc(t.responsable||"(sin nombre)")+'</div>'
     +'<div style="font-size:12.5px;color:#8A929C;margin-top:2px">Tarjeta '+esc(t.numero||"(pendiente)")+' · '+esc(t.puesto||"")+' '+chipTipo(t.tipo)+'</div>'
     +'<div style="margin-top:4px"><span class="moretog" onclick="editCorreoTarjeta(\''+t.id+'\')">✉️ '+(t.correo?esc(t.correo):"agregar correo")+'</span>'
-    +' <span class="moretog" onclick="imprimirConstancia(\''+t.id+'\')">'+icon('download',13)+' Constancia (PDF)</span></div></div>';
+    +' <span class="moretog" onclick="imprimirConstancia(\''+t.id+'\')">'+icon('download',13)+' Constancia (PDF)</span>'
+    +(t.firmaRecibida?(' <span class="moretog" onclick="verFirma(\''+t.id+'\')">'+icon('check',13)+' Firmado'+(t.firmaFecha?(' ('+esc(t.firmaFecha)+')'):'')+'</span>'):'')
+    +'</div></div>';
   h+='<div class="filters">'
     +'<div class="fp '+(mode.filter==="todos"?"on":"")+'" onclick="setFilter(\'todos\')">Todos ('+n+')</div>'
     +'<div class="fp '+(mode.filter==="pend"?"on":"")+'" onclick="setFilter(\'pend\')">Pendientes ('+(n-d)+')</div>'
@@ -345,24 +347,51 @@ function imprimirConstancia(tarjetaId){
       +'<td>'+esc(b.estado||"")+'</td>'
       +'</tr>';
   }).join("");
-  const html = '<div class="pdhead">'
-      +'<div class="pdtitle">Instituto Guatemalteco de Seguridad Social — Auditoría Interna</div>'
-      +'<div class="pdsub">Constancia de responsabilidad de bienes</div>'
-    +'</div>'
-    +'<table class="pdinfo"><tr><td><b>Responsable:</b> '+esc(t.responsable||"")+'</td><td><b>Tarjeta No.:</b> '+esc(t.numero||"(pendiente)")+'</td></tr>'
-      +'<tr><td><b>Puesto:</b> '+esc(t.puesto||"—")+'</td><td><b>Correo:</b> '+esc(t.correo||"—")+'</td></tr>'
-      +'<tr><td colspan="2"><b>Fecha de emisión:</b> '+today()+'</td></tr></table>'
-    +'<table class="pdtabla"><thead><tr><th>No. Inventario</th><th>Descripción</th><th>Valor</th><th>Estado</th></tr></thead>'
-      +'<tbody>'+(filas||'<tr><td colspan="4">Sin bienes registrados en esta tarjeta.</td></tr>')+'</tbody>'
-      +'<tfoot><tr><td colspan="2"><b>Total ('+list.length+' bien(es))</b></td><td class="pdnum"><b>'+money(totalValor)+'</b></td><td></td></tr></tfoot>'
-    +'</table>'
-    +'<div class="pdfirmas">'
-      +'<div class="pdfirma"><div class="pdline"></div>Firma del responsable</div>'
-      +'<div class="pdfirma"><div class="pdline"></div>Firma de Auditoría Interna</div>'
-    +'</div>'
-    +'<div class="pdnota">Revise el texto de esta constancia antes de usarla como documento oficial — el formato es un punto de partida, no un modelo institucional certificado.</div>';
-  document.getElementById("printArea").innerHTML = html;
-  setTimeout(function(){ window.print(); }, 80);
+  fotoGet("S"+tarjetaId).then(function(firma){
+    const firmaImg = firma ? '<img class="pdfirmaimg" src="data:image/jpeg;base64,'+firma.b64+'">' : '';
+    const firmaNota = (firma && t.firmaFecha) ? ('<div class="pdfirmafecha">Firmado electrónicamente el '+esc(t.firmaFecha)+'</div>') : '';
+    const html = '<div class="pdhead">'
+        +'<div class="pdtitle">Instituto Guatemalteco de Seguridad Social — Auditoría Interna</div>'
+        +'<div class="pdsub">Constancia de responsabilidad de bienes</div>'
+      +'</div>'
+      +'<table class="pdinfo"><tr><td><b>Responsable:</b> '+esc(t.responsable||"")+'</td><td><b>Tarjeta No.:</b> '+esc(t.numero||"(pendiente)")+'</td></tr>'
+        +'<tr><td><b>Puesto:</b> '+esc(t.puesto||"—")+'</td><td><b>Correo:</b> '+esc(t.correo||"—")+'</td></tr>'
+        +'<tr><td colspan="2"><b>Fecha de emisión:</b> '+today()+'</td></tr></table>'
+      +'<table class="pdtabla"><thead><tr><th>No. Inventario</th><th>Descripción</th><th>Valor</th><th>Estado</th></tr></thead>'
+        +'<tbody>'+(filas||'<tr><td colspan="4">Sin bienes registrados en esta tarjeta.</td></tr>')+'</tbody>'
+        +'<tfoot><tr><td colspan="2"><b>Total ('+list.length+' bien(es))</b></td><td class="pdnum"><b>'+money(totalValor)+'</b></td><td></td></tr></tfoot>'
+      +'</table>'
+      +'<div class="pdfirmas">'
+        +'<div class="pdfirma">'+firmaImg+'<div class="pdline"></div>Firma del responsable'+firmaNota+'</div>'
+        +'<div class="pdfirma"><div class="pdline"></div>Firma de Auditoría Interna</div>'
+      +'</div>'
+      +'<div class="pdnota">Revise el texto de esta constancia antes de usarla como documento oficial — el formato es un punto de partida, no un modelo institucional certificado.</div>';
+    document.getElementById("printArea").innerHTML = html;
+    setTimeout(function(){ window.print(); }, 80);
+  });
+}
+function verFirma(tarjetaId){
+  const t = TARJETAS[tarjetaId]; if(!t) return;
+  fotoGet("S"+tarjetaId).then(function(r){
+    let h = '<div class="grip"></div><h3>Firma de recibido</h3>';
+    if(r){
+      h += '<img src="data:image/jpeg;base64,'+r.b64+'" style="width:100%;border:1px solid #E2E6EC;border-radius:10px;background:#fff">';
+      h += '<div class="note">Firmado por '+esc(t.responsable||"")+(t.firmaFecha?(' el '+esc(t.firmaFecha)):"")+'.</div>';
+      if(requiereEdicion()) h += '<button class="act o" onclick="quitarFirma(\''+tarjetaId+'\')">🗑️ Quitar firma</button>';
+    } else {
+      h += '<div class="note">No se encontró la imagen de la firma en este dispositivo.</div>';
+    }
+    h += '<button class="act o" onclick="closeMenu()">Cerrar</button>';
+    document.getElementById("sheet").innerHTML = h;
+    showSheet();
+  });
+}
+function quitarFirma(tarjetaId){
+  if(!requiereEdicion()) return;
+  if(!confirm("¿Quitar la firma registrada de esta tarjeta?")) return;
+  fotoDel("S"+tarjetaId).then(function(){
+    return db.collection("tarjetas").doc(tarjetaId).update({firmaRecibida:false, firmaUrl:firebase.firestore.FieldValue.delete()});
+  }).then(function(){ closeMenu(); toast("Firma eliminada"); render(); }).catch(function(){ toast("No se pudo quitar la firma"); });
 }
 
 /* ================= TARJETA DE BIEN ================= */
@@ -618,7 +647,7 @@ function delHallazgo(id){
 function newSession(){
   if(!requiereEdicion()) return;
   fotoDel("Lses");
-  curSes = { tipo:"existente", tarjetaId:null, numero:"", persona:"", empleado:"", correo:"", loc:"", foto:0, items:[] };
+  curSes = { tipo:"existente", tarjetaId:null, numero:"", persona:"", empleado:"", correo:"", loc:"", foto:0, items:[], firmaB64:null };
   mode.view="ses"; mode.q=""; document.getElementById("search").value=""; render(); window.scrollTo(0,0);
 }
 function cancelSession(){ fotoDel("Lses"); curSes=null; goHome(); }
@@ -666,6 +695,12 @@ function renderSession(v){
   h += '</div>';
   h += '<div class="tools" style="margin-top:10px"><button class="fotobtn" id="fb_Lses" onclick="takePhoto(\'Lses\')">'+icon('camera',15)+' Foto del lugar</button>'
      + '<img class="thumb" id="th_Lses" style="display:none" onclick="viewPhoto(\'Lses\')"></div>';
+  h += '<label style="margin-top:10px">Firma de recibido (opcional)</label>'
+     + '<div style="font-size:11.5px;color:#8A929C;margin-bottom:6px">Si el responsable está presente, que firme aquí como constancia de que recibió los bienes.</div>'
+     + '<canvas id="firmaPad" style="width:100%;height:140px;border:1.5px dashed #C7CEDA;border-radius:10px;background:#fff;touch-action:none;cursor:crosshair"></canvas>'
+     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">'
+     + '<span style="font-size:11.5px;color:#8A929C" id="firmaEstado">Sin firmar</span>'
+     + '<span class="moretog" onclick="limpiarFirma()">Borrar firma</span></div>';
   h += '</div></div>';
   h += '<div class="item"><label style="font-size:12px;color:#5B6470;font-weight:700">Números de bien que tiene esta persona</label>'
      + '<div style="display:flex;gap:8px;margin-top:6px"><input id="invin" style="flex:1;padding:12px;border:1.5px solid #E2E6EC;border-radius:10px;font-size:17px;font-weight:700" placeholder="Léalo del bien y escríbalo" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addInv();}">'
@@ -674,6 +709,48 @@ function renderSession(v){
   h += '<div id="sesitems">'+s.items.map(sesItemCard).join("")+'</div>';
   h += '<button class="act g" onclick="saveSession()">✓ Guardar toma y enviar correo (<span id="sessavecount">'+s.items.length+'</span> bienes)</button>';
   v.innerHTML = h; loadThumbs();
+  setTimeout(initFirmaPad, 50);
+}
+/* ================= FIRMA DE RECIBIDO (canvas) ================= */
+let firmaCtx=null, firmaDibujando=false, firmaTieneTrazo=false;
+function initFirmaPad(){
+  const cv = document.getElementById("firmaPad"); if(!cv || !curSes) return;
+  const rect = cv.getBoundingClientRect();
+  const w = Math.max(1, Math.round(rect.width)), h2 = Math.max(1, Math.round(rect.height));
+  cv.width = w*2; cv.height = h2*2;
+  firmaCtx = cv.getContext("2d");
+  firmaCtx.scale(2,2);
+  firmaCtx.fillStyle="#fff"; firmaCtx.fillRect(0,0,w,h2);
+  firmaCtx.strokeStyle="#17202e"; firmaCtx.lineWidth=2.2; firmaCtx.lineCap="round"; firmaCtx.lineJoin="round";
+  firmaDibujando=false; firmaTieneTrazo=false;
+  if(curSes.firmaB64){
+    const img=new Image();
+    img.onload=function(){ firmaCtx.drawImage(img,0,0,w,h2); };
+    img.src="data:image/jpeg;base64,"+curSes.firmaB64;
+    firmaTieneTrazo=true;
+  }
+  actualizarFirmaEstado();
+  function pos(e){
+    const r=cv.getBoundingClientRect();
+    const p = (e.touches&&e.touches[0]) ? e.touches[0] : e;
+    return {x:p.clientX-r.left, y:p.clientY-r.top};
+  }
+  function start(e){ e.preventDefault(); firmaDibujando=true; const p=pos(e); firmaCtx.beginPath(); firmaCtx.moveTo(p.x,p.y); }
+  function move(e){ if(!firmaDibujando) return; e.preventDefault(); const p=pos(e); firmaCtx.lineTo(p.x,p.y); firmaCtx.stroke(); firmaTieneTrazo=true; actualizarFirmaEstado(); }
+  function end(){ if(!firmaDibujando) return; firmaDibujando=false; guardarFirmaCanvas(); }
+  cv.onpointerdown=start; cv.onpointermove=move; cv.onpointerup=end; cv.onpointerleave=end; cv.onpointercancel=end;
+}
+function actualizarFirmaEstado(){
+  const el=document.getElementById("firmaEstado"); if(el) el.textContent = firmaTieneTrazo?"✓ Firmado":"Sin firmar";
+}
+function guardarFirmaCanvas(){
+  if(!curSes || !firmaTieneTrazo) return;
+  const cv=document.getElementById("firmaPad"); if(!cv) return;
+  curSes.firmaB64 = cv.toDataURL("image/jpeg",0.85).split(",")[1];
+}
+function limpiarFirma(){
+  if(curSes) curSes.firmaB64=null;
+  initFirmaPad();
 }
 function renderSesItems(){
   const c=document.getElementById("sesitems"); if(!c){ render(); return; }
@@ -876,6 +953,9 @@ function saveSession(){
   resolverTarjetaDestino(s).then(function(dest){
     const batch = db.batch();
     const nowTxt = today();
+    if(s.firmaB64){
+      batch.set(db.collection("tarjetas").doc(dest.id), {firmaRecibida:true, firmaFecha:nowTxt, firmaPersona:s.persona}, {merge:true});
+    }
     s.items.forEach(function(it){
       const cn = bienDocId(it.codigo);
       const ref = db.collection("bienes").doc(cn);
@@ -915,6 +995,13 @@ function saveSession(){
     });
     return batch.commit().then(function(){ return dest; });
   }).then(function(dest){
+    if(s.firmaB64){
+      const nombreFirma = "FIRMA_"+sanit(s.persona)+"_"+dest.id+".jpg";
+      fotoPut({k:"S"+dest.id, b64:s.firmaB64, name:nombreFirma, ts:Date.now()});
+      subirFoto(nombreFirma, s.firmaB64).then(function(url){
+        if(url) db.collection("tarjetas").doc(dest.id).update({firmaUrl:url}).catch(function(){});
+      });
+    }
     toast("Toma guardada ✓ ("+s.items.length+" bienes)");
     return notificarPersona(s, dest.numero||"");
   }).then(function(){
@@ -941,6 +1028,7 @@ function notificarPersona(s, numeroReal){
   });
   if(s.fotoB64){ fotoPromesas.push(Promise.resolve({name: s.fotoName||"LUGAR.jpg", b64: s.fotoB64})); }
   else if(s.foto){ fotoPromesas.push(fotoGet("Lses").then(function(r){ return r?{name:r.name,b64:r.b64}:null; }).catch(function(){return null;})); }
+  if(s.firmaB64){ fotoPromesas.push(Promise.resolve({name: "FIRMA_"+sanit(s.persona)+".jpg", b64: s.firmaB64})); }
   const conFoto = fotoPromesas.length;
   return Promise.all(fotoPromesas).then(function(fotos){
     const payload = { type:"notificar", correo:s.correo, persona:s.persona, tarjeta:numeroReal||"(pendiente)",
