@@ -289,7 +289,7 @@ function renderPanelMetricas(){
   const s = statsGlobales();
   return '<div class="kpigrid">'
     + '<div class="kpicard static"><div class="kpinum">'+s.pct+'%</div><div class="kpilbl">Avance de verificación</div><div class="kpisub">'+s.done+' / '+s.total+' bienes</div></div>'
-    + '<div class="kpicard kpi-disc" onclick="abrirDiscrepancias()"><div class="kpinum">'+s.disc+'</div><div class="kpilbl">Discrepancias</div><div class="kpisub">NO / NO UBICADO</div></div>'
+    + '<div class="kpicard kpi-disc" onclick="abrirDiscrepancias()"><div class="kpinum">'+s.disc+'</div><div class="kpilbl">Discrepancias</div><div class="kpisub">Bienes marcados NO</div></div>'
     + '<div class="kpicard kpi-pend" onclick="openPendientes()"><div class="kpinum">'+s.pendCount+'</div><div class="kpilbl">Pendientes de asignar</div><div class="kpisub">'+(s.pendViejos?s.pendViejos+' con '+UMBRAL_DIAS_PENDIENTE+'+ días':'Sin atrasos')+'</div></div>'
     + '<div class="kpicard kpi-valor static"><div class="kpinum">'+money(s.valorTotal)+'</div><div class="kpilbl">Valor total</div><div class="kpisub">'+s.tarjetas+' responsable(s)</div></div>'
     + '</div>';
@@ -500,7 +500,6 @@ function itemCard(b, showOwner, extraChip){
     : '<div class="bgrp">'
         +'<button class="btn b-si '+(b.existe==="SÍ"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'SÍ\')">'+icon('check',16)+' SÍ<small>existe</small></button>'
         +'<button class="btn b-no '+(b.existe==="NO"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'NO\')">'+icon('x',16)+' NO<small>no está</small></button>'
-        +'<button class="btn b-nu '+(b.existe==="NO UBICADO"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'NO UBICADO\')">'+icon('helpCircle',16)+' NO<small>ubicado</small></button>'
       +'</div>'
       +'<div class="bgrp estado" style="'+(b.existe==="SÍ"?"":"display:none")+'">'
         +['BUENO','REGULAR','MALO','PARA BAJA'].map(function(e){ const cl=e==="PARA BAJA"?"baja":e.toLowerCase();
@@ -510,6 +509,7 @@ function itemCard(b, showOwner, extraChip){
     +'<div class="itop"><span class="inv">'+esc(b.codigo)+(b.codigoSiges?' <small style="font-weight:600;color:#8A929C">· SIGES '+esc(b.codigoSiges)+'</small>':'')+'</span><span class="val">'+money(b.valor)+'</span></div>'
     +'<div class="ochips">'+chipCategoria(b)+chipTipo(b.tipo)+nuevo+pendChip+dup+(extraChip||"")+'</div>'
     +descField
+    +(b.existe==="NO UBICADO"?'<div class="warnbox">'+icon('alertTriangle',13,'margin-right:4px')+'Quedó marcado como “NO UBICADO”, opción que ya se retiró. Vuelva a marcarlo como SÍ o NO.</div>':'')
     +(b.notaDuplicado?'<div class="warnbox">'+esc(b.notaDuplicado)+'</div>':'')
     +(b.tarjetaAnteriorNumero?'<div class="warnbox">↩ Descargado de tarjeta '+esc(b.tarjetaAnteriorNumero)+' ('+esc(b.responsableAnterior||"")+')</div>':'')
     +owner
@@ -737,7 +737,7 @@ function responderPregunta(pregunta){
   if(categoria) descFiltro.push("de "+((CATEGORIAS_BIEN.find(function(c){return c.cod===categoria;})||{}).nombre||"").toLowerCase());
   if(ubic) descFiltro.push("en "+ubic);
   if(estado) descFiltro.push("en estado "+estado.toLowerCase());
-  if(existe==="NO UBICADO") descFiltro.push("marcados NO UBICADO");
+  if(existe==="NO UBICADO") descFiltro.push("marcados NO UBICADO (opción retirada)");
   else if(existe==="NO") descFiltro.push("marcados NO (no están)");
   else if(existe==="SÍ") descFiltro.push("verificados");
   else if(existe==="__VACIO__") descFiltro.push("sin verificar todavía");
@@ -753,7 +753,7 @@ function responderPregunta(pregunta){
   }
   if(/DISCREPANCIA/.test(t) && !existe && !categoria && !ubic){
     const s = statsGlobales();
-    return "Hay "+s.disc+" bien(es) con discrepancia (marcados NO o NO UBICADO). Puede verlos en el menú, en 'Discrepancias'.";
+    return "Hay "+s.disc+" bien(es) con discrepancia (marcados NO). Puede verlos en el menú, en 'Discrepancias'.";
   }
   if(/VALOR|CUANTO VALE|CUANTO CUESTA|CUANTO CUESTAN|MONTO/.test(t)){
     const lista = Object.values(BIENES).filter(coincide);
@@ -1645,7 +1645,7 @@ function openMenu(){
     +'<div class="mitem" onclick="enviarCorreoPrueba()"><span class="ic">'+icon('mail',20)+'</span><div><b>Enviar correo de prueba (con foto)</b><small>Para confirmar que la foto sí llega adjunta</small></div></div>'
     +'<div class="mitem" onclick="abrirFusion()"><span class="ic">'+icon('refreshCw',20)+'</span><div><b>Fusionar tarjetas duplicadas</b><small>Si la misma persona quedó con dos tarjetas</small></div></div>'
     +'<div class="mitem" onclick="abrirAvanceUbicacion()"><span class="ic">'+icon('mapPin',20)+'</span><div><b>Avance por ubicación</b><small>Cuánto falta por verificar en cada lugar</small></div></div>'
-    +'<div class="mitem" onclick="abrirDiscrepancias()"><span class="ic">'+icon('alertTriangle',20)+'</span><div><b>Discrepancias</b><small>Todos los NO / NO UBICADO en un solo lugar</small></div></div>'
+    +'<div class="mitem" onclick="abrirDiscrepancias()"><span class="ic">'+icon('alertTriangle',20)+'</span><div><b>Discrepancias</b><small>Todos los bienes marcados NO en un solo lugar</small></div></div>'
     +'<div class="mitem" onclick="abrirActividadReciente()"><span class="ic">'+icon('clock',20)+'</span><div><b>Actividad reciente</b><small>Últimos movimientos de todos los bienes</small></div></div>'
     +'<div class="mitem" onclick="abrirAsistente()"><span class="ic">'+icon('chat',20)+'</span><div><b>Asistente del inventario</b><small>Pregunte cantidades, valores o listados en lenguaje natural</small></div></div>'
     +'<div class="mitem" onclick="generarExcel()"><span class="ic">'+icon('barChart',20)+'</span><div><b>Generar reporte en Excel</b><small>Resumen, bienes, discrepancias, tarjetas, personal, movimientos y hallazgos</small></div></div>'
@@ -1741,7 +1741,12 @@ function repararUbicaciones(){
   next();
 }
 
-/* ================= DISCREPANCIAS (todo lo NO / NO UBICADO, en un solo lugar) ================= */
+/* ================= DISCREPANCIAS (los bienes marcados NO, en un solo lugar) =================
+   "NO UBICADO" se retiró como opción, pero se siguen incluyendo los bienes que quedaron con ese
+   valor de antes, para no esconder hallazgos ya registrados. Hay una herramienta para pasarlos a NO. */
+function bienesNoUbicadoAntiguos(){
+  return Object.values(BIENES).filter(function(b){ return b.existe==="NO UBICADO"; });
+}
 function discrepancias(){
   return Object.values(BIENES).filter(function(b){ return b.existe==="NO" || b.existe==="NO UBICADO"; })
     .sort(function(a,b){
@@ -1749,11 +1754,44 @@ function discrepancias(){
       return (a.responsable||"").localeCompare(b.responsable||"");
     });
 }
+function convertirNoUbicado(){
+  if(!requiereEdicion()) return;
+  const items = bienesNoUbicadoAntiguos();
+  if(!items.length){ toast("No hay bienes marcados NO UBICADO"); return; }
+  if(!confirm('¿Pasar a "NO" los '+items.length+' bien(es) que quedaron marcados como NO UBICADO? Queda registrado en el historial de cada bien.')) return;
+  closeMenu();
+  toast("Actualizando "+items.length+" bien(es)…");
+  function chunk(arr,n){ const out=[]; for(let i=0;i<arr.length;i+=n) out.push(arr.slice(i,i+n)); return out; }
+  const chunks = chunk(items,200);
+  let i=0;
+  function next(){
+    if(i>=chunks.length){ toast("✓ "+items.length+" bien(es) actualizados a NO"); render(); return; }
+    const batch = db.batch();
+    chunks[i].forEach(function(b){
+      batch.update(db.collection("bienes").doc(b.id), {existe:"NO", actualizado: firebase.firestore.FieldValue.serverTimestamp()});
+      const movRef = db.collection("movimientos").doc();
+      batch.set(movRef, { codigo:b.codigo, tipoMovimiento:"VERIFICACION",
+        tarjetaAnteriorNumero:"", responsableAnterior:"",
+        tarjetaNuevaNumero:b.tarjetaNumero||"", responsableNuevo:b.responsable||"",
+        existe:"NO", estado:b.estado||"", ubicacion:b.ubicacion||"",
+        observaciones:'Se retiró la opción "NO UBICADO"; el bien pasó a NO',
+        fecha: firebase.firestore.FieldValue.serverTimestamp(), fechaTxt: today(), capturadoPor: META.by||"" });
+    });
+    i++;
+    batch.commit().then(next).catch(function(e){ toast("Error al actualizar: "+(e.message||e)); });
+  }
+  next();
+}
 function abrirDiscrepancias(){
   const items = discrepancias();
+  const antiguos = bienesNoUbicadoAntiguos();
   const totalValor = items.reduce(function(s,b){ return s+Number(b.valor||0); },0);
   let h = '<div class="grip"></div><h3>Discrepancias</h3>'
-    + '<div class="note">Todos los bienes marcados NO o NO UBICADO en la auditoría completa, para revisar sin entrar tarjeta por tarjeta.</div>';
+    + '<div class="note">Todos los bienes marcados NO en la auditoría completa, para revisar sin entrar tarjeta por tarjeta.</div>';
+  if(antiguos.length){
+    h += '<div class="warnbox">'+icon('alertTriangle',13,'margin-right:4px')+antiguos.length+' bien(es) quedaron marcados como “NO UBICADO”, opción que ya se retiró.</div>'
+      + (puedeEditar()?'<button class="act n" onclick="convertirNoUbicado()">Pasarlos todos a NO</button>':'');
+  }
   if(!items.length){
     h += emptyState("No hay discrepancias registradas", "Todo lo verificado hasta ahora está en orden");
   } else {

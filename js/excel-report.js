@@ -201,7 +201,7 @@
 
     seccion("HALLAZGOS Y DIFERENCIAS");
     par("Bienes marcados NO (no están)", datos.no);
-    par("Bienes marcados NO UBICADO", datos.noUbicado);
+    if(datos.noUbicado) par("Bienes marcados NO UBICADO (opción retirada)", datos.noUbicado);
     par("Bienes sin responsable asignado", datos.pendientesAsignar);
     par("Bienes encontrados sin tarjeta (hallazgos)", datos.hallazgos);
 
@@ -315,7 +315,7 @@
       { h:"Fecha verificación", w:15, tipo:"fecha", get:function(b){ return aFecha(b.fechaVerificacion) || (b.fechaVerificacion||""); } },
       { h:"Verificado por", w:20, get:function(b){ return b.verificadoPor||""; } }
     ];
-    X.utils.book_append_sheet(wb, crearHoja(X, "Bienes con diferencia (NO / NO UBICADO)", colsDisc, disc, {totales:true}), "DISCREPANCIAS");
+    X.utils.book_append_sheet(wb, crearHoja(X, "Bienes con diferencia", colsDisc, disc, {totales:true}), "DISCREPANCIAS");
 
     var colsTarj = [
       { h:"No. Tarjeta", w:13, get:function(t){ return t.numero||"(pendiente)"; } },
