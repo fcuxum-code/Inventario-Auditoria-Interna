@@ -326,3 +326,17 @@
 .mrfin .mrsig{max-width:340px;}
 .mrsalir{margin-top:8px; border:1.5px solid var(--linea); border-radius:13px; background:#fff;
   color:var(--azul); font-size:15px; font-weight:700; padding:14px 26px;}
+
+/* ================= BARRA DE AVISO (sin conexión / versión nueva) ================= */
+#avisoBar{position:fixed; left:0; right:0; bottom:0; z-index:150;
+  display:none; align-items:center; gap:2px; padding:11px 14px;
+  font-size:13px; box-shadow:0 -6px 22px rgba(20,30,60,.14);}
+#avisoBar.show{display:flex;}
+#avisoBar b{display:block; font-size:13.5px; line-height:1.25;}
+#avisoBar small{display:block; font-size:11.5px; opacity:.9; margin-top:1px; line-height:1.3;}
+#avisoBar.av-off{background:#FFF6DA; color:#6b5a1e; border-top:1.5px solid #F0D68A;}
+#avisoBar.av-new{background:var(--azul); color:#fff; cursor:pointer;}
+#avisoBar.av-new small{opacity:.85;}
+/* se coloca encima de la barra de navegación (offline.js calcula su alto),
+   y se reserva espacio abajo para no tapar el final del contenido */
+body.con-aviso{padding-bottom:180px;}
