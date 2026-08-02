@@ -48,7 +48,7 @@
     cont.innerHTML=arr.map(function(p){ var ina=p.activo===false;
       var fb=ina?fmtFechaISO(p.fechaBaja):'';
       return '<div style="background:'+(ina?'#FFF4F4':'#fff')+';border:1px solid '+(ina?'#F3C6C6':'#e6e9f0')+';border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer" onclick="editarPersonal(\''+esc(p.__id)+'\')">'
-        +'<div style="font-weight:700;color:#1F3864">'+esc(p.nombre)+(ina?' <span style="color:#c0392b;font-size:12px">&#9940; baja'+(fb?' '+esc(fb):'')+'</span>':'')+'</div>'
+        +'<div style="font-weight:700;color:#1F3864">'+esc(p.nombre)+(ina?' <span style="color:#c0392b;font-size:12px">&#9940; baja'+(fb?' desde '+esc(fb):'')+'</span>':'')+'</div>'
         +'<div style="font-size:12.5px;color:#5E7196">No. '+esc(p.noEmpleado)+' &middot; '+esc(p.cargo||'-')+' &middot; Renglon '+esc(p.renglon||'-')+'</div>'
         +'<div style="font-size:12.5px;color:#5E7196">'+esc(p.correo||'sin correo')+(p.dpi?' &middot; DPI '+esc(p.dpi):'')+'</div></div>';
     }).join('')||'<div style="color:#5E7196;padding:10px">Sin resultados</div>'; }
@@ -103,7 +103,7 @@
     return '<div style="background:#FFF4F4;border:1px solid #F3C6C6;border-radius:12px;padding:12px 14px;margin-top:14px">'
       +'<b style="color:#c0392b">&#9888;&#65039; '+n+' bien(es) siguen a su nombre</b>'
       +'<div style="font-size:12.5px;color:#7a3b3b;margin-top:3px">'+cuando+'. Hay que reasignar estos bienes a otro responsable.</div></div>'; }
-  window.editarPersonal=function(id){ var p=id?PERSONAL.find(function(x){return x.__id===id;}):{renglon:'011',cargo:'',noEmpleado:'',nombre:'',dpi:'',correo:'',activo:true}; if(!p)return;
+  window.editarPersonal=function(id){ var p=id?PERSONAL.find(function(x){return x.__id===id;}):{renglon:'011',cargo:'',noEmpleado:'',nombre:'',dpi:'',correo:'',activo:true,fechaBaja:''}; if(!p)return;
     var view=document.getElementById('view');
     function f(l,k,val,tipo){ return '<label style="display:block;font-size:12.5px;color:#5E7196;margin-top:8px">'+l+'<input type="'+(tipo||'text')+'" id="pf_'+k+'" value="'+esc(val||'')+'" style="width:100%;padding:10px;border:1px solid #cdd6e4;border-radius:9px;margin-top:3px;box-sizing:border-box"></label>'; }
     view.innerHTML='<div style="padding:8px 2px"><button class="backbtn" onclick="openPersonal()">&lsaquo; Personal</button>'
