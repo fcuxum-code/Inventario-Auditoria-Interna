@@ -989,7 +989,16 @@ function editCorreoTarjeta(id){
 }
 
 /* ================= BÚSQUEDA ================= */
-function onSearch(q){ mode.q=q.trim(); render(); }
+/* Al escribir, se espera un momento antes de volver a dibujar la lista. Antes cada letra
+   redibujaba todas las tarjetas: con 765 bienes, escribir una palabra tardaba ~19 s en un
+   teléfono de gama media. Si se borra todo, se responde de inmediato. */
+let _tSearch = null;
+function onSearch(q){
+  const val = q.trim();
+  clearTimeout(_tSearch);
+  if(!val){ mode.q = ""; render(); return; }
+  _tSearch = setTimeout(function(){ mode.q = val; render(); }, 260);
+}
 function renderBarraFiltros(){
   const ESTADOS = [['BUENO','Bueno'],['REGULAR','Regular'],['MALO','Malo'],['PARA BAJA','Para baja']];
   let h = '<div class="filtrobar '+(mostrarFiltros||filtrosActivos()?"":"oculto")+'">';
@@ -1523,12 +1532,34 @@ function openIDB(){ return new Promise(function(res,rej){
   rq.onsuccess=function(e){ idb=e.target.result; res(idb); };
   rq.onerror=function(e){ rej(e); };
 });}
+/* Las fotos se recuerdan en memoria: cada dibujado de una lista consultaba la base de fotos
+   una vez por bien (una transacción por tarjeta, en cada dibujado). Al escribir o al
+   sincronizar eso se repetía sin necesidad. El recuerdo se actualiza al guardar o borrar. */
+const _fotoCache = new Map();
+const _FOTO_CACHE_MAX = 60; // las fotos pesan; se recuerdan solo las últimas usadas
+function _fotoCacheSet(k, r){
+  if(_fotoCache.has(k)) _fotoCache.delete(k);   // reinsertar la deja como la más reciente
+  _fotoCache.set(k, r);
+  while(_fotoCache.size > _FOTO_CACHE_MAX){
+    _fotoCache.delete(_fotoCache.keys().next().value); // sale la más antigua
+  }
+}
 function fotoPut(rec){ return openIDB().then(function(d2){ return new Promise(function(res,rej){
-  const tx=d2.transaction("fotos","readwrite"); tx.objectStore("fotos").put(rec); tx.oncomplete=res; tx.onerror=rej; }); }); }
-function fotoGet(k){ return openIDB().then(function(d2){ return new Promise(function(res,rej){
-  const rq=d2.transaction("fotos").objectStore("fotos").get(k); rq.onsuccess=function(){res(rq.result||null);}; rq.onerror=rej; }); }); }
+  const tx=d2.transaction("fotos","readwrite"); tx.objectStore("fotos").put(rec);
+  tx.oncomplete=function(){ _fotoCacheSet(rec.k, rec); res(); }; tx.onerror=rej; }); }); }
+function fotoGet(k){
+  if(_fotoCache.has(k)){
+    const r = _fotoCache.get(k);
+    _fotoCacheSet(k, r); // marcarla como recién usada
+    return Promise.resolve(r);
+  }
+  return openIDB().then(function(d2){ return new Promise(function(res,rej){
+    const rq=d2.transaction("fotos").objectStore("fotos").get(k);
+    rq.onsuccess=function(){ const r=rq.result||null; _fotoCacheSet(k,r); res(r); }; rq.onerror=rej; }); });
+}
 function fotoDel(k){ return openIDB().then(function(d2){ return new Promise(function(res,rej){
-  const tx=d2.transaction("fotos","readwrite"); tx.objectStore("fotos").delete(k); tx.oncomplete=res; tx.onerror=rej; }); }); }
+  const tx=d2.transaction("fotos","readwrite"); tx.objectStore("fotos").delete(k);
+  tx.oncomplete=function(){ _fotoCacheSet(k, null); res(); }; tx.onerror=rej; }); }); }
 let camTarget=null;
 function takePhoto(k){ if(!requiereEdicion()) return; camTarget=k; const c=document.getElementById("camin"); c.value=""; c.click(); }
 document.getElementById("camin").addEventListener("change", function(){
