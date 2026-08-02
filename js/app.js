@@ -215,6 +215,15 @@ function arrancar(){
 }
 
 /* ================= LISTENERS EN VIVO ================= */
+/* Al guardar en lote (por ejemplo marcar 20 pendientes de una tarjeta) la nube responde
+   varias veces seguidas y cada respuesta redibujaba toda la pantalla. Se agrupan en un solo
+   dibujado por cuadro de animación: se ve igual de inmediato y trabaja mucho menos. */
+let _pedidoRender = false;
+function renderPronto(){
+  if(_pedidoRender) return;
+  _pedidoRender = true;
+  requestAnimationFrame(function(){ _pedidoRender = false; render(); });
+}
 let _unsubs = [];
 function detenerListeners(){ _unsubs.forEach(function(fn){ try{ fn(); }catch(e){} }); _unsubs=[]; }
 function iniciarListeners(){
@@ -225,7 +234,7 @@ function iniciarListeners(){
       else { TARJETAS[ch.doc.id] = Object.assign({id:ch.doc.id}, ch.doc.data()); }
     });
     ready.t = true; afterFirstSync();
-    if(firstSyncDone) render();
+    if(firstSyncDone) renderPronto();
   }, function(e){ setSync("off","Error de sincronización"); }));
 
   _unsubs.push(db.collection("bienes").onSnapshot(function(snap){
@@ -234,7 +243,7 @@ function iniciarListeners(){
       else { BIENES[ch.doc.id] = Object.assign({id:ch.doc.id}, ch.doc.data()); }
     });
     ready.b = true; afterFirstSync();
-    if(firstSyncDone){ refreshProgress(); render(); }
+    if(firstSyncDone){ refreshProgress(); renderPronto(); }
   }, function(e){ setSync("off","Error de sincronización"); }));
 
   _unsubs.push(db.collection("hallazgos").onSnapshot(function(snap){
@@ -242,7 +251,7 @@ function iniciarListeners(){
       if(ch.type==="removed"){ delete HALLAZGOS[ch.doc.id]; }
       else { HALLAZGOS[ch.doc.id] = Object.assign({id:ch.doc.id}, ch.doc.data()); }
     });
-    if(firstSyncDone && (mode.view==="hall"||mode.q)) render();
+    if(firstSyncDone && (mode.view==="hall"||mode.q)) renderPronto();
   }, function(){}));
 }
 let firstSyncDone=false;
@@ -336,7 +345,22 @@ function mostrarBuscador(visible){
   const sb = document.querySelector(".searchbar");
   if(sb) sb.style.display = visible ? "" : "none";
 }
-function goHome(){ mode={view:"home",tarjetaId:null,filter:"todos",q:""}; resetFiltrosBusqueda(); document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
+/* Al entrar a una ficha se recuerda dónde iba la lista, para volver al mismo lugar.
+   Antes, con 48 responsables, volver siempre lo dejaba hasta arriba y había que buscar
+   de nuevo por dónde iba. */
+let _scrollInicio = 0;
+function goHome(){
+  mode={view:"home",tarjetaId:null,filter:"todos",q:""}; resetFiltrosBusqueda();
+  document.getElementById("search").value=""; render();
+  const y = _scrollInicio; _scrollInicio = 0;
+  // Se recupera la posición tras dibujar. Se repite un instante después porque las fotos y
+  // los módulos que agregan datos a las tarjetas cambian el alto de la página al terminar,
+  // y si solo se hiciera una vez el listado quedaba más arriba de donde iba.
+  requestAnimationFrame(function(){
+    window.scrollTo(0, y);
+    if(y > 0) setTimeout(function(){ if(mode.view==="home") window.scrollTo(0, y); }, 90);
+  });
+}
 function render(){
   if(!firstSyncDone) return;
   const v=document.getElementById("view");
@@ -392,7 +416,9 @@ function renderPendientes(v){
   h += pend.map(function(b){ return itemCard(b, false, chipPendienteViejo(b)); }).join("");
   v.innerHTML=h; loadThumbs();
 }
-function openPerson(id){ mode={view:"person",tarjetaId:id,filter:"todos",q:""}; resetFiltrosBusqueda(); document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
+function openPerson(id){
+  if(mode.view==="home") _scrollInicio = window.scrollY || 0;
+  mode={view:"person",tarjetaId:id,filter:"todos",q:""}; resetFiltrosBusqueda(); document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
 /* ================= CONTROL "ACTUALIZADO EN AS-400" (por tarjeta) =================
    Marca que la tarjeta completa del responsable ya se cargó al sistema AS-400.
    Se guarda con fecha y con quién la marcó, para que quede constancia de auditoría. */
