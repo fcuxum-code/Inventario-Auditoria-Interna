@@ -310,10 +310,10 @@ function renderPanelMetricas(){
       +'</div>') : '');
 }
 /* ================= FILTROS DE BÚSQUEDA ================= */
-let searchFiltros = { ubic:"", estado:"", categoria:"" };
+let searchFiltros = { ubic:"", estado:"", categoria:"", as400:"" };
 let mostrarFiltros = false;
-function filtrosActivos(){ return !!(searchFiltros.ubic || searchFiltros.estado || searchFiltros.categoria); }
-function resetFiltrosBusqueda(){ searchFiltros={ubic:"",estado:"",categoria:""}; mostrarFiltros=false; }
+function filtrosActivos(){ return !!(searchFiltros.ubic || searchFiltros.estado || searchFiltros.categoria || searchFiltros.as400); }
+function resetFiltrosBusqueda(){ searchFiltros={ubic:"",estado:"",categoria:"",as400:""}; mostrarFiltros=false; }
 function toggleFiltrosBusqueda(){ mostrarFiltros=!mostrarFiltros; render(); }
 function setFiltroBusqueda(campo,val){ searchFiltros[campo]=val; render(); }
 function limpiarFiltrosBusqueda(){ resetFiltrosBusqueda(); render(); }
@@ -321,6 +321,13 @@ function bienCoincideFiltros(b){
   if(searchFiltros.ubic && b.ubicacion!==searchFiltros.ubic) return false;
   if(searchFiltros.estado && b.estado!==searchFiltros.estado) return false;
   if(searchFiltros.categoria && categoriaBien(b).cod!==searchFiltros.categoria) return false;
+  if(searchFiltros.as400){
+    // El estado de carga al AS-400 es de la tarjeta; un bien sin tarjeta no puede estar cargado.
+    const tj = b.tarjetaId ? TARJETAS[b.tarjetaId] : null;
+    const cargado = !!(tj && tj.as400Actualizado);
+    if(searchFiltros.as400==="SI" && !cargado) return false;
+    if(searchFiltros.as400==="NO" && cargado) return false;
+  }
   return true;
 }
 /* ================= NAVEGACIÓN / RENDER ================= */
@@ -470,6 +477,8 @@ function renderPerson(v){
     +'<div class="fp '+(mode.filter==="list"?"on":"")+'" onclick="setFilter(\'list\')">Hechos ('+d+')</div></div>';
   if(n===0){
     h+='<button class="act o" style="margin-bottom:12px" onclick="borrarTarjetaDefinitiva(\''+t.id+'\')">'+icon('trash',15,'margin-right:6px')+'Borrar este responsable (tarjeta vacía)</button>';
+  } else if(puedeEditar() && (n-d)>0){
+    h+='<button class="act p" style="margin-bottom:12px" onclick="abrirModoRapido(\''+t.id+'\')">'+icon('zap',16,'margin-right:7px')+'Modo rápido — verificar '+(n-d)+' pendiente'+((n-d)===1?'':'s')+'</button>';
   }
   if(show.length===0){ h+=emptyState('No hay bienes en este filtro'); v.innerHTML=h; loadThumbs(); return; }
   if(mode.filter!=="list" && (n-d)>1){
@@ -506,6 +515,73 @@ function borrarTarjetaDefinitiva(id){
 function setFilter(f){ mode.filter=f; render(); }
 
 /* ================= CONSTANCIA DE RESPONSABILIDAD (imprimir / PDF) ================= */
+/* ================= REPORTE EJECUTIVO (una página, para imprimir o enviar) ================= */
+function imprimirReporteEjecutivo(){
+  closeMenu();
+  const s = statsGlobales();
+  const lista = Object.values(BIENES);
+
+  // Avance por ubicación
+  const porUbic = {};
+  lista.forEach(function(b){
+    const u = b.ubicacion || "(sin ubicación registrada)";
+    if(!porUbic[u]) porUbic[u] = {total:0, si:0, no:0, pend:0, valor:0};
+    const g = porUbic[u]; g.total++; g.valor += Number(b.valor||0);
+    if(b.existe==="SÍ") g.si++; else if(b.existe) g.no++; else g.pend++;
+  });
+  const filasUbic = Object.keys(porUbic).sort(function(a,b){ return porUbic[b].total-porUbic[a].total; }).map(function(u){
+    const g = porUbic[u], pct = g.total?Math.round(g.si/g.total*100):0;
+    return '<tr><td>'+esc(u)+'</td><td class="pdnum">'+g.total+'</td><td class="pdnum">'+g.si+'</td>'
+      +'<td class="pdnum">'+g.no+'</td><td class="pdnum">'+g.pend+'</td><td class="pdnum">'+pct+'%</td></tr>';
+  }).join("");
+
+  // Diferencias por responsable
+  const disc = discrepancias();
+  const porResp = {};
+  disc.forEach(function(b){
+    const r = b.responsable || "(sin responsable)";
+    if(!porResp[r]) porResp[r] = {n:0, valor:0};
+    porResp[r].n++; porResp[r].valor += Number(b.valor||0);
+  });
+  const filasResp = Object.keys(porResp).sort(function(a,b){ return porResp[b].n-porResp[a].n; }).slice(0,12).map(function(r){
+    return '<tr><td>'+esc(r)+'</td><td class="pdnum">'+porResp[r].n+'</td><td class="pdnum">'+money(porResp[r].valor)+'</td></tr>';
+  }).join("");
+
+  const kpi = function(etq, val, extra){
+    return '<div class="pdkpi"><div class="pdkpinum">'+val+'</div><div class="pdkpilbl">'+etq+'</div>'
+      + (extra?'<div class="pdkpisub">'+extra+'</div>':'') + '</div>';
+  };
+
+  const html = '<div class="pdhead">'
+      +'<div class="pdtitle">Instituto Guatemalteco de Seguridad Social — Auditoría Interna</div>'
+      +'<div class="pdsub">Reporte ejecutivo — Inventario físico de bienes</div>'
+      +'<div class="pdfecha">Generado el '+today()+(META.by?('  ·  Por '+esc(META.by)):'')+'</div>'
+    +'</div>'
+    +'<div class="pdkpis">'
+      + kpi("Avance de verificación", s.pct+"%", s.done+" de "+s.total+" bienes")
+      + kpi("Diferencias", s.disc, "bienes marcados NO")
+      + kpi("Sin responsable", s.pendCount, "pendientes de asignar")
+      + kpi("Valor del inventario", money(s.valorTotal), s.tarjetas+" tarjeta(s)")
+    +'</div>'
+    +'<div class="pdsec">Avance por ubicación</div>'
+    +'<table class="pdtabla"><thead><tr><th>Ubicación</th><th>Bienes</th><th>Verificados</th><th>Con diferencia</th><th>Pendientes</th><th>Avance</th></tr></thead>'
+      +'<tbody>'+(filasUbic||'<tr><td colspan="6">Sin datos.</td></tr>')+'</tbody></table>'
+    +'<div class="pdsec">Diferencias por responsable</div>'
+    +'<table class="pdtabla"><thead><tr><th>Responsable</th><th>Bienes con diferencia</th><th>Valor</th></tr></thead>'
+      +'<tbody>'+(filasResp||'<tr><td colspan="3">No se registraron diferencias.</td></tr>')+'</tbody>'
+      +'<tfoot><tr><td><b>Total</b></td><td class="pdnum"><b>'+disc.length+'</b></td>'
+      +'<td class="pdnum"><b>'+money(disc.reduce(function(a,b){return a+Number(b.valor||0);},0))+'</b></td></tr></tfoot></table>'
+    +'<div class="pdsec">Carga al sistema AS-400</div>'
+    +'<div class="pdtexto">'+s.as400Ok+' de '+s.tarjetas+' tarjetas de responsabilidad ya fueron cargadas al AS-400 ('+s.as400Pct+'%). '
+      + (s.as400Pend? ('Quedan '+s.as400Pend+' pendiente'+(s.as400Pend===1?'':'s')+' de cargar.') : 'No queda ninguna pendiente.')+'</div>'
+    +'<div class="pdfirmas">'
+      +'<div class="pdfirma"><div class="pdline"></div>Elaboró — Auditoría Interna</div>'
+      +'<div class="pdfirma"><div class="pdline"></div>Revisó</div>'
+    +'</div>'
+    +'<div class="pdnota">Revise el texto de este reporte antes de usarlo como documento oficial — el formato es un punto de partida, no un modelo institucional certificado.</div>';
+  document.getElementById("printArea").innerHTML = html;
+  setTimeout(function(){ window.print(); }, 80);
+}
 function imprimirConstancia(tarjetaId){
   const t = TARJETAS[tarjetaId]; if(!t) return;
   const list = bienesDe(t.id).slice().sort(function(a,b){ return (a.codigo||"").localeCompare(b.codigo||""); });
@@ -926,6 +1002,10 @@ function renderBarraFiltros(){
   h += '<select onchange="setFiltroBusqueda(\'categoria\',this.value)"><option value="">Categoría (todas)</option>'
      + CATEGORIAS_BIEN.map(function(c){ return '<option value="'+c.cod+'" '+(searchFiltros.categoria===c.cod?"selected":"")+'>'+esc(c.nombre)+'</option>'; }).join("")
      + '<option value="OTROS" '+(searchFiltros.categoria==="OTROS"?"selected":"")+'>Otros / sin clasificar</option>'
+     + '</select>';
+  h += '<select onchange="setFiltroBusqueda(\'as400\',this.value)"><option value="">AS-400 (todas)</option>'
+     + '<option value="NO" '+(searchFiltros.as400==="NO"?"selected":"")+'>Pendientes de cargar</option>'
+     + '<option value="SI" '+(searchFiltros.as400==="SI"?"selected":"")+'>Ya cargadas</option>'
      + '</select>';
   if(filtrosActivos()) h += '<span class="moretog" onclick="limpiarFiltrosBusqueda()">'+icon('x',12)+' Limpiar filtros</span>';
   h += '</div>';
@@ -1753,6 +1833,7 @@ function openMenu(){
     +'<div class="mitem" onclick="abrirFusion()"><span class="ic">'+icon('refreshCw',20)+'</span><div><b>Fusionar tarjetas duplicadas</b><small>Si la misma persona quedó con dos tarjetas</small></div></div>'
 
     + sec("Reportes")
+    +'<div class="mitem" onclick="imprimirReporteEjecutivo()"><span class="ic">'+icon('clipboardCheck',20)+'</span><div><b>Reporte ejecutivo (PDF)</b><small>Resumen de una página: avance, diferencias y carga al AS-400</small></div></div>'
     +'<div class="mitem" onclick="generarExcel()"><span class="ic">'+icon('barChart',20)+'</span><div><b>Generar reporte en Excel</b><small>Resumen, bienes, discrepancias, tarjetas, personal, movimientos y hallazgos</small></div></div>'
     +'<div class="mitem" onclick="importarExcel()"><span class="ic">'+icon('upload',20)+'</span><div><b>Importar bienes nuevos desde Excel</b><small>Los crea como pendientes de asignar</small></div></div>'
 

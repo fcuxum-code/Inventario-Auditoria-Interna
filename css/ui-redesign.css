@@ -97,3 +97,9 @@ button{ font-family:inherit !important; }
 
 /* --- Ajustes: modal Hallazgo/pickers --- */
 #sheet, .sheet{ box-shadow:0 -14px 40px rgba(10,15,30,.28) !important; border-top-left-radius:20px !important; border-top-right-radius:20px !important; }
+
+/* Impresión: el fondo y la marca de agua de la app no deben salir en el documento.
+   Va en este archivo porque carga después de styles.css y su !important gana. */
+@media print{
+  html, body{ background:#fff !important; background-image:none !important; }
+}
