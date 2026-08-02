@@ -211,6 +211,7 @@
 
     seccion("RESPONSABLES");
     par("Tarjetas de responsabilidad activas", datos.tarjetas);
+    par("Tarjetas ya actualizadas en AS-400", datos.tarjetasAS400 + " de " + datos.tarjetas);
     par("Empleados registrados", datos.personalTotal);
     par("Empleados dados de baja", datos.personalBaja);
 
@@ -257,6 +258,7 @@
       valorTotal: bienes.reduce(function(s,b){ return s+Number(b.valor||0); }, 0),
       valorDiscrepancias: disc.reduce(function(s,b){ return s+Number(b.valor||0); }, 0),
       tarjetas: (typeof tarjetasActivas==="function" ? tarjetasActivas().length : 0),
+      tarjetasAS400: (typeof tarjetasActivas==="function" ? tarjetasActivas().filter(function(t){ return t.as400Actualizado; }).length : 0),
       personalTotal: personal.length,
       personalBaja: personal.filter(function(p){ return p.activo===false; }).length,
       porUbicacion: Object.values(porUbic).sort(function(a,b){ return b.total-a.total; }),
@@ -327,7 +329,10 @@
       { h:"Bienes cargados", w:15, tipo:"entero", get:function(t){ return t.__n; } },
       { h:"Verificados", w:13, tipo:"entero", get:function(t){ return t.__d; } },
       { h:"Valor asignado", w:15, tipo:"moneda", get:function(t){ return t.__q; } },
-      { h:"Firma de recibido", w:16, get:function(t){ return t.firmaRecibida ? ("Sí"+(t.firmaFecha?(" · "+t.firmaFecha):"")) : "No"; } }
+      { h:"Firma de recibido", w:16, get:function(t){ return t.firmaRecibida ? ("Sí"+(t.firmaFecha?(" · "+t.firmaFecha):"")) : "No"; } },
+      { h:"Actualizado en AS-400", w:18, get:function(t){ return t.as400Actualizado ? "Sí" : "No"; } },
+      { h:"Fecha AS-400", w:14, tipo:"fecha", get:function(t){ return aFecha(t.as400Fecha) || (t.as400Fecha||""); } },
+      { h:"Actualizado por", w:20, get:function(t){ return t.as400Por||""; } }
     ];
     var tarjs = (typeof tarjetasActivas==="function" ? tarjetasActivas() : []).map(function(t){
       var items = (typeof bienesDe==="function") ? bienesDe(t.id) : [];

@@ -64,6 +64,19 @@
   .c-rev{background:var(--amarbg); color:var(--amar); margin-left:5px;}
   .c-hz{background:var(--naranjabg); color:var(--naranja);}
   .c-old{background:var(--rojobg); color:var(--rojo); margin-left:5px;}
+  /* check "Actualizado en AS-400" (por tarjeta de responsable) */
+  .as400box{display:flex; align-items:center; gap:11px; margin:10px 2px 2px; padding:11px 13px;
+    background:var(--card); border:1.5px solid var(--linea); border-radius:12px; cursor:pointer;
+    box-shadow:0 1px 3px rgba(20,30,60,.05);}
+  .as400box:active{background:#f6f8fc;}
+  .as400box b{font-size:13.5px; color:#17202e; display:block;}
+  .as400box small{display:block; font-size:11.5px; color:var(--gris2); margin-top:1px;}
+  .as400chk{flex:none; width:24px; height:24px; border-radius:7px; border:2px solid #C3CDDC;
+    background:#fff; display:flex; align-items:center; justify-content:center; color:#fff;}
+  .as400box.on{background:var(--verdebg); border-color:var(--verdeb);}
+  .as400box.on b{color:var(--verde);}
+  .as400box.on .as400chk{background:var(--verde); border-color:var(--verde);}
+  .c-as400{background:var(--verdebg); color:var(--verde); margin-left:5px;}
   /* categoría todavía sin confirmar: se distingue con borde punteado, no con un "?" */
   .chip.cat-est{border:1px dashed currentColor; opacity:.82;}
   .chip[onclick]{cursor:pointer;}

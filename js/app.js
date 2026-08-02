@@ -341,7 +341,8 @@ function render(){
       +'<div class="ring" style="--p:'+p+'"><span class="ringtxt">'+d+'/'+n+'</span></div>'
       +'<div class="pinfo"><div class="pname">'+esc(t.responsable||"(sin nombre)")+'</div>'
       +'<div class="pmeta">Tarjeta '+esc(t.numero||"(pendiente)")+' '+chipTipo(t.tipo)
-      +(t.correo?' <span class="pill-mail">✉️</span>':'')+'</div></div>'
+      +(t.correo?' <span class="pill-mail">✉️</span>':'')
+      +(t.as400Actualizado?' <span class="chip c-as400">'+icon('check',10,'margin-right:2px')+'AS-400</span>':'')+'</div></div>'
       +'<div style="color:#B8C0CC;font-size:20px">›</div></div>';
   });
   v.innerHTML=h;
@@ -374,6 +375,37 @@ function renderPendientes(v){
   v.innerHTML=h; loadThumbs();
 }
 function openPerson(id){ mode={view:"person",tarjetaId:id,filter:"todos",q:""}; resetFiltrosBusqueda(); document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
+/* ================= CONTROL "ACTUALIZADO EN AS-400" (por tarjeta) =================
+   Marca que la tarjeta completa del responsable ya se cargó al sistema AS-400.
+   Se guarda con fecha y con quién la marcó, para que quede constancia de auditoría. */
+function as400Control(t){
+  const puede = puedeEditar();
+  if(t.as400Actualizado){
+    const detalle = (t.as400Fecha?esc(t.as400Fecha):"") + (t.as400Por?(" · "+esc(t.as400Por)):"");
+    return '<div class="as400box on"'+(puede?' onclick="marcarAS400(\''+t.id+'\',false)"':'')+'>'
+      + '<span class="as400chk">'+icon('check',15)+'</span>'
+      + '<div><b>Actualizado en AS-400</b>'+(detalle?'<small>'+detalle+'</small>':'')
+      + (puede?'<small>Toque para desmarcar</small>':'')+'</div></div>';
+  }
+  if(!puede){
+    return '<div class="as400box"><span class="as400chk"></span><div><b>Pendiente de actualizar en AS-400</b></div></div>';
+  }
+  return '<div class="as400box" onclick="marcarAS400(\''+t.id+'\',true)">'
+    + '<span class="as400chk"></span>'
+    + '<div><b>Marcar como actualizado en AS-400</b><small>Toque cuando ya haya cargado esta tarjeta al sistema</small></div></div>';
+}
+function marcarAS400(tarjetaId, valor){
+  if(!requiereEdicion()) return;
+  const t = TARJETAS[tarjetaId]; if(!t) return;
+  if(!valor && !confirm('¿Quitar la marca de "Actualizado en AS-400" de la tarjeta de '+(t.responsable||"esta persona")+'?')) return;
+  const patch = valor
+    ? { as400Actualizado:true, as400Fecha: today(), as400Por: META.by||"" }
+    : { as400Actualizado:false, as400Fecha:"", as400Por:"" };
+  patch.actualizada = firebase.firestore.FieldValue.serverTimestamp();
+  db.collection("tarjetas").doc(tarjetaId).set(patch, {merge:true})
+    .then(function(){ toast(valor?"Marcada como actualizada en AS-400 ✓":"Marca de AS-400 quitada"); })
+    .catch(function(){ toast("No se pudo guardar (revise conexión)"); });
+}
 function renderPerson(v){
   const t = TARJETAS[mode.tarjetaId];
   if(!t){ goHome(); return; }
@@ -389,7 +421,8 @@ function renderPerson(v){
     +'<div style="margin-top:4px"><span class="moretog" onclick="editCorreoTarjeta(\''+t.id+'\')">✉️ '+(t.correo?esc(t.correo):"agregar correo")+'</span>'
     +' <span class="moretog" onclick="imprimirConstancia(\''+t.id+'\')">'+icon('download',13)+' Constancia (PDF)</span>'
     +(t.firmaRecibida?(' <span class="moretog" onclick="verFirma(\''+t.id+'\')">'+icon('check',13)+' Firmado'+(t.firmaFecha?(' ('+esc(t.firmaFecha)+')'):'')+'</span>'):'')
-    +'</div></div>';
+    +'</div></div>'
+    + as400Control(t);
   h+='<div class="filters">'
     +'<div class="fp '+(mode.filter==="todos"?"on":"")+'" onclick="setFilter(\'todos\')">Todos ('+n+')</div>'
     +'<div class="fp '+(mode.filter==="pend"?"on":"")+'" onclick="setFilter(\'pend\')">Pendientes ('+(n-d)+')</div>'
