@@ -72,7 +72,11 @@ function categoriaBien(b){
 function chipCategoria(b){
   const c = categoriaBien(b);
   const cls = {COMPUTO:"c-comp",MOBILIARIO:"c-bod",COMUNICACION:"c-ind",MEDICO:"c-dup",ELECTRO:"c-hz",HERRAMIENTA:"c-old",VEHICULO:"c-rev",OTROS:""}[c.cod]||"";
-  return '<span class="chip '+cls+'" style="cursor:pointer" onclick="event.stopPropagation();abrirCategoriaPicker(\''+b.id+'\')" title="Categoría estimada — toque para corregir">'+esc(c.nombre.toUpperCase())+(b.categoriaManual?"":" ?")+'</span>';
+  // Sin confirmar se marca con borde punteado (antes se ponía un "?" que parecía un error de dedo).
+  const estimada = !b.categoriaManual;
+  return '<span class="chip '+cls+(estimada?" cat-est":"")+'" onclick="event.stopPropagation();abrirCategoriaPicker(\''+b.id+'\')"'
+    + ' title="'+(estimada?"Categoría estimada por la descripción — toque para confirmarla o corregirla":"Categoría confirmada — toque para cambiarla")+'">'
+    + esc(c.nombre.toUpperCase())+'</span>';
 }
 function abrirCategoriaPicker(id){
   const b = BIENES[id]; if(!b) return;
@@ -309,11 +313,17 @@ function bienCoincideFiltros(b){
   return true;
 }
 /* ================= NAVEGACIÓN / RENDER ================= */
+// El buscador general solo tiene sentido en las pantallas que listan bienes.
+function mostrarBuscador(visible){
+  const sb = document.querySelector(".searchbar");
+  if(sb) sb.style.display = visible ? "" : "none";
+}
 function goHome(){ mode={view:"home",tarjetaId:null,filter:"todos",q:""}; resetFiltrosBusqueda(); document.getElementById("search").value=""; render(); window.scrollTo(0,0); }
 function render(){
   if(!firstSyncDone) return;
   const v=document.getElementById("view");
   const fbtn = document.getElementById("filterbtn"); if(fbtn) fbtn.classList.toggle("on", filtrosActivos()||mostrarFiltros);
+  mostrarBuscador(mode.view!=="ses"); // en "Nueva toma" el buscador no aplica y solo estorba
   if(mode.q || filtrosActivos() || mostrarFiltros) return renderSearch(v);
   if(mode.view==="person") return renderPerson(v);
   if(mode.view==="hall") return renderHall(v);
@@ -356,7 +366,7 @@ function renderPendientes(v){
   });
   const viejos = pend.filter(function(b){ return chipPendienteViejo(b); }).length;
   let h='<button class="backbtn" onclick="goHome()">‹ Responsables</button>';
-  h+='<div style="margin:6px 2px 8px"><div style="font-size:18px;font-weight:800;color:#1F3864">📦 Bienes pendientes de asignar</div>'
+  h+='<div style="margin:6px 2px 8px"><div style="font-size:18px;font-weight:800;color:#1F3864">'+icon('package',17,'margin-right:6px')+'Bienes pendientes de asignar</div>'
     +'<div style="font-size:12.5px;color:#8A929C;margin-top:2px">Bienes ya ingresados al sistema (por ejemplo, importados de Excel) que todavía no tienen responsable. Asígnelos con 🧍 Nueva toma cuando visite a la persona.</div></div>';
   if(pend.length===0){ h+=emptyState('No hay bienes pendientes de asignar'); v.innerHTML=h; return; }
   if(viejos>0){ h+='<div class="warnbox">'+icon('alertTriangle',13,'margin-right:4px')+viejos+' bien(es) llevan '+UMBRAL_DIAS_PENDIENTE+' días o más sin asignar.</div>'; }
@@ -385,11 +395,11 @@ function renderPerson(v){
     +'<div class="fp '+(mode.filter==="pend"?"on":"")+'" onclick="setFilter(\'pend\')">Pendientes ('+(n-d)+')</div>'
     +'<div class="fp '+(mode.filter==="list"?"on":"")+'" onclick="setFilter(\'list\')">Hechos ('+d+')</div></div>';
   if(n===0){
-    h+='<button class="act o" style="margin-bottom:12px" onclick="borrarTarjetaDefinitiva(\''+t.id+'\')">🗑️ Borrar este responsable (tarjeta vacía)</button>';
+    h+='<button class="act o" style="margin-bottom:12px" onclick="borrarTarjetaDefinitiva(\''+t.id+'\')">'+icon('trash',15,'margin-right:6px')+'Borrar este responsable (tarjeta vacía)</button>';
   }
   if(show.length===0){ h+=emptyState('No hay bienes en este filtro'); v.innerHTML=h; loadThumbs(); return; }
   if(mode.filter!=="list" && (n-d)>1){
-    h+='<button class="act o" style="margin-bottom:12px" onclick="marcarPendientesNo(\''+t.id+'\')">🚫 Ninguno de los pendientes está aquí (marcar todos NO)</button>';
+    h+='<button class="act o" style="margin-bottom:12px" onclick="marcarPendientesNo(\''+t.id+'\')">'+icon('x',15,'margin-right:6px')+'Ninguno de los pendientes está aquí (marcar todos NO)</button>';
   }
   h += show.map(function(b){ return itemCard(b); }).join("");
   v.innerHTML=h; loadThumbs();
@@ -493,7 +503,7 @@ function itemCard(b, showOwner, extraChip){
   const descField = (b.esNuevo && !soloLectura)
     ? '<input type="text" value="'+esc(b.descripcion||"")+'" onchange="markCampo(\''+id+'\',\'descripcion\',this.value)" placeholder="Descripción del bien" style="width:100%;padding:9px 11px;border:1.4px solid #E2E6EC;border-radius:9px;font-size:14px;margin:4px 0 2px">'
     : '<div class="desc">'+esc(b.descripcion||"")+'</div>';
-  const asignarBtn = (!b.tarjetaId && !soloLectura) ? '<button class="act p" style="margin:8px 0 0" onclick="asignarPendiente(\''+id+'\')">🧍 Asignar a una persona</button>' : '';
+  const asignarBtn = (!b.tarjetaId && !soloLectura) ? '<button class="act p" style="margin:8px 0 0" onclick="asignarPendiente(\''+id+'\')">'+icon('user',15,'margin-right:6px')+'Asignar a una persona</button>' : '';
   const estadoActualTxt = {BUENO:"Bueno",REGULAR:"Regular",MALO:"Malo","PARA BAJA":"Para baja"}[b.estado] || "";
   const accionesExiste = soloLectura
     ? '<div class="powner" style="margin-top:6px">'+(b.existe?('Estado: <b>'+esc(b.existe)+'</b>'+(estadoActualTxt?" · "+esc(estadoActualTxt):"")):"Sin verificar todavía")+'</div>'
@@ -864,9 +874,9 @@ function openHall(){ mode={view:"hall",tarjetaId:null,filter:"todos",q:""}; rese
 function renderHall(v){
   const list = Object.values(HALLAZGOS).sort(function(a,b){ return (b.creadoTs||0)-(a.creadoTs||0); });
   let h='<button class="backbtn" onclick="goHome()">‹ Responsables</button>';
-  h+='<div style="margin:6px 2px 8px"><div style="font-size:18px;font-weight:800;color:#7A4508">📸 Hallazgos</div>'
+  h+='<div style="margin:6px 2px 8px"><div style="font-size:18px;font-weight:800;color:#7A4508">'+icon('camera',17,'margin-right:6px')+'Hallazgos</div>'
     +'<div style="font-size:12.5px;color:#8A929C;margin-top:2px">Bienes encontrados que NO están en ninguna tarjeta.</div></div>';
-  h+='<button class="act n" style="margin:4px 0 14px" onclick="newHallazgo()">➕ Agregar bien encontrado</button>';
+  h+='<button class="act n" style="margin:4px 0 14px" onclick="newHallazgo()">'+icon('plusCircle',16,'margin-right:6px')+'Agregar bien encontrado</button>';
   if(list.length===0) h+=emptyState('Aún no hay hallazgos anotados');
   else h+=list.map(hallCard).join("");
   v.innerHTML=h; loadThumbs();
@@ -957,8 +967,8 @@ function renderSession(v){
   h += '<div class="item" style="border-left-color:#1F3864"><div class="fform">';
   h += '<label>¿A qué tarjeta pasan estos bienes?</label>';
   h += '<div class="toggle2">'
-    + '<div class="tbtn '+(s.tipo==="existente"?"sel":"")+'" onclick="sesSetTipo(\'existente\')">🔁 Tarjeta existente</div>'
-    + '<div class="tbtn '+(s.tipo==="nueva"?"sel":"")+'" onclick="sesSetTipo(\'nueva\')">🆕 Tarjeta nueva</div>'
+    + '<div class="tbtn '+(s.tipo==="existente"?"sel":"")+'" onclick="sesSetTipo(\'existente\')">'+icon('refreshCw',15,'margin-right:5px')+'Tarjeta existente</div>'
+    + '<div class="tbtn '+(s.tipo==="nueva"?"sel":"")+'" onclick="sesSetTipo(\'nueva\')">'+icon('plusCircle',15,'margin-right:5px')+'Tarjeta nueva</div>'
     + '</div>';
   if(s.tipo==="existente"){
     h += '<button class="tpickbtn" style="margin-top:10px" onclick="openTarjetaPicker()">'
@@ -979,9 +989,10 @@ function renderSession(v){
   h += '<label>No. de empleado (opcional)</label><input id="sp_emp" value="'+esc(s.empleado)+'" oninput="curSes.empleado=this.value" inputmode="numeric">';
   h += '<label>Correo electrónico (para el aviso automático)</label><input id="sp_mail" type="email" value="'+esc(s.correo)+'" oninput="curSes.correo=this.value" placeholder="nombre@igss.gob.gt">';
   h += '<label>Ubicación *</label><div class="bgrp" style="flex-direction:column;gap:7px">';
-  LOCS.forEach(function(L){ h+='<button class="btn '+(s.loc===L?"b-si sel":"")+'" style="text-align:left;font-size:13px" onclick="sesSetLoc(\''+esc(L)+'\')">'+(s.loc===L?"✓ ":"")+esc(L)+'</button>'; });
+  LOCS.forEach(function(L){ h+='<button class="btn '+(s.loc===L?"b-si sel":"")+'" style="text-align:left;font-size:13px;display:flex;align-items:center;gap:8px" onclick="sesSetLoc(\''+esc(L)+'\')">'
+    + icon(s.loc===L?'check':'mapPin',15) + esc(L)+'</button>'; });
   h += '</div>';
-  h += '<div class="tools" style="margin-top:10px"><button class="fotobtn" id="fb_Lses" onclick="takePhoto(\'Lses\')">'+icon('camera',15)+' Foto del lugar</button>'
+  h += '<div class="tools" style="margin-top:10px"><button class="fotobtn" id="fb_Lses" data-label="Foto del lugar" onclick="takePhoto(\'Lses\')">'+icon('camera',15)+' Foto del lugar</button>'
      + '<img class="thumb" id="th_Lses" style="display:none" onclick="viewPhoto(\'Lses\')"></div>';
   h += '<label style="margin-top:10px">Firma de recibido (opcional)</label>'
      + '<div style="font-size:11.5px;color:#8A929C;margin-bottom:6px">Si el responsable está presente, que firme aquí como constancia de que recibió los bienes.</div>'
@@ -1534,7 +1545,9 @@ function driveThumbUrl(u){ if(!u) return ""; var m=String(u).match(/[-\w]{25,}/)
     function refreshFotoUI(k){
   fotoGet(k).then(function(r){
     const btn=document.getElementById("fb_"+k), th=document.getElementById("th_"+k);
-    if(btn){ btn.classList.toggle("has",!!r); btn.innerHTML=icon('camera',15)+(r?' '+icon('check',13,'margin-left:2px'):' Foto'); }
+    // Se respeta la etiqueta propia del botón (p. ej. "Foto del lugar"); antes se perdía al refrescar.
+    if(btn){ const etq=btn.getAttribute("data-label")||"Foto";
+      btn.classList.toggle("has",!!r); btn.innerHTML=icon('camera',15)+(r?' '+etq+' '+icon('check',13,'margin-left:2px'):' '+etq); }
     if(th){ if(r){ th.src="data:image/jpeg;base64,"+r.b64; th.style.display=""; } else th.style.display="none"; }
   });
 }
@@ -1634,23 +1647,33 @@ const GS_CODE =
 
 /* ================= MENÚ ================= */
 function openMenu(){
+  const sec = function(txt){ return '<div class="msec">'+txt+'</div>'; };
   document.getElementById("sheet").innerHTML =
     '<div class="grip"></div><h3>Menú</h3>'
     +'<div class="fld"><label>'+icon('user',14)+' ¿Quién realiza el inventario? (se anota en cada bien)</label>'
       +'<input id="byin" type="text" value="'+esc(META.by||"")+'" placeholder="Su nombre" oninput="META.by=this.value; saveMeta();"></div>'
-    +'<div class="fld" style="margin-top:14px"><label>'+icon('mail',14)+' URL de Apps Script (correos y fotos a Drive)</label>'
-      +'<input id="gsin" type="url" value="'+esc(META.gsUrl||"")+'" placeholder="https://script.google.com/macros/s/…/exec" oninput="META.gsUrl=this.value; saveMeta();"></div>'
-    +'<div class="mitem" onclick="verCodigoGS()"><span class="ic">'+icon('code',20)+'</span><div><b>Ver código para Apps Script</b><small>Cópielo y péguelo una sola vez</small></div></div>'
-    +'<div class="mitem" onclick="probarGS()"><span class="ic">'+icon('zap',20)+'</span><div><b>Probar conexión de correo/fotos</b><small>'+(META.gsUrl?"Configurado":"Sin configurar")+'</small></div></div>'
-    +'<div class="mitem" onclick="enviarCorreoPrueba()"><span class="ic">'+icon('mail',20)+'</span><div><b>Enviar correo de prueba (con foto)</b><small>Para confirmar que la foto sí llega adjunta</small></div></div>'
-    +'<div class="mitem" onclick="abrirFusion()"><span class="ic">'+icon('refreshCw',20)+'</span><div><b>Fusionar tarjetas duplicadas</b><small>Si la misma persona quedó con dos tarjetas</small></div></div>'
+
+    + sec("Revisar")
     +'<div class="mitem" onclick="abrirAvanceUbicacion()"><span class="ic">'+icon('mapPin',20)+'</span><div><b>Avance por ubicación</b><small>Cuánto falta por verificar en cada lugar</small></div></div>'
     +'<div class="mitem" onclick="abrirDiscrepancias()"><span class="ic">'+icon('alertTriangle',20)+'</span><div><b>Discrepancias</b><small>Todos los bienes marcados NO en un solo lugar</small></div></div>'
     +'<div class="mitem" onclick="abrirActividadReciente()"><span class="ic">'+icon('clock',20)+'</span><div><b>Actividad reciente</b><small>Últimos movimientos de todos los bienes</small></div></div>'
     +'<div class="mitem" onclick="abrirAsistente()"><span class="ic">'+icon('chat',20)+'</span><div><b>Asistente del inventario</b><small>Pregunte cantidades, valores o listados en lenguaje natural</small></div></div>'
+
+    + sec("Herramientas")
+    +'<div class="mitem" onclick="abrirFusion()"><span class="ic">'+icon('refreshCw',20)+'</span><div><b>Fusionar tarjetas duplicadas</b><small>Si la misma persona quedó con dos tarjetas</small></div></div>'
+
+    + sec("Reportes")
     +'<div class="mitem" onclick="generarExcel()"><span class="ic">'+icon('barChart',20)+'</span><div><b>Generar reporte en Excel</b><small>Resumen, bienes, discrepancias, tarjetas, personal, movimientos y hallazgos</small></div></div>'
     +'<div class="mitem" onclick="importarExcel()"><span class="ic">'+icon('upload',20)+'</span><div><b>Importar bienes nuevos desde Excel</b><small>Los crea como pendientes de asignar</small></div></div>'
 
+    + sec("Configuración")
+    +'<div class="fld"><label>'+icon('mail',14)+' URL de Apps Script (correos y fotos a Drive)</label>'
+      +'<input id="gsin" type="url" value="'+esc(META.gsUrl||"")+'" placeholder="https://script.google.com/macros/s/…/exec" oninput="META.gsUrl=this.value; saveMeta();"></div>'
+    +'<div class="mitem" onclick="verCodigoGS()"><span class="ic">'+icon('code',20)+'</span><div><b>Ver código para Apps Script</b><small>Cópielo y péguelo una sola vez</small></div></div>'
+    +'<div class="mitem" onclick="probarGS()"><span class="ic">'+icon('zap',20)+'</span><div><b>Probar conexión de correo/fotos</b><small>'+(META.gsUrl?"Configurado":"Sin configurar")+'</small></div></div>'
+    +'<div class="mitem" onclick="enviarCorreoPrueba()"><span class="ic">'+icon('mail',20)+'</span><div><b>Enviar correo de prueba (con foto)</b><small>Para confirmar que la foto sí llega adjunta</small></div></div>'
+
+    + sec("Cuenta")
     +'<div class="mitem" onclick="cerrarSesion()"><span class="ic">'+icon('logOut',20)+'</span><div><b>Cerrar sesión</b><small>'+esc(firebase.auth().currentUser?firebase.auth().currentUser.email:"")+'</small></div></div>'
     +'<div class="note">Los datos viven en la nube (Firestore) y se sincronizan solos entre dispositivos, aunque cierre la app. No hace falta exportar para no perderlos — el respaldo es solo un extra.</div>';
   showSheet();

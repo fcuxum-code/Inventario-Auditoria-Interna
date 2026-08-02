@@ -19,9 +19,11 @@
       if(existing){ if(existing.textContent!==texto) existing.textContent=texto; continue; }
       var badge = document.createElement('div');
       badge.className = 'colab-badge';
-      badge.style.cssText = 'margin:6px 0;padding:6px 10px;background:#eef6ff;border:1px solid #b6d4fe;border-radius:8px;font-size:13px;color:#084298;font-weight:600;line-height:1.3;';
+      badge.style.cssText = 'margin:5px 0;padding:4px 9px;background:#f2f7fd;border:1px solid #dce9f7;border-radius:8px;font-size:12px;color:#3d5a80;font-weight:600;line-height:1.3;display:inline-block;';
       badge.textContent = texto;
-      var ref = card.children.length>1 ? card.children[1] : null;
+      // Va después de la descripción (es dato secundario); antes quedaba arriba de todo,
+      // compitiendo con lo que identifica al bien.
+      var ref = card.querySelector('.bgrp') || card.querySelector('.tools') || null;
       card.insertBefore(badge, ref);
     }
   }

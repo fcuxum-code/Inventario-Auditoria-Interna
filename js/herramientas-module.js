@@ -133,7 +133,7 @@
       var sheet=document.getElementById('sheet'); if(!sheet) return;
       if(sheet.querySelector('#herrMenuMarker')) return;
       var anchor=sheet.querySelector('[onclick="abrirFusion()"]');
-      var html='<div class="mitem" onclick="herrAbrirUbicacion()"><span class="ic">'+icon('mapPin',20)+'</span><div><b id="herrMenuMarker">Ver bienes por ubicación</b><small>Buscar todo lo que hay en un lugar</small></div></div>'
+      var html='<div class="mitem" onclick="herrAbrirUbicacion()"><span class="ic">'+icon('search',20)+'</span><div><b id="herrMenuMarker">Ver bienes por ubicación</b><small>Buscar todo lo que hay en un lugar</small></div></div>'
         +'<div class="mitem" onclick="herrAbrirAsignarLote()"><span class="ic">'+icon('layers',20)+'</span><div><b>Asignar tarjeta en lote</b><small>Por empleado o No. de tarjeta, varios bienes a la vez</small></div></div>';
       if(anchor) anchor.insertAdjacentHTML('afterend', html);
       else sheet.insertAdjacentHTML('beforeend', html);

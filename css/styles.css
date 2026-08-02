@@ -10,7 +10,7 @@
   html,body{margin:0; padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
     background:var(--fondo); color:#1a1f26; font-size:16px; line-height:1.4;
-    padding-bottom:84px; -webkit-text-size-adjust:100%;}
+    padding-bottom:104px; -webkit-text-size-adjust:100%;}
   header{position:sticky; top:0; z-index:50; background:var(--azul); color:#fff;
     padding:10px 12px 8px; box-shadow:0 2px 8px rgba(0,0,0,.18);}
   .hrow{display:flex; align-items:center; gap:10px;}
@@ -64,6 +64,9 @@
   .c-rev{background:var(--amarbg); color:var(--amar); margin-left:5px;}
   .c-hz{background:var(--naranjabg); color:var(--naranja);}
   .c-old{background:var(--rojobg); color:var(--rojo); margin-left:5px;}
+  /* categoría todavía sin confirmar: se distingue con borde punteado, no con un "?" */
+  .chip.cat-est{border:1px dashed currentColor; opacity:.82;}
+  .chip[onclick]{cursor:pointer;}
   /* panel de métricas (inicio) */
   .kpigrid{display:grid; grid-template-columns:1fr 1fr; gap:9px; margin:2px 0 12px;}
   .kpicard{background:var(--card); border:1px solid var(--linea); border-radius:13px; padding:12px 13px;
@@ -92,7 +95,8 @@
   .itop{display:flex; align-items:baseline; gap:8px;}
   .inv{font-size:18px; font-weight:800; color:#141a24; letter-spacing:.3px;}
   .val{margin-left:auto; font-size:13px; font-weight:700; color:var(--teal); white-space:nowrap;}
-  .desc{font-size:13.5px; color:#2c333d; margin:6px 0 2px;}
+  /* la descripción es lo que el auditor lee para identificar el bien: va primero en jerarquía */
+  .desc{font-size:14.5px; font-weight:600; color:#17202e; margin:7px 0 3px; line-height:1.32;}
   .ochips{margin:5px 0 2px;}
   .powner{font-size:11.5px; color:var(--gris2); margin-top:3px;}
   .bgrp{display:flex; gap:7px; margin-top:10px;}
@@ -112,7 +116,7 @@
   /* fila foto + extra */
   .tools{display:flex; gap:8px; align-items:center; margin-top:9px; flex-wrap:wrap;}
   .moretog{font-size:12.5px; color:var(--azul2); font-weight:600;}
-  .fotobtn{border:1.6px dashed #B8C4D4; background:#F7FAFE; color:var(--azul2); font-size:12.5px; font-weight:700;
+  .fotobtn{border:1.5px solid #CBD6E5; background:#F7FAFE; color:var(--azul2); font-size:12.5px; font-weight:700;
     padding:8px 12px; border-radius:9px;}
     .drivefoto{border:1.6px solid var(--verdeb); background:var(--verdebg); color:var(--verde); font-size:12.5px; font-weight:700; padding:8px 12px; border-radius:9px; text-decoration:none; display:inline-block;}
     .drivefoto{display:inline-flex; align-items:center; gap:6px;}
@@ -142,6 +146,9 @@
   .grip{width:40px; height:4px; background:#D5DAE2; border-radius:3px; margin:8px auto 12px;}
   .sheet h3{margin:2px 0 12px; font-size:16px; color:var(--azul);}
   .mitem{display:flex; align-items:center; gap:12px; padding:14px 6px; border-top:1px solid var(--linea); font-size:15px;}
+  /* encabezado de grupo dentro del menú */
+  .msec{margin:18px 0 2px; font-size:11px; font-weight:800; letter-spacing:.9px; text-transform:uppercase; color:var(--gris2);}
+  .msec + .mitem{border-top:none;}
   .mitem .ic{font-size:20px; width:26px; text-align:center; color:var(--azul2); flex:none; display:flex; align-items:center; justify-content:center;}
   .mitem b{font-weight:600;}
   .mitem small{display:block; color:var(--gris2); font-size:11.5px; font-weight:400;}

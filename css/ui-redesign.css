@@ -40,7 +40,8 @@ header .htitle small{ opacity:.85 !important; font-weight:500 !important; }
 #search{
   border:1px solid var(--linea) !important;
   border-radius:14px !important;
-  padding:14px 16px !important;
+  /* deja lugar a la lupa (izq.) y al boton de filtros (der.), si no el texto queda encima */
+  padding:14px 52px 14px 44px !important;
   box-shadow:var(--shadow-sm) !important;
   background:rgba(255,255,255,.96) !important;
   font-size:15px !important;
@@ -61,12 +62,12 @@ header .htitle small{ opacity:.85 !important; font-weight:500 !important; }
 .prow:hover{ transform:translateY(-2px); box-shadow:var(--shadow-md) !important; border-color:#d4dcec !important; }
 .prow:active{ transform:translateY(0); }
 
-/* Alert cards */
-#resumenAlerta > *, .hzrow{
+/* Alert cards — se estiliza el aviso completo, no sus hijos (antes dibujaba una caja dentro de otra) */
+#resumenAlerta, .hzrow{
   border-radius:14px !important;
   box-shadow:var(--shadow-sm) !important;
-  border:1px solid var(--linea) !important;
 }
+.hzrow{ border:1px solid var(--linea) !important; }
 
 .hint{ color:var(--muted) !important; }
 
@@ -83,10 +84,12 @@ header .htitle small{ opacity:.85 !important; font-weight:500 !important; }
 #fabbar button{
   border-radius:14px !important;
   font-weight:700 !important;
-  font-size:13.5px !important;
-  padding:12px 8px !important;
+  /* que las 4 etiquetas quepan en una sola línea, para que la barra no crezca ni quede despareja */
+  font-size:12px !important;
+  padding:10px 4px !important;
   transition:transform .14s, background .18s, color .18s;
 }
+#fabbar button span:last-child{ white-space:nowrap; }
 #fabbar button:active{ transform:scale(.97); }
 
 /* Generic buttons harmony */

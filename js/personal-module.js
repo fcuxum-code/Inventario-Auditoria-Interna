@@ -27,6 +27,7 @@
   };
 
   window.openPersonal=function(){ var view=document.getElementById('view'); if(!view)return;
+    if(typeof mostrarBuscador==='function') mostrarBuscador(false);
     view.innerHTML='<div style="padding:8px 2px"><button class="backbtn" onclick="goHome()">&lsaquo; Volver</button>'
       +'<h2 id="perTitulo" style="margin:10px 2px 6px;color:#1F3864">Personal</h2>'
       +'<input id="perSearch" placeholder="Buscar por nombre, No. o correo..." oninput="filtrarPersonal()" style="width:100%;padding:11px;border:1px solid #cdd6e4;border-radius:10px;margin-bottom:8px">'
@@ -48,8 +49,8 @@
     cont.innerHTML=arr.map(function(p){ var ina=p.activo===false;
       var fb=ina?fmtFechaISO(p.fechaBaja):'';
       return '<div style="background:'+(ina?'#FFF4F4':'#fff')+';border:1px solid '+(ina?'#F3C6C6':'#e6e9f0')+';border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer" onclick="editarPersonal(\''+esc(p.__id)+'\')">'
-        +'<div style="font-weight:700;color:#1F3864">'+esc(p.nombre)+(ina?' <span style="color:#c0392b;font-size:12px">&#9940; baja'+(fb?' desde '+esc(fb):'')+'</span>':'')+'</div>'
-        +'<div style="font-size:12.5px;color:#5E7196">No. '+esc(p.noEmpleado)+' &middot; '+esc(p.cargo||'-')+' &middot; Renglon '+esc(p.renglon||'-')+'</div>'
+        +'<div style="font-weight:700;color:#1F3864">'+esc(p.nombre)+(ina?' <span style="color:#c0392b;font-size:12px">&#9679; baja'+(fb?' desde '+esc(fb):'')+'</span>':'')+'</div>'
+        +'<div style="font-size:12.5px;color:#5E7196">No. '+esc(p.noEmpleado)+' &middot; '+esc(p.cargo||'-')+' &middot; Renglón '+esc(p.renglon||'-')+'</div>'
         +'<div style="font-size:12.5px;color:#5E7196">'+esc(p.correo||'sin correo')+(p.dpi?' &middot; DPI '+esc(p.dpi):'')+'</div></div>';
     }).join('')||'<div style="color:#5E7196;padding:10px">Sin resultados</div>'; }
   function tarjetasDePersonal(p){
@@ -108,7 +109,7 @@
     function f(l,k,val,tipo){ return '<label style="display:block;font-size:12.5px;color:#5E7196;margin-top:8px">'+l+'<input type="'+(tipo||'text')+'" id="pf_'+k+'" value="'+esc(val||'')+'" style="width:100%;padding:10px;border:1px solid #cdd6e4;border-radius:9px;margin-top:3px;box-sizing:border-box"></label>'; }
     view.innerHTML='<div style="padding:8px 2px"><button class="backbtn" onclick="openPersonal()">&lsaquo; Personal</button>'
       +'<h2 style="margin:10px 2px;color:#1F3864">'+(id?'Editar empleado':'Nuevo empleado')+'</h2>'
-      +f('Nombre completo','nombre',p.nombre)+f('No. de empleado','noEmpleado',p.noEmpleado)+f('Renglon','renglon',p.renglon)+f('Cargo nominal','cargo',p.cargo)+f('DPI','dpi',p.dpi)+f('Correo','correo',p.correo)
+      +f('Nombre completo','nombre',p.nombre)+f('No. de empleado','noEmpleado',p.noEmpleado)+f('Renglón','renglon',p.renglon)+f('Cargo nominal','cargo',p.cargo)+f('DPI','dpi',p.dpi)+f('Correo','correo',p.correo)
       +'<label style="display:block;margin-top:12px;font-size:13px;color:#1F3864"><input type="checkbox" id="pf_activo" '+(p.activo!==false?'checked':'')+'> Empleado activo</label>'
       +f('Fecha de baja (dejar vacía si sigue laborando)','fechaBaja',p.fechaBaja,'date')
       +'<button onclick="guardarPersonal(\''+(id||'')+'\')" style="width:100%;padding:13px;border:none;border-radius:10px;background:#2E7D32;color:#fff;font-weight:700;margin-top:14px">Guardar</button>'
@@ -148,7 +149,7 @@
     document.querySelectorAll('#view .prow').forEach(function(row){ var old=row.querySelector('.alarma-badge'); if(old)old.remove(); row.style.background=''; row.style.border='';
       var m=(row.getAttribute('onclick')||'').match(/openPerson\('([^']+)'\)/); if(!m)return; var t=TARJETAS[m[1]]; if(!t)return;
       if(!esActivo(t.responsable||'')){ row.style.background='#FFF4F4'; row.style.border='1px solid #F3C6C6';
-        var b=document.createElement('div'); b.className='alarma-badge'; b.style.cssText='color:#c0392b;font-size:12px;font-weight:700;margin-top:3px'; b.innerHTML='&#9888;&#65039; Ya no esta en el listado - reasignar bienes';
+        var b=document.createElement('div'); b.className='alarma-badge'; b.style.cssText='color:#c0392b;font-size:12px;font-weight:700;margin-top:3px'; b.innerHTML='&#9888;&#65039; Ya no está en el listado — reasignar bienes';
         var info=row.querySelector('.pinfo'); if(info)info.appendChild(b); } }); }
   function actualizarResumen(){ var view=document.getElementById('view'); if(!view||!document.querySelector('#view .prow')||!PACTIVOS)return;
     var ex=document.getElementById('resumenAlerta'); if(ex)ex.remove();
@@ -156,7 +157,9 @@
     var nResp=Object.keys(resp).length; if(!nResp)return; var nB=0;
     if(typeof BIENES==='object'){ Object.keys(BIENES).forEach(function(id){ var b=BIENES[id]; if(b&&resp[(b.responsable||'').trim()])nB++; }); }
     var box=document.createElement('div'); box.id='resumenAlerta'; box.style.cssText='background:#FFF4F4;border:1px solid #F3C6C6;border-radius:12px;padding:12px 14px;margin:0 2px 10px;display:flex;align-items:center;gap:10px';
-    box.innerHTML='<span style="font-size:22px">&#9888;&#65039;</span><div style="flex:1"><b style="color:#c0392b">'+nResp+' responsable(s) ya no estan en el listado</b><div style="font-size:12.5px;color:#7a3b3b">'+nB+' bien(es) por reasignar. Revisa las tarjetas marcadas abajo.</div></div>';
+    box.innerHTML='<span style="font-size:20px;line-height:1">&#9888;&#65039;</span><div style="flex:1">'
+      +'<b style="color:#c0392b;font-size:14px;display:block;line-height:1.3">'+nResp+(nResp===1?' responsable ya no está':' responsables ya no están')+' en el listado</b>'
+      +'<div style="font-size:12.5px;color:#7a3b3b;margin-top:2px">'+nB+(nB===1?' bien':' bienes')+' por reasignar. Revise las tarjetas marcadas abajo.</div></div>';
     var hz=view.querySelector('.hzrow'), first=document.querySelector('#view .prow'); var ref=hz||first; if(ref&&ref.parentNode)ref.parentNode.insertBefore(box,ref); }
   function sugerirEnFicha(){ var view=document.getElementById('view'); if(!view||typeof TARJETAS==='undefined'||!PACTIVOS)return;
     var back=view.querySelector('.backbtn'); if(!back||back.textContent.indexOf('Responsables')<0)return; if(document.getElementById('sugCambio'))return;
@@ -165,8 +168,8 @@
     var cand={}; if(typeof BIENES==='object'){ Object.keys(BIENES).forEach(function(id){ var b=BIENES[id]; if(b&&(b.responsable||'').trim()===orphanNom){ var v=(b.observaciones||'').trim(); if(v)cand[v]=(cand[v]||0)+1; } }); }
     var lista=Object.keys(cand).sort(function(a,b){return cand[b]-cand[a];});
     var box=document.createElement('div'); box.id='sugCambio'; box.style.cssText='background:#FFF8E6;border:1px solid #F0D68A;border-radius:12px;padding:12px 14px;margin:8px 2px';
-    box.innerHTML='<b style="color:#8a6d00">&#9888;&#65039; Este responsable ya no esta en el listado</b><div style="font-size:13px;color:#6b5a1e;margin-top:4px">Hay que reasignar sus bienes.'
-      +(lista.length?' Segun tus anotaciones, posibles nuevos responsables:</div><div style="margin-top:6px">'+lista.slice(0,5).map(function(c){return '<span style="display:inline-block;background:#F5E6B8;border-radius:8px;padding:3px 9px;margin:2px;font-size:12.5px;color:#6b5a1e">'+esc(c)+' ('+cand[c]+')</span>';}).join('')+'</div>':' No hay anotaciones de quien los tiene.</div>');
+    box.innerHTML='<b style="color:#8a6d00">&#9888;&#65039; Este responsable ya no está en el listado</b><div style="font-size:13px;color:#6b5a1e;margin-top:4px">Hay que reasignar sus bienes.'
+      +(lista.length?' Según tus anotaciones, posibles nuevos responsables:</div><div style="margin-top:6px">'+lista.slice(0,5).map(function(c){return '<span style="display:inline-block;background:#F5E6B8;border-radius:8px;padding:3px 9px;margin:2px;font-size:12.5px;color:#6b5a1e">'+esc(c)+' ('+cand[c]+')</span>';}).join('')+'</div>':' No hay anotaciones de quién los tiene.</div>');
     header.parentNode.insertBefore(box,header.nextSibling); }
 
   ['render','renderPerson'].forEach(function(fn){ var orig=window[fn]; if(typeof orig==='function'){ window[fn]=function(){ var r=orig.apply(this,arguments); setTimeout(function(){ marcarAlarmas(); if(fn==='render')actualizarResumen(); if(fn==='renderPerson')sugerirEnFicha(); },20); return r; }; } });
