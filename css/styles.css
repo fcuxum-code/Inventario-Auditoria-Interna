@@ -340,3 +340,7 @@
 /* se coloca encima de la barra de navegación (offline.js calcula su alto),
    y se reserva espacio abajo para no tapar el final del contenido */
 body.con-aviso{padding-bottom:180px;}
+
+/* pasos para instalar la app en la pantalla de inicio */
+.pasosinst{margin:10px 0 4px; padding-left:22px; font-size:13.5px; color:#2c333d; line-height:1.55;}
+.pasosinst li{margin-bottom:6px;}

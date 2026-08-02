@@ -1,0 +1,42 @@
+{
+  "name": "Inventario Físico – Auditoría Interna IGSS",
+  "short_name": "Inventario A.I.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1F3864",
+  "theme_color": "#1F3864",
+  "icons": [
+    {
+      "src": "./icons/icono-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icono-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icons/icono-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icono-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "lang": "es-GT",
+  "description": "Toma de inventario físico de bienes — Auditoría Interna, IGSS",
+  "categories": [
+    "business",
+    "productivity"
+  ]
+}
