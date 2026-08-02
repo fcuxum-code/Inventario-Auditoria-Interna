@@ -1648,7 +1648,7 @@ function openMenu(){
     +'<div class="mitem" onclick="abrirDiscrepancias()"><span class="ic">'+icon('alertTriangle',20)+'</span><div><b>Discrepancias</b><small>Todos los NO / NO UBICADO en un solo lugar</small></div></div>'
     +'<div class="mitem" onclick="abrirActividadReciente()"><span class="ic">'+icon('clock',20)+'</span><div><b>Actividad reciente</b><small>Últimos movimientos de todos los bienes</small></div></div>'
     +'<div class="mitem" onclick="abrirAsistente()"><span class="ic">'+icon('chat',20)+'</span><div><b>Asistente del inventario</b><small>Pregunte cantidades, valores o listados en lenguaje natural</small></div></div>'
-    +'<div class="mitem" onclick="generarExcel()"><span class="ic">'+icon('barChart',20)+'</span><div><b>Generar Excel (todos los movimientos)</b><small>Libro con bienes, movimientos, hallazgos y tarjetas</small></div></div>'
+    +'<div class="mitem" onclick="generarExcel()"><span class="ic">'+icon('barChart',20)+'</span><div><b>Generar reporte en Excel</b><small>Resumen, bienes, discrepancias, tarjetas, personal, movimientos y hallazgos</small></div></div>'
     +'<div class="mitem" onclick="importarExcel()"><span class="ic">'+icon('upload',20)+'</span><div><b>Importar bienes nuevos desde Excel</b><small>Los crea como pendientes de asignar</small></div></div>'
 
     +'<div class="mitem" onclick="cerrarSesion()"><span class="ic">'+icon('logOut',20)+'</span><div><b>Cerrar sesión</b><small>'+esc(firebase.auth().currentUser?firebase.auth().currentUser.email:"")+'</small></div></div>'
@@ -1838,84 +1838,4 @@ function abrirAvanceUbicacion(){
   showSheet();
 }
 
-/* ================= GENERAR EXCEL (libro completo) ================= */
-function generarExcel(){
-  closeMenu();
-  if(typeof XLSX==="undefined"){ toast("No se pudo cargar el generador de Excel (revise internet)"); return; }
-  toast("Preparando el libro de Excel…");
-  db.collection("movimientos").get().then(function(snap){
-    const movs = snap.docs.map(function(d){ return d.data(); });
-    const wb = XLSX.utils.book_new();
-
-    const base = Object.values(BIENES).sort(function(a,b){return (a.tarjetaNumero||"").localeCompare(b.tarjetaNumero||"");}).map(function(b){
-      return {
-        "No. Inventario": b.codigo, "No. SIGES": b.codigoSiges||"", "No. Tarjeta": b.tarjetaNumero||"", "Responsable": b.responsable||"",
-        "Descripción": b.descripcion||"", "Valor Q": Number(b.valor||0), "Tipo": b.tipo||"",
-        "Categoría (estimada)": categoriaBien(b).nombre,
-        "¿Existe?": b.existe||"", "Estado físico": b.estado||"", "Ubicación": b.ubicacion||"", "Colaborador actual": b.colaborador||"",
-        "Observaciones": b.observaciones||"", "Fecha verificación": b.fechaVerificacion||"", "Verificado por": b.verificadoPor||"",
-        "Descargado de tarjeta": b.tarjetaAnteriorNumero||"", "Responsable anterior": b.responsableAnterior||"",
-        "Foto": b.fotoUrl||"", "Nota / revisar": b.notaDuplicado||""
-      };
-    });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(base), "BASE");
-
-    const tarjs = tarjetasActivas().map(function(t){
-      const items = bienesDe(t.id);
-      return { "No. Tarjeta": t.numero||"(pendiente)", "Responsable": t.responsable||"", "No. Empleado": t.empleado||"",
-        "Correo": t.correo||"", "Puesto": t.puesto||"", "Tipo": t.tipo||"", "Bienes cargados": items.length,
-        "Verificados": doneCount(items) };
-    });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(tarjs), "TARJETAS");
-
-    const mv = movs.sort(function(a,b){return (a.fechaTxt||"").localeCompare(b.fechaTxt||"");}).map(function(m){
-      return { "Código": m.codigo||"", "Tipo movimiento": m.tipoMovimiento||"",
-        "Tarjeta anterior": m.tarjetaAnteriorNumero||"", "Responsable anterior": m.responsableAnterior||"",
-        "Tarjeta nueva": m.tarjetaNuevaNumero||"", "Responsable nuevo": m.responsableNuevo||"",
-        "Existe": m.existe||"", "Estado": m.estado||"", "Ubicación": m.ubicacion||"",
-        "Observaciones": m.observaciones||"", "Fecha": m.fechaTxt||"", "Capturado por": m.capturadoPor||"" };
-    });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mv), "MOVIMIENTOS");
-
-    const hz = Object.values(HALLAZGOS).map(function(z){
-      return { "No. Inventario": z.inv||"S/N", "Cantidad": z.cant||1, "Descripción": z.desc||"",
-        "Con quién / dónde": z.resp||"", "Ubicación": z.ubi||"", "Estado": z.est||"",
-        "Observaciones": z.obs||"", "Fecha": z.f||"", "Anotado por": z.by||"" };
-    });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(hz), "HALLAZGOS");
-
-    const filename = "Inventario_AI_"+new Date().toISOString().slice(0,10)+".xlsx";
-    XLSX.writeFile(wb, filename);
-    toast("Excel generado ✓ (revise Descargas)");
-    setTimeout(function(){
-      pedirTexto("Enviar Excel por correo", "Escriba el correo, o cancele para omitir", "", "email", function(correo){
-        if(!correo || !correo.trim()) return;
-        if(!META.gsUrl){ toast("Falta configurar Apps Script para enviar correos (menú ☰)"); return; }
-        toast("Verificando versión…");
-        verificarVersionGS().then(function(r){
-          if(!r.ok){
-            if(r.motivo==="desactualizado") avisoGSDesactualizado();
-            else toast("⚠️ No se pudo conectar con Apps Script.");
-            return;
-          }
-          toast("Enviando Excel por correo…");
-          const b64 = XLSX.write(wb, {type:"base64", bookType:"xlsx"});
-          fetch(META.gsUrl, {method:"POST", body: JSON.stringify({
-            type:"correoExcel", correo: correo.trim(), filename: filename,
-            asunto: "Reporte de Inventario - Auditoría Interna",
-            cuerpo: "Se adjunta el reporte de inventario generado el "+today()+" desde la app.",
-            b64: b64
-          })})
-            .then(function(r){ return r.json().catch(function(){return null;}); })
-            .then(function(j){
-              if(j && j.ok===false) toast("⚠️ No se pudo enviar: "+(j.error||"error desconocido"));
-              else toast("✉️ Excel enviado a "+correo.trim());
-            })
-            .catch(function(){ toast("⚠️ No se pudo enviar el correo (revise conexión)"); });
-        });
-      });
-    }, 500);
-  }).catch(function(e){
-    toast("No se pudo generar: "+(e.message||e));
-  });
-}
+/* El reporte en Excel se genera en js/excel-report.js, con formato institucional. */
