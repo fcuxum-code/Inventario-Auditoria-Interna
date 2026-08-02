@@ -660,6 +660,156 @@ function actividadRow(m){
     +(m.capturadoPor?'<div class="stamp">Registrado por '+esc(m.capturadoPor)+'</div>':'')
   +'</div>';
 }
+/* ================= ASISTENTE DEL INVENTARIO (preguntas en lenguaje natural, 100% local) =================
+   No es una IA externa: no hay clave de API ni se envía información a internet. Reconoce preguntas
+   comunes (cuántos, valor total, listados) combinando los mismos filtros que ya existen en la app
+   (ubicación, categoría, estado, responsable) y responde con los datos ya cargados. Si no reconoce la
+   pregunta, lo dice claramente en vez de inventar una respuesta. */
+const CATEGORIA_ALIAS = {
+  COMPUTO: ["COMPUTO","COMPUTACION"],
+  MOBILIARIO: ["MOBILIARIO","MUEBLES"],
+  COMUNICACION: ["COMUNICACION","TELEFONOS"],
+  MEDICO: ["MEDICO","MEDICOS","SALUD"],
+  ELECTRO: ["ELECTRODOMESTICO","ELECTRODOMESTICOS"],
+  HERRAMIENTA: ["HERRAMIENTA","HERRAMIENTAS"],
+  VEHICULO: ["VEHICULO","VEHICULOS","TRANSPORTE"]
+};
+function detectarUbicacion(t){
+  for(let i=0;i<LOCS.length;i++){ if(t.indexOf(normTexto(LOCS[i]))>=0) return LOCS[i]; }
+  return "";
+}
+function detectarCategoria(t){
+  for(let i=0;i<CATEGORIAS_BIEN.length;i++){
+    const c = CATEGORIAS_BIEN[i];
+    const alias = (CATEGORIA_ALIAS[c.cod]||[]).concat([normTexto(c.nombre)]);
+    if(alias.some(function(a){ return t.indexOf(a)>=0; })) return c.cod;
+    if(c.kw.some(function(k){ return t.indexOf(k)>=0; })) return c.cod;
+  }
+  return "";
+}
+function detectarEstado(t){
+  if(t.indexOf("PARA BAJA")>=0 || (t.indexOf("BAJA")>=0 && t.indexOf("TRABAJA")<0)) return "PARA BAJA";
+  if(t.indexOf("BUEN ESTADO")>=0 || t.indexOf("BUENO")>=0) return "BUENO";
+  if(t.indexOf("MAL ESTADO")>=0 || t.indexOf("MALO")>=0) return "MALO";
+  if(t.indexOf("REGULAR")>=0) return "REGULAR";
+  return "";
+}
+function detectarExiste(t){
+  if(t.indexOf("NO UBICADO")>=0) return "NO UBICADO";
+  if(t.indexOf("NO ENCONTRADO")>=0 || t.indexOf("FALTANTE")>=0 || t.indexOf("PERDIDO")>=0) return "NO";
+  if(t.indexOf("SIN VERIFICAR")>=0) return "__VACIO__";
+  if(t.indexOf("VERIFICADO")>=0 || t.indexOf("ENCONTRADO")>=0) return "SÍ";
+  return "";
+}
+function detectarResponsable(t){
+  let mejor=null;
+  Object.values(TARJETAS).forEach(function(tj){
+    if(mejor || !tj.responsable) return;
+    if(t.indexOf(normTexto(tj.responsable))>=0) mejor=tj;
+  });
+  if(mejor) return mejor;
+  const palabras = t.replace(/[^A-Z0-9Ñ\s]/g,"").split(/\s+/).filter(function(w){ return w.length>=4; });
+  Object.values(TARJETAS).forEach(function(tj){
+    if(mejor || !tj.responsable) return;
+    const partes = normTexto(tj.responsable).split(/\s+/);
+    if(palabras.some(function(w){ return partes.indexOf(w)>=0; })) mejor=tj;
+  });
+  return mejor;
+}
+function responderPregunta(pregunta){
+  const t = normTexto(pregunta);
+  const ubic = detectarUbicacion(t);
+  const categoria = detectarCategoria(t);
+  const estado = detectarEstado(t);
+  const existe = detectarExiste(t);
+  const tarjeta = detectarResponsable(t);
+  function coincide(b){
+    if(ubic && b.ubicacion!==ubic) return false;
+    if(categoria && categoriaBien(b).cod!==categoria) return false;
+    if(estado && b.estado!==estado) return false;
+    if(existe==="__VACIO__" && b.existe) return false;
+    if(existe && existe!=="__VACIO__" && b.existe!==existe) return false;
+    if(tarjeta && b.tarjetaId!==tarjeta.id) return false;
+    return true;
+  }
+  const descFiltro = [];
+  if(tarjeta) descFiltro.push("de "+tarjeta.responsable);
+  if(categoria) descFiltro.push("de "+((CATEGORIAS_BIEN.find(function(c){return c.cod===categoria;})||{}).nombre||"").toLowerCase());
+  if(ubic) descFiltro.push("en "+ubic);
+  if(estado) descFiltro.push("en estado "+estado.toLowerCase());
+  if(existe==="NO UBICADO") descFiltro.push("marcados NO UBICADO");
+  else if(existe==="NO") descFiltro.push("marcados NO (no están)");
+  else if(existe==="SÍ") descFiltro.push("verificados");
+  else if(existe==="__VACIO__") descFiltro.push("sin verificar todavía");
+  const sufijo = descFiltro.length ? (" "+descFiltro.join(" ")) : "";
+
+  if(/PENDIENTE.*ASIGNAR|SIN ASIGNAR/.test(t)){
+    const pend = bienesPendientes();
+    return pend.length+" bien(es) están pendientes de asignar."+(pend.length?" Puede verlos en el inicio, en la tarjeta de 'Pendientes de asignar'.":"");
+  }
+  if(/AVANCE|PORCENTAJE|CUANTO LLEVAMOS|COMO VAMOS/.test(t)){
+    const s = statsGlobales();
+    return "Llevan "+s.pct+"% de avance: "+s.done+" de "+s.total+" bienes verificados.";
+  }
+  if(/DISCREPANCIA/.test(t) && !existe && !categoria && !ubic){
+    const s = statsGlobales();
+    return "Hay "+s.disc+" bien(es) con discrepancia (marcados NO o NO UBICADO). Puede verlos en el menú, en 'Discrepancias'.";
+  }
+  if(/VALOR|CUANTO VALE|CUANTO CUESTA|CUANTO CUESTAN|MONTO/.test(t)){
+    const lista = Object.values(BIENES).filter(coincide);
+    if(lista.length===0) return "No encontré bienes"+sufijo+".";
+    const total = lista.reduce(function(s,b){ return s+Number(b.valor||0); },0);
+    return "El valor total de "+lista.length+" bien(es)"+sufijo+" es "+money(total)+".";
+  }
+  if(tarjeta && /QUE TIENE|BIENES DE|QUE BIENES/.test(t)){
+    const lista = bienesDe(tarjeta.id);
+    if(lista.length===0) return tarjeta.responsable+" no tiene bienes asignados todavía.";
+    const nombres = lista.slice(0,8).map(function(b){ return b.codigo+" ("+(b.descripcion||"sin descripción")+")"; }).join(", ");
+    return tarjeta.responsable+" tiene "+lista.length+" bien(es): "+nombres+(lista.length>8?"…":"")+".";
+  }
+  if(/CUANT[OA]S?|NUMERO DE|CANTIDAD DE/.test(t) || ubic || categoria || estado || existe || tarjeta){
+    const lista = Object.values(BIENES).filter(coincide);
+    return "Hay "+lista.length+" bien(es)"+sufijo+".";
+  }
+  return "__NO_ENTENDIDO__";
+}
+let asistenteHistorial = [];
+function abrirAsistente(){
+  asistenteHistorial = [];
+  renderAsistente();
+  showSheet();
+}
+function renderAsistente(){
+  let h = '<div class="grip"></div><h3>'+icon('chat',18,'margin-right:6px;vertical-align:-3px')+'Asistente del inventario</h3>'
+    + '<div class="hint" style="margin-top:-8px">Responde con los datos que ya están cargados en la app — no es una IA externa, no envía nada a internet. Ejemplos: "¿cuántos bienes de cómputo hay en Archivo General?", "¿cuánto vale lo que tiene María?", "¿cuántos pendientes de asignar hay?".</div>'
+    + '<div id="asistChat" style="max-height:260px;overflow:auto;margin:10px 0"></div>'
+    + '<div style="display:flex;gap:8px"><input id="asistIn" type="text" placeholder="Escriba su pregunta…" autocomplete="off" style="flex:1;padding:11px 13px;border:1.5px solid #E2E6EC;border-radius:10px;font-size:15px" onkeydown="if(event.key===\'Enter\'){event.preventDefault();asistPreguntar();}">'
+    + '<button class="act p" style="margin:0;width:auto;padding:0 16px" onclick="asistPreguntar()">Preguntar</button></div>'
+    + '<button class="act o" style="margin-top:10px" onclick="closeMenu()">Cerrar</button>';
+  document.getElementById("sheet").innerHTML = h;
+  pintarAsistChat();
+  setTimeout(function(){ const el=document.getElementById("asistIn"); if(el) el.focus(); },150);
+}
+function pintarAsistChat(){
+  const box = document.getElementById("asistChat"); if(!box) return;
+  if(asistenteHistorial.length===0){ box.innerHTML = '<div class="hint">Aún no ha preguntado nada.</div>'; return; }
+  box.innerHTML = asistenteHistorial.map(function(m){
+    return '<div style="margin-bottom:10px"><div style="font-weight:700;font-size:13.5px;color:#1F3864">'+esc(m.q)+'</div>'
+      + '<div style="font-size:13.5px;color:#333;margin-top:2px">'+esc(m.a)+'</div></div>';
+  }).join("");
+  box.scrollTop = box.scrollHeight;
+}
+function asistPreguntar(){
+  const el = document.getElementById("asistIn"); const q = (el?el.value:"").trim(); if(!q) return;
+  let a = responderPregunta(q);
+  if(a==="__NO_ENTENDIDO__"){
+    a = "No entendí esa pregunta. Puedo responder sobre cantidades, valores y listados combinando ubicación, categoría, estado o responsable. Ejemplo: \"¿cuántos bienes de cómputo hay en Archivo General?\".";
+  }
+  asistenteHistorial.push({q:q,a:a});
+  el.value="";
+  pintarAsistChat();
+  setTimeout(function(){ const inp=document.getElementById("asistIn"); if(inp) inp.focus(); },10);
+}
 function editCorreoTarjeta(id){
   if(!requiereEdicion()) return;
   const t = TARJETAS[id]; if(!t) return;
@@ -1497,6 +1647,7 @@ function openMenu(){
     +'<div class="mitem" onclick="abrirAvanceUbicacion()"><span class="ic">'+icon('mapPin',20)+'</span><div><b>Avance por ubicación</b><small>Cuánto falta por verificar en cada lugar</small></div></div>'
     +'<div class="mitem" onclick="abrirDiscrepancias()"><span class="ic">'+icon('alertTriangle',20)+'</span><div><b>Discrepancias</b><small>Todos los NO / NO UBICADO en un solo lugar</small></div></div>'
     +'<div class="mitem" onclick="abrirActividadReciente()"><span class="ic">'+icon('clock',20)+'</span><div><b>Actividad reciente</b><small>Últimos movimientos de todos los bienes</small></div></div>'
+    +'<div class="mitem" onclick="abrirAsistente()"><span class="ic">'+icon('chat',20)+'</span><div><b>Asistente del inventario</b><small>Pregunte cantidades, valores o listados en lenguaje natural</small></div></div>'
     +'<div class="mitem" onclick="generarExcel()"><span class="ic">'+icon('barChart',20)+'</span><div><b>Generar Excel (todos los movimientos)</b><small>Libro con bienes, movimientos, hallazgos y tarjetas</small></div></div>'
     +'<div class="mitem" onclick="importarExcel()"><span class="ic">'+icon('upload',20)+'</span><div><b>Importar bienes nuevos desde Excel</b><small>Los crea como pendientes de asignar</small></div></div>'
 
