@@ -286,8 +286,12 @@ function statsGlobales(){
   const pend = bienesPendientes();
   const pendViejos = pend.filter(function(b){ return chipPendienteViejo(b); }).length;
   const valorTotal = lista.reduce(function(s,b){ return s+Number(b.valor||0); },0);
+  const tarjs = tarjetasActivas();
+  const as400Ok = tarjs.filter(function(t){ return t.as400Actualizado; }).length;
   return { total:total, done:done, pct:pct, disc:disc, pendCount:pend.length, pendViejos:pendViejos,
-    valorTotal:valorTotal, tarjetas: tarjetasActivas().length };
+    valorTotal:valorTotal, tarjetas: tarjs.length,
+    as400Ok: as400Ok, as400Pend: tarjs.length - as400Ok,
+    as400Pct: tarjs.length ? Math.round(as400Ok/tarjs.length*100) : 0 };
 }
 function renderPanelMetricas(){
   const s = statsGlobales();
@@ -296,7 +300,14 @@ function renderPanelMetricas(){
     + '<div class="kpicard kpi-disc" onclick="abrirDiscrepancias()"><div class="kpinum">'+s.disc+'</div><div class="kpilbl">Discrepancias</div><div class="kpisub">Bienes marcados NO</div></div>'
     + '<div class="kpicard kpi-pend" onclick="openPendientes()"><div class="kpinum">'+s.pendCount+'</div><div class="kpilbl">Pendientes de asignar</div><div class="kpisub">'+(s.pendViejos?s.pendViejos+' con '+UMBRAL_DIAS_PENDIENTE+'+ días':'Sin atrasos')+'</div></div>'
     + '<div class="kpicard kpi-valor static"><div class="kpinum">'+money(s.valorTotal)+'</div><div class="kpilbl">Valor total</div><div class="kpisub">'+s.tarjetas+' responsable(s)</div></div>'
-    + '</div>';
+    + '</div>'
+    + (s.tarjetas ? ('<div class="as400bar" onclick="abrirPendientesAS400()">'
+        + '<div class="as400bartop"><b>Carga al AS-400</b><span>'+s.as400Ok+' de '+s.tarjetas+' tarjetas · '+s.as400Pct+'%</span></div>'
+        + '<div class="locbarwrap"><div class="locbar" style="width:'+s.as400Pct+'%"></div></div>'
+        + '<div class="as400barsub">'+(s.as400Pend
+            ? (s.as400Pend+' tarjeta'+(s.as400Pend===1?'':'s')+' pendiente'+(s.as400Pend===1?'':'s')+' de cargar — toque para verlas')
+            : 'Todas las tarjetas están cargadas al AS-400')+'</div>'
+      +'</div>') : '');
 }
 /* ================= FILTROS DE BÚSQUEDA ================= */
 let searchFiltros = { ubic:"", estado:"", categoria:"" };
@@ -393,6 +404,36 @@ function as400Control(t){
   return '<div class="as400box" onclick="marcarAS400(\''+t.id+'\',true)">'
     + '<span class="as400chk"></span>'
     + '<div><b>Marcar como actualizado en AS-400</b><small>Toque cuando ya haya cargado esta tarjeta al sistema</small></div></div>';
+}
+function abrirPendientesAS400(){
+  const s = statsGlobales();
+  const pend = tarjetasActivas().filter(function(t){ return !t.as400Actualizado; });
+  const listos = tarjetasActivas().filter(function(t){ return t.as400Actualizado; })
+    .sort(function(a,b){ return (b.as400Fecha||"").localeCompare(a.as400Fecha||""); });
+  let h = '<div class="grip"></div><h3>Carga al AS-400</h3>'
+    + '<div class="note">Tarjetas de responsabilidad que ya cargó al sistema AS-400 y las que todavía faltan. Toque una para abrir su ficha.</div>'
+    + '<div class="hint">'+s.as400Ok+' de '+s.tarjetas+' cargadas ('+s.as400Pct+'%)</div>';
+  if(!pend.length){
+    h += emptyState("No queda ninguna tarjeta pendiente", "Todas están cargadas al AS-400");
+  } else {
+    h += '<div class="msec">Pendientes de cargar ('+pend.length+')</div>';
+    h += pend.sort(function(a,b){ return (a.responsable||"").localeCompare(b.responsable||""); }).map(function(t){
+      const items = bienesDe(t.id);
+      return '<div class="tlist-item" onclick="closeMenu();openPerson(\''+t.id+'\')"><div><b>'+esc(t.responsable||"(sin nombre)")+'</b>'
+        + '<small>Tarjeta '+esc(t.numero||"(pendiente)")+' · '+items.length+' bien(es)</small></div><span style="color:#B8C0CC">›</span></div>';
+    }).join("");
+  }
+  if(listos.length){
+    h += '<div class="msec">Ya cargadas ('+listos.length+')</div>';
+    h += listos.map(function(t){
+      return '<div class="tlist-item" onclick="closeMenu();openPerson(\''+t.id+'\')"><div><b>'+esc(t.responsable||"(sin nombre)")+'</b>'
+        + '<small>Tarjeta '+esc(t.numero||"(pendiente)")+(t.as400Fecha?(' · cargada '+esc(t.as400Fecha)):"")+(t.as400Por?(' por '+esc(t.as400Por)):"")+'</small></div>'
+        + '<span style="color:var(--verde)">'+icon('check',15)+'</span></div>';
+    }).join("");
+  }
+  h += '<button class="act o" onclick="closeMenu()">Cerrar</button>';
+  document.getElementById("sheet").innerHTML = h;
+  showSheet();
 }
 function marcarAS400(tarjetaId, valor){
   if(!requiereEdicion()) return;
@@ -786,6 +827,15 @@ function responderPregunta(pregunta){
   else if(existe==="__VACIO__") descFiltro.push("sin verificar todavía");
   const sufijo = descFiltro.length ? (" "+descFiltro.join(" ")) : "";
 
+  if(/AS.?400/.test(t)){
+    const s = statsGlobales();
+    if(!s.tarjetas) return "Todavía no hay tarjetas de responsabilidad registradas.";
+    if(!s.as400Pend) return "Las "+s.tarjetas+" tarjetas ya están cargadas al AS-400.";
+    const faltan = tarjetasActivas().filter(function(x){ return !x.as400Actualizado; })
+      .map(function(x){ return x.responsable||"(sin nombre)"; }).sort();
+    return "Van "+s.as400Ok+" de "+s.tarjetas+" tarjetas cargadas al AS-400 ("+s.as400Pct+"%). Faltan "+s.as400Pend+": "
+      + faltan.slice(0,8).join(", ") + (faltan.length>8?"…":"") + ".";
+  }
   if(/PENDIENTE.*ASIGNAR|SIN ASIGNAR/.test(t)){
     const pend = bienesPendientes();
     return pend.length+" bien(es) están pendientes de asignar."+(pend.length?" Puede verlos en el inicio, en la tarjeta de 'Pendientes de asignar'.":"");
@@ -824,7 +874,7 @@ function abrirAsistente(){
 }
 function renderAsistente(){
   let h = '<div class="grip"></div><h3>'+icon('chat',18,'margin-right:6px;vertical-align:-3px')+'Asistente del inventario</h3>'
-    + '<div class="hint" style="margin-top:-8px">Responde con los datos que ya están cargados en la app — no es una IA externa, no envía nada a internet. Ejemplos: "¿cuántos bienes de cómputo hay en Archivo General?", "¿cuánto vale lo que tiene María?", "¿cuántos pendientes de asignar hay?".</div>'
+    + '<div class="hint" style="margin-top:-8px">Responde con los datos que ya están cargados en la app — no es una IA externa, no envía nada a internet. Ejemplos: "¿cuántos bienes de cómputo hay en Archivo General?", "¿cuánto vale lo que tiene María?", "¿qué falta de subir al AS-400?".</div>'
     + '<div id="asistChat" style="max-height:260px;overflow:auto;margin:10px 0"></div>'
     + '<div style="display:flex;gap:8px"><input id="asistIn" type="text" placeholder="Escriba su pregunta…" autocomplete="off" style="flex:1;padding:11px 13px;border:1.5px solid #E2E6EC;border-radius:10px;font-size:15px" onkeydown="if(event.key===\'Enter\'){event.preventDefault();asistPreguntar();}">'
     + '<button class="act p" style="margin:0;width:auto;padding:0 16px" onclick="asistPreguntar()">Preguntar</button></div>'
@@ -928,17 +978,24 @@ function hallCard(z){
     +'<div class="stamp">Anotado '+esc(z.f||"")+(z.by?" · "+esc(z.by):"")+'</div>'
   +'</div>';
 }
+function hfUbic(L){ const el=document.getElementById("hf_ubi"); if(el){ el.value=L; el.focus(); } }
 function newHallazgo(){ if(!requiereEdicion()) return; hallForm(null); }
 function editHallazgo(id){ hallForm(HALLAZGOS[id]||null); }
 function hallForm(z){
   document.getElementById("sheet").innerHTML =
-    '<div class="grip"></div><h3>'+(z?"Editar hallazgo":"➕ Bien encontrado (hallazgo)")+'</h3>'
+    '<div class="grip"></div><h3>'+(z?"Editar hallazgo":icon('plusCircle',17,'margin-right:6px')+"Bien encontrado (hallazgo)")+'</h3>'
     +'<div class="fform">'
     +'<label>No. de inventario (si tiene placa)</label><input id="hf_inv" type="text" value="'+esc(z?z.inv:"")+'" placeholder="Ej. 512345 o vacío">'
     +'<label>Descripción del bien *</label><input id="hf_desc" type="text" value="'+esc(z?z.desc:"")+'" placeholder="Ej. Silla secretarial negra">'
     +'<label>Cantidad</label><input id="hf_cant" type="number" min="1" value="'+(z?z.cant:1)+'">'
     +'<label>¿Con quién / dónde se encontró?</label><input id="hf_resp" type="text" value="'+esc(z?z.resp:"")+'" placeholder="Nombre de la persona o lugar">'
-    +'<label>Ubicación física</label><input id="hf_ubi" type="text" value="'+esc(z?z.ubi:"")+'" placeholder="Ej. Bodega, pasillo 2">'
+    // Se ofrecen las mismas ubicaciones que el resto de la app, para que los reportes no queden
+    // con nombres distintos para el mismo lugar. Igual se puede escribir un detalle libre.
+    +'<label>Ubicación física</label>'
+    +'<div class="bgrp" style="flex-wrap:wrap;gap:6px;margin-bottom:6px">'
+      + LOCS.map(function(L){ return '<button class="btn" style="flex:1 1 45%;font-size:12.5px;padding:9px 6px" onclick="hfUbic(\''+esc(L)+'\')">'+esc(L)+'</button>'; }).join("")
+    +'</div>'
+    +'<input id="hf_ubi" type="text" value="'+esc(z?z.ubi:"")+'" placeholder="Toque un lugar o escríbalo (ej. Bodega, pasillo 2)">'
     +'<label>Estado físico</label><div class="bgrp estado" id="hf_estwrap">'
       +['BUENO','REGULAR','MALO','PARA BAJA'].map(function(e){ const cl=e==="PARA BAJA"?"baja":e.toLowerCase();
         return '<button class="btn est e-'+cl+' '+((z&&z.est===e)?"sel":"")+'" onclick="hfEst(this,\''+e+'\')">'+(e==="PARA BAJA"?"Baja":e.charAt(0)+e.slice(1).toLowerCase())+'</button>'; }).join("")

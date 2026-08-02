@@ -64,6 +64,14 @@
   .c-rev{background:var(--amarbg); color:var(--amar); margin-left:5px;}
   .c-hz{background:var(--naranjabg); color:var(--naranja);}
   .c-old{background:var(--rojobg); color:var(--rojo); margin-left:5px;}
+  /* barra de avance de carga al AS-400 (inicio) */
+  .as400bar{background:var(--card); border:1px solid var(--linea); border-radius:13px; padding:11px 13px;
+    margin:0 0 12px; box-shadow:0 1px 3px rgba(20,30,60,.05); cursor:pointer;}
+  .as400bar:active{background:#f6f8fc;}
+  .as400bartop{display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:6px;}
+  .as400bartop b{font-size:13px; color:#17202e;}
+  .as400bartop span{font-size:11.5px; color:var(--gris2); flex:none;}
+  .as400barsub{font-size:11px; color:var(--gris2); margin-top:5px;}
   /* check "Actualizado en AS-400" (por tarjeta de responsable) */
   .as400box{display:flex; align-items:center; gap:11px; margin:10px 2px 2px; padding:11px 13px;
     background:var(--card); border:1.5px solid var(--linea); border-radius:12px; cursor:pointer;
