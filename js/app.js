@@ -40,6 +40,62 @@ function today(){ const d=new Date(); return String(d.getDate()).padStart(2,"0")
 function chipTipo(tp){ tp=tp||""; if(tp.indexOf("MPUTO")>=0)return '<span class="chip c-comp">CÓMPUTO</span>';
   if(tp.indexOf("BODEGA")>=0||tp.indexOf("GENERAL")>=0)return '<span class="chip c-bod">BODEGA</span>';
   return '<span class="chip c-ind">INDIVIDUAL</span>'; }
+
+/* ================= CATEGORÍA DEL BIEN (estimada por palabras clave de la descripción) =================
+   El campo "tipo" (INDIVIDUAL / GENERAL-BODEGA) es sobre custodia, no sobre qué clase de objeto es.
+   Como casi todos los bienes reales quedan como "INDIVIDUAL" en ese campo, no sirve para distinguir
+   cómputo de mobiliario, etc. Esta categoría se ADIVINA a partir del texto de la descripción — no es
+   una clasificación oficial. Si el usuario marca una categoría manual (categoriaManual), esa manda. */
+const CATEGORIAS_BIEN = [
+  { cod:"COMPUTO", nombre:"Equipo de cómputo", kw:["COMPUTADOR","LAPTOP","NOTEBOOK","MONITOR","IMPRESORA","ESCANER","TECLADO","MOUSE","UPS","NO BREAK","NOBREAK","NO-BREAK","SERVIDOR","ROUTER","SWITCH","TABLET","PROYECTOR","VIDEO BEAM","VIDEOBEAM","DISCO DURO","MEMORIA RAM","ALL IN ONE","ALL-IN-ONE","ORDENADOR","CPU","REGULADOR DE VOLTAJE"] },
+  { cod:"MOBILIARIO", nombre:"Mobiliario y equipo de oficina", kw:["ESCRITORIO","SILLA","SILLON","ARCHIVO METAL","ARCHIVADOR","MESA","ESTANTE","LIBRERA","LIBRERO","GABINETE","PERFORADORA","ENGRAPADORA","PIZARRA","CREDENZA","BANCA","BANCO","SOFA","VITRINA","MUEBLE","ANAQUEL","MODULO","COUNTER","MOSTRADOR"] },
+  { cod:"COMUNICACION", nombre:"Equipo de comunicación", kw:["TELEFONO","RADIO COMUNICACION","CENTRAL TELEFONICA","FAX","WALKIE"] },
+  { cod:"MEDICO", nombre:"Equipo médico", kw:["CAMILLA","TENSIOMETRO","OXIMETRO","ESTERILIZADOR","BASCULA","SILLA DE RUEDAS","ESTETOSCOPIO","GLUCOMETRO","NEBULIZADOR","ELECTROCARDIOGRAFO","EQUIPO MEDICO"] },
+  { cod:"ELECTRO", nombre:"Electrodomésticos", kw:["REFRIGERADOR","MICROONDAS","CAFETERA","VENTILADOR","AIRE ACONDICIONADO","MINISPLIT","MINI SPLIT","DISPENSADOR DE AGUA","EXTRACTOR","LICUADORA","HORNO"] },
+  { cod:"HERRAMIENTA", nombre:"Herramientas y equipo diverso", kw:["TALADRO","CAJA DE HERRAMIENTA","ESCALERA","EXTINTOR","COMPRESOR","SOLDADORA"] },
+  { cod:"VEHICULO", nombre:"Vehículos", kw:["VEHICULO","MOTOCICLETA","MOTONETA","CAMIONETA","PICK UP","PICKUP","MICROBUS","CAMION"] }
+];
+function normTexto(s){ return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase(); }
+function categoriaBien(b){
+  if(!b) return { cod:"OTROS", nombre:"Otros / sin clasificar" };
+  if(b.categoriaManual){
+    const m = CATEGORIAS_BIEN.find(function(c){ return c.cod===b.categoriaManual; });
+    if(m) return m;
+  }
+  const desc = normTexto(b.descripcion);
+  for(let i=0;i<CATEGORIAS_BIEN.length;i++){
+    const c = CATEGORIAS_BIEN[i];
+    if(c.kw.some(function(k){ return desc.indexOf(k)>=0; })) return c;
+  }
+  return { cod:"OTROS", nombre:"Otros / sin clasificar" };
+}
+function chipCategoria(b){
+  const c = categoriaBien(b);
+  const cls = {COMPUTO:"c-comp",MOBILIARIO:"c-bod",COMUNICACION:"c-ind",MEDICO:"c-dup",ELECTRO:"c-hz",HERRAMIENTA:"c-old",VEHICULO:"c-rev",OTROS:""}[c.cod]||"";
+  return '<span class="chip '+cls+'" style="cursor:pointer" onclick="event.stopPropagation();abrirCategoriaPicker(\''+b.id+'\')" title="Categoría estimada — toque para corregir">'+esc(c.nombre.toUpperCase())+(b.categoriaManual?"":" ?")+'</span>';
+}
+function abrirCategoriaPicker(id){
+  const b = BIENES[id]; if(!b) return;
+  const actual = categoriaBien(b).cod;
+  let h = '<div class="grip"></div><h3>Categoría de '+esc(b.codigo)+'</h3>'
+    + '<div class="hint" style="margin-top:-8px">'+esc(b.descripcion||"")+'</div>';
+  if(!puedeEditar()){
+    h += '<div class="note">Categoría estimada a partir de la descripción. No tiene permiso de edición para corregirla.</div>';
+  } else {
+    h += '<div class="note">Se calcula adivinando por palabras clave de la descripción — no es una clasificación oficial. Corríjala si no es correcta.</div>';
+    h += CATEGORIAS_BIEN.map(function(c){
+      return '<div class="tlist-item" onclick="fijarCategoriaManual(\''+id+'\',\''+c.cod+'\')"><div><b>'+esc(c.nombre)+'</b></div>'+(actual===c.cod?'<span style="color:#2E7D32">✓</span>':'')+'</div>';
+    }).join("");
+    if(b.categoriaManual) h += '<button class="act o" style="margin-top:8px" onclick="fijarCategoriaManual(\''+id+'\',null)">Quitar corrección (volver a la automática)</button>';
+  }
+  h += '<button class="act o" onclick="closeMenu()">Cerrar</button>';
+  document.getElementById("sheet").innerHTML = h;
+  showSheet();
+}
+function fijarCategoriaManual(id,cod){
+  if(!requiereEdicion()) return;
+  db.collection("bienes").doc(id).update({categoriaManual: cod||""}).then(function(){ closeMenu(); toast("Categoría actualizada ✓"); }).catch(function(){ toast("No se pudo guardar"); });
+}
 let tt=null;
 function toast(m){ const el=document.getElementById("toast"); el.textContent=m; el.classList.add("show");
   clearTimeout(tt); tt=setTimeout(function(){el.classList.remove("show");},2600); }
@@ -239,23 +295,17 @@ function renderPanelMetricas(){
     + '</div>';
 }
 /* ================= FILTROS DE BÚSQUEDA ================= */
-let searchFiltros = { ubic:"", estado:"", tipo:"" };
+let searchFiltros = { ubic:"", estado:"", categoria:"" };
 let mostrarFiltros = false;
-function filtrosActivos(){ return !!(searchFiltros.ubic || searchFiltros.estado || searchFiltros.tipo); }
-function resetFiltrosBusqueda(){ searchFiltros={ubic:"",estado:"",tipo:""}; mostrarFiltros=false; }
+function filtrosActivos(){ return !!(searchFiltros.ubic || searchFiltros.estado || searchFiltros.categoria); }
+function resetFiltrosBusqueda(){ searchFiltros={ubic:"",estado:"",categoria:""}; mostrarFiltros=false; }
 function toggleFiltrosBusqueda(){ mostrarFiltros=!mostrarFiltros; render(); }
 function setFiltroBusqueda(campo,val){ searchFiltros[campo]=val; render(); }
 function limpiarFiltrosBusqueda(){ resetFiltrosBusqueda(); render(); }
-function tipoCategoria(tp){
-  tp = tp||"";
-  if(tp.indexOf("MPUTO")>=0) return "COMPUTO";
-  if(tp.indexOf("BODEGA")>=0 || tp.indexOf("GENERAL")>=0) return "BODEGA";
-  return "INDIVIDUAL";
-}
 function bienCoincideFiltros(b){
   if(searchFiltros.ubic && b.ubicacion!==searchFiltros.ubic) return false;
   if(searchFiltros.estado && b.estado!==searchFiltros.estado) return false;
-  if(searchFiltros.tipo && tipoCategoria(b.tipo)!==searchFiltros.tipo) return false;
+  if(searchFiltros.categoria && categoriaBien(b).cod!==searchFiltros.categoria) return false;
   return true;
 }
 /* ================= NAVEGACIÓN / RENDER ================= */
@@ -458,7 +508,7 @@ function itemCard(b, showOwner, extraChip){
       +'</div>';
   return '<div class="item '+cls+'" id="it_'+id+'">'
     +'<div class="itop"><span class="inv">'+esc(b.codigo)+(b.codigoSiges?' <small style="font-weight:600;color:#8A929C">· SIGES '+esc(b.codigoSiges)+'</small>':'')+'</span><span class="val">'+money(b.valor)+'</span></div>'
-    +'<div class="ochips">'+chipTipo(b.tipo)+nuevo+pendChip+dup+(extraChip||"")+'</div>'
+    +'<div class="ochips">'+chipCategoria(b)+chipTipo(b.tipo)+nuevo+pendChip+dup+(extraChip||"")+'</div>'
     +descField
     +(b.notaDuplicado?'<div class="warnbox">'+esc(b.notaDuplicado)+'</div>':'')
     +(b.tarjetaAnteriorNumero?'<div class="warnbox">↩ Descargado de tarjeta '+esc(b.tarjetaAnteriorNumero)+' ('+esc(b.responsableAnterior||"")+')</div>':'')
@@ -623,7 +673,6 @@ function editCorreoTarjeta(id){
 function onSearch(q){ mode.q=q.trim(); render(); }
 function renderBarraFiltros(){
   const ESTADOS = [['BUENO','Bueno'],['REGULAR','Regular'],['MALO','Malo'],['PARA BAJA','Para baja']];
-  const TIPOS = [['INDIVIDUAL','Individual'],['BODEGA','Bodega/General'],['COMPUTO','Cómputo']];
   let h = '<div class="filtrobar '+(mostrarFiltros||filtrosActivos()?"":"oculto")+'">';
   h += '<select onchange="setFiltroBusqueda(\'ubic\',this.value)"><option value="">Ubicación (todas)</option>'
      + LOCS.map(function(l){ return '<option value="'+esc(l)+'" '+(searchFiltros.ubic===l?"selected":"")+'>'+esc(l)+'</option>'; }).join("")
@@ -631,8 +680,9 @@ function renderBarraFiltros(){
   h += '<select onchange="setFiltroBusqueda(\'estado\',this.value)"><option value="">Estado (todos)</option>'
      + ESTADOS.map(function(e){ return '<option value="'+e[0]+'" '+(searchFiltros.estado===e[0]?"selected":"")+'>'+e[1]+'</option>'; }).join("")
      + '</select>';
-  h += '<select onchange="setFiltroBusqueda(\'tipo\',this.value)"><option value="">Tipo (todos)</option>'
-     + TIPOS.map(function(t){ return '<option value="'+t[0]+'" '+(searchFiltros.tipo===t[0]?"selected":"")+'>'+t[1]+'</option>'; }).join("")
+  h += '<select onchange="setFiltroBusqueda(\'categoria\',this.value)"><option value="">Categoría (todas)</option>'
+     + CATEGORIAS_BIEN.map(function(c){ return '<option value="'+c.cod+'" '+(searchFiltros.categoria===c.cod?"selected":"")+'>'+esc(c.nombre)+'</option>'; }).join("")
+     + '<option value="OTROS" '+(searchFiltros.categoria==="OTROS"?"selected":"")+'>Otros / sin clasificar</option>'
      + '</select>';
   if(filtrosActivos()) h += '<span class="moretog" onclick="limpiarFiltrosBusqueda()">'+icon('x',12)+' Limpiar filtros</span>';
   h += '</div>';
@@ -1650,6 +1700,7 @@ function generarExcel(){
       return {
         "No. Inventario": b.codigo, "No. SIGES": b.codigoSiges||"", "No. Tarjeta": b.tarjetaNumero||"", "Responsable": b.responsable||"",
         "Descripción": b.descripcion||"", "Valor Q": Number(b.valor||0), "Tipo": b.tipo||"",
+        "Categoría (estimada)": categoriaBien(b).nombre,
         "¿Existe?": b.existe||"", "Estado físico": b.estado||"", "Ubicación": b.ubicacion||"", "Colaborador actual": b.colaborador||"",
         "Observaciones": b.observaciones||"", "Fecha verificación": b.fechaVerificacion||"", "Verificado por": b.verificadoPor||"",
         "Descargado de tarjeta": b.tarjetaAnteriorNumero||"", "Responsable anterior": b.responsableAnterior||"",
