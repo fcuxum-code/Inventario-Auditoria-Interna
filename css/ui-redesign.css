@@ -1,5 +1,8 @@
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+/* La tipografía Inter se carga desde index.html de forma NO bloqueante.
+   Antes venía con @import aquí, que obliga al navegador a bajar este CSS, parsearlo y
+   recién entonces pedir la fuente, dejando la pantalla en blanco mientras tanto — y si no
+   hay señal, hasta que se agota el tiempo de espera. Medido con datos reales: ~13 s. */
 :root{
   --azul:#1F3864; --azul2:#2F5496; --ink:#182338; --muted:#64748b;
   --fondo:#eef1f6; --card:#ffffff; --linea:#e6eaf1;

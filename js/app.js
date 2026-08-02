@@ -1671,10 +1671,30 @@ function confirmarImportacion(){
   }
   next();
 }
+/* El lector de Excel (SheetJS, ~500 KB) solo hace falta al importar, que es algo ocasional.
+   Antes se bajaba en cada arranque de la app; ahora se pide en el momento. */
+function cargarLectorExcel(){
+  if(typeof XLSX!=="undefined") return Promise.resolve(true);
+  if(window.__xlsxPromesa) return window.__xlsxPromesa;
+  toast("Preparando el lector de Excel…");
+  window.__xlsxPromesa = new Promise(function(res){
+    const s = document.createElement("script");
+    s.src = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
+    s.onload = function(){ res(true); };
+    s.onerror = function(){ window.__xlsxPromesa = null; res(false); };
+    document.head.appendChild(s);
+  });
+  return window.__xlsxPromesa;
+}
 function importarExcel(){
   closeMenu();
   if(!requiereEdicion()) return;
-  if(typeof XLSX==="undefined"){ toast("No se pudo cargar el lector de Excel (revise internet)"); return; }
+  cargarLectorExcel().then(function(ok){
+    if(!ok){ toast("No se pudo cargar el lector de Excel (revise su conexión)"); return; }
+    mostrarImportarExcel();
+  });
+}
+function mostrarImportarExcel(){
   window.__excelMode = "importar";
   document.getElementById("sheet").innerHTML = '<div class="grip"></div><h3>📥 Importar bienes desde Excel</h3>'
     +'<div class="note">El archivo debe tener columnas con <b>No. de Inventario</b>, <b>Descripción</b> y opcionalmente <b>Valor</b>. No importa el nombre exacto de la columna ni el orden, la app las reconoce sola. Los bienes se crean <b>sin responsable</b> — después los asigna con 🧍 Nueva toma. Esta opción solo AGREGA, nunca elimina nada.</div>'
