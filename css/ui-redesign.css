@@ -43,8 +43,9 @@ header .htitle small{ opacity:.85 !important; font-weight:500 !important; }
 #search{
   border:1px solid var(--linea) !important;
   border-radius:14px !important;
-  /* deja lugar a la lupa (izq.) y al boton de filtros (der.), si no el texto queda encima */
-  padding:14px 52px 14px 44px !important;
+  /* deja lugar a la lupa de la izquierda; el microfono y los filtros ya no van encima
+     del campo, van al lado en la misma fila, asi que a la derecha basta el margen normal */
+  padding:14px 16px 14px 44px !important;
   box-shadow:var(--shadow-sm) !important;
   background:rgba(255,255,255,.96) !important;
   font-size:15px !important;

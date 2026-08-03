@@ -1047,17 +1047,24 @@ function renderBarraFiltros(){
   return h;
 }
 function renderSearch(v){
-  const q = mode.q.toLowerCase();
+  /* Se compara sin tildes: en el teléfono nadie escribe "María" con tilde, y el dictado por
+     voz tampoco es constante con ellas. Antes buscar "maria" no encontraba a "María López".
+     Además se buscan todas las palabras por separado, así "lopez maria" también da con ella. */
+  const q = normTexto(mode.q);
+  const palabras = q.split(/\s+/).filter(Boolean);
+  function coincide(campos){
+    if(!palabras.length) return true;
+    const texto = campos.map(normTexto).join(" ");
+    return palabras.every(function(p){ return texto.indexOf(p)>=0; });
+  }
   const ids = Object.keys(BIENES).filter(function(id){
     const b=BIENES[id];
     if(!bienCoincideFiltros(b)) return false;
     if(!q) return true;
-    return String(b.codigo).toLowerCase().indexOf(q)>=0 || (b.descripcion||"").toLowerCase().indexOf(q)>=0
-      || (b.responsable||"").toLowerCase().indexOf(q)>=0 || String(b.tarjetaNumero||"").toLowerCase().indexOf(q)>=0
-      || String(b.codigoSiges||"").toLowerCase().indexOf(q)>=0;
+    return coincide([b.codigo, b.descripcion, b.responsable, b.tarjetaNumero, b.codigoSiges, b.colaborador]);
   });
   const hz = q ? Object.values(HALLAZGOS).filter(function(z){
-    return (z.inv||"").toLowerCase().indexOf(q)>=0 || (z.desc||"").toLowerCase().indexOf(q)>=0;
+    return coincide([z.inv, z.desc]);
   }) : [];
   let h = renderBarraFiltros();
   h += '<div class="hint">'+(ids.length+hz.length)+' resultado(s)'+(q?' para "'+esc(mode.q)+'"':(filtrosActivos()?' con estos filtros':''))+'.</div>';

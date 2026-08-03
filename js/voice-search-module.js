@@ -21,24 +21,70 @@
     return out || compact.toUpperCase();
   }
   window.__voiceConvert=convert;
+
+  /* En la toma siempre se dicta un número de bien, y ahí convert() hace lo correcto:
+     junta todo en un código. Pero el buscador de la pantalla principal también busca por
+     nombre y descripción, y ahí juntar todo arruina la búsqueda: "María López" quedaba
+     "MARIALOPEZ" y no encontraba nada. Se distingue mirando las palabras dictadas: si casi
+     todas son nombres de dígitos o letras deletreadas ("eme uno dos tres"), es un código;
+     si son palabras corrientes, se busca tal como se dijo. */
+  function esCodigoDictado(raw){
+    if(!raw) return true;
+    var pal = raw.trim().split(/[\s,\.\-]+/).filter(Boolean);
+    if(pal.length <= 1) return true;          // una sola palabra: convert() la deja igual
+    var tecnicas = 0;
+    pal.forEach(function(w0){
+      var w = normWord(w0);
+      if(NUM[w] !== undefined || LET[w] !== undefined || w.length === 1) tecnicas++;
+    });
+    return tecnicas >= pal.length * 0.6;
+  }
+  function textoParaBuscar(codigo, crudo){
+    return esCodigoDictado(crudo) ? codigo : String(crudo || '').trim();
+  }
+  window.__voiceEsCodigo = esCodigoDictado;
+  window.__voiceTextoBusqueda = textoParaBuscar;
+  /* El microfono se dibuja con el mismo trazo que el resto de la app en vez de un emoji,
+     que cambiaba de forma segun el telefono y no se entendia que fuera un boton. */
+  function svgMic(){
+    return (typeof icon === 'function')
+      ? icon('mic', 20)
+      : '<span style="font-size:18px;line-height:1">\uD83C\uDF99\uFE0F</span>';
+  }
   function makeMic(title){
     var b=document.createElement('button');
-    b.type='button'; b.className='__voiceMic'; b.title=title||'Dictar por voz'; b.textContent='\uD83C\uDF99\uFE0F';
-    b.style.cssText='flex:none;width:46px;height:46px;border:1px solid #e6eaf1;background:#fff;border-radius:12px;font-size:19px;cursor:pointer;box-shadow:0 1px 2px rgba(20,30,60,.05);transition:transform .14s,background .18s;';
+    b.type='button'; b.className='__voiceMic'; b.title=title||'Dictar por voz';
+    b.setAttribute('aria-label', title||'Dictar por voz');
+    b.innerHTML=svgMic();
     return b;
   }
   function fire(el){ ['input','keyup','change'].forEach(function(ev){ el.dispatchEvent(new Event(ev,{bubbles:true})); }); }
+  function aviso(msg){
+    if(typeof toast === 'function') toast(msg); else alert(msg);
+  }
   function listen(btn, onResult){
-    if(!SR){ alert('Tu navegador no permite dictado por voz. Usa Chrome (celular o computadora).'); return; }
+    if(!SR){ aviso('Este navegador no permite dictado por voz. Use Chrome.'); return; }
+    if(btn.classList.contains('escuchando')) return;   // ya esta grabando, no abrir dos a la vez
     var rec=new SR(); rec.lang='es-GT'; rec.interimResults=false; rec.maxAlternatives=4; rec.continuous=false;
-    var old=btn.textContent; btn.textContent='\uD83D\uDD34'; btn.style.background='#fdecec';
-    var reset=function(){ btn.textContent=old; btn.style.background='#fff'; };
+    var cerrado=false;
+    btn.classList.add('escuchando');
+    var reset=function(){ if(cerrado) return; cerrado=true; btn.classList.remove('escuchando'); };
     rec.onresult=function(e){
-      var alts=e.results[0]; var best='';
-      for(var i=0;i<alts.length;i++){ var c=convert(alts[i].transcript); if(c.length>best.length) best=c; }
-      onResult(best, alts[0].transcript);
+      var alts=e.results[0]; var best='', crudo=alts.length?alts[0].transcript:'';
+      for(var i=0;i<alts.length;i++){
+        var c=convert(alts[i].transcript);
+        // se guarda el dictado tal cual de la MISMA alternativa elegida, no el de la primera
+        if(c.length>best.length){ best=c; crudo=alts[i].transcript; }
+      }
+      onResult(best, crudo);
     };
-    rec.onerror=reset; rec.onend=reset;
+    rec.onerror=function(e){
+      reset();
+      var c = e && e.error;
+      if(c==='not-allowed' || c==='service-not-allowed') aviso('Permita el micr\u00F3fono para dictar');
+      else if(c==='no-speech') aviso('No se escuch\u00F3 nada, intente de nuevo');
+    };
+    rec.onend=reset;
     try{ rec.start(); }catch(err){ reset(); }
   }
   function attachSearch(){
@@ -46,8 +92,14 @@
     if(document.getElementById('__searchMic')) return;
     var wrap=document.createElement('div'); wrap.id='__searchWrap'; wrap.style.cssText='display:flex;gap:8px;align-items:center;';
     s.parentNode.insertBefore(wrap,s); wrap.appendChild(s); s.style.flex='1'; s.style.width='auto';
-    var mic=makeMic('Dictar No. de bien o codigo'); mic.id='__searchMic'; wrap.appendChild(mic);
-    mic.onclick=function(){ listen(mic,function(v){ if(v){ s.value=v; s.focus(); fire(s); } }); };
+    var mic=makeMic('Dictar el nombre o el No. de bien'); mic.id='__searchMic'; wrap.appendChild(mic);
+    mic.onclick=function(){
+      listen(mic,function(v, crudo){
+        var texto = textoParaBuscar(v, crudo);
+        if(texto){ s.value=texto; s.focus(); fire(s); }
+        else aviso('No se entendió, intente de nuevo');
+      });
+    };
   }
   function attachToma(){
     var inputs=[].slice.call(document.querySelectorAll('#view input[type=text],#view input:not([type]),#sheet input[type=text],#sheet input:not([type])'));
