@@ -43,6 +43,19 @@
     try { history.back(); } catch(e){ ignorarPop = false; }
   }
 
+  /* Cerrar de un golpe varios niveles seguidos (salir de las guías estando dentro de un
+     procedimiento cierra el procedimiento y el listado a la vez). Se usa history.go(-n),
+     que retrocede n pasos con un solo evento; llamar back() varias veces seguidas dejaría
+     eventos sueltos que después cerrarían de más. */
+  function salirVarios(tipos){
+    if(!listo) return;
+    var n = 0;
+    while(pila.length && tipos.indexOf(pila[pila.length-1].tipo) >= 0){ pila.pop(); n++; }
+    if(!n) return;
+    ignorarPop = true;
+    try { history.go(-n); } catch(e){ ignorarPop = false; }
+  }
+
   window.addEventListener("popstate", function(){
     if(ignorarPop){ ignorarPop = false; return; }
     var nivel = pila.pop();
@@ -109,6 +122,24 @@
     envolver("mrCerrar", function(){
       var top = nivelActual();
       if(top && top.tipo === "modorapido") salir("modorapido");
+    });
+
+    // Guías de AS-400 y SICOIN: dos niveles, el listado y el procedimiento abierto.
+    envolver("abrirGuias", null, function(){
+      entrar("guias", function(){ if(typeof guiasCerrar === "function") guiasCerrar(); });
+    });
+    envolver("guiasCerrar", function(){
+      // si se cierra estando dentro de un procedimiento hay dos entradas que retirar
+      salirVarios(["guiasproc", "guias"]);
+    });
+    envolver("guiasAbrirProc", null, function(){
+      var top = nivelActual();
+      if(top && top.tipo === "guiasproc") return;  // cambiar de procedimiento no apila otro
+      entrar("guiasproc", function(){ if(typeof guiasVolver === "function") guiasVolver(); });
+    });
+    envolver("guiasVolver", function(){
+      var top = nivelActual();
+      if(top && top.tipo === "guiasproc") salir("guiasproc");
     });
   }
 

@@ -364,3 +364,119 @@ body.con-aviso{padding-bottom:180px;}
 /* pasos para instalar la app en la pantalla de inicio */
 .pasosinst{margin:10px 0 4px; padding-left:22px; font-size:13.5px; color:#2c333d; line-height:1.55;}
 .pasosinst li{margin-bottom:6px;}
+
+/* ================= CÓMO SE HACE (AS-400 y SICOIN) ================= */
+#guias{position:fixed; inset:0; z-index:200; background:var(--fondo); display:flex; flex-direction:column;
+  overscroll-behavior:contain;}
+.gtop{display:flex; align-items:center; gap:10px; padding:12px 14px; background:var(--azul); color:#fff;
+  box-shadow:0 2px 10px rgba(0,0,0,.18);}
+.gtoptit{flex:1; font-size:15.5px; font-weight:800; line-height:1.2; min-width:0;}
+.gtoptit small{display:block; font-size:11.5px; font-weight:500; opacity:.82; margin-top:2px;}
+.gbody{flex:1; overflow:auto; -webkit-overflow-scrolling:touch; padding:14px 14px 34px;}
+.gintro{display:flex; align-items:flex-start; background:#EAF0FA; border:1px solid #CBD9EE; border-radius:12px;
+  padding:11px 13px; font-size:12.5px; color:#28405f; line-height:1.45; margin-bottom:12px;}
+
+/* buscador dentro de la guía */
+.gbuscar{position:relative; display:flex; align-items:center; margin-bottom:16px;}
+.gbuscar svg{position:absolute; left:13px; color:var(--gris2); pointer-events:none;}
+.gbuscar input{width:100%; padding:12px 14px 12px 40px; border:1px solid var(--linea); border-radius:12px;
+  font-size:15px; background:#fff; outline:none; box-shadow:0 1px 2px rgba(20,30,60,.05);}
+.gbuscar input:focus{border-color:var(--azul2);}
+
+/* encabezado de cada sistema */
+.gsis{margin:4px 2px 9px;}
+.gsisnom{display:inline-block; font-size:11.5px; font-weight:800; letter-spacing:.7px; color:#fff;
+  background:var(--azul); border-radius:20px; padding:4px 12px;}
+.gsis-sicoin .gsisnom{background:var(--teal);}
+.gsisnota{font-size:12.5px; color:var(--gris); line-height:1.45; margin-top:7px;}
+
+/* tarjeta de cada procedimiento */
+.gcard{display:flex; align-items:center; gap:11px; width:100%; text-align:left; margin-bottom:9px;
+  background:#fff; border:1px solid var(--linea); border-radius:14px; padding:13px 13px;
+  box-shadow:0 1px 3px rgba(20,30,60,.06); color:inherit; font:inherit;}
+.gcard:active{transform:scale(.985);}
+.gcard.encurso{border-color:var(--azul2); box-shadow:0 0 0 3px rgba(47,84,150,.12);}
+.gcardic{flex:none; width:40px; height:40px; border-radius:11px; display:flex; align-items:center;
+  justify-content:center; background:#EAF0FA; color:var(--azul);}
+.gcardic-sicoin{background:#E1F0F0; color:var(--teal);}
+.gcardtxt{flex:1; min-width:0;}
+/* solo el nombre del procedimiento: con 'b' a secas tambien alcanzaba a las teclas
+   resaltadas dentro del renglon que coincide con la busqueda y las volvia bloque */
+.gcardtxt > b{display:block; font-size:14.5px; font-weight:700; color:#1a1f26; line-height:1.3;}
+.gcardtxt small{display:block; font-size:11.5px; color:var(--gris2); margin-top:3px;}
+.gmatch{display:block; font-size:11.5px; color:var(--gris); font-style:normal; margin-top:6px;
+  border-left:2.5px solid var(--azul2); padding-left:8px; line-height:1.4;}
+.gcardch{flex:none; color:#B8C0CC; font-size:19px; display:flex; align-items:center;}
+.gcard .gcardch svg{color:var(--verde);}
+
+/* avance dentro de un procedimiento */
+.gprog{margin:0 2px 14px;}
+.gprogtxt{display:flex; justify-content:space-between; align-items:center; font-size:12.5px;
+  font-weight:700; color:var(--gris);}
+.gprogre{color:var(--azul2); font-weight:700;}
+.gprogbar{margin-top:6px; height:7px; border-radius:20px; background:#DFE4EC; overflow:hidden;}
+.gprogbar i{display:block; height:100%; background:linear-gradient(90deg,#3ea346,#57c95f);
+  border-radius:20px; transition:width .25s;}
+
+/* los pasos */
+.gpasos{list-style:none; margin:0; padding:0;}
+.gpaso{display:flex; align-items:flex-start; gap:11px; background:#fff; border:1px solid var(--linea);
+  border-radius:13px; padding:13px 13px; margin-bottom:8px; box-shadow:0 1px 2px rgba(20,30,60,.05);}
+.gpaso:active{transform:scale(.99);}
+.gnum{flex:none; width:28px; height:28px; border-radius:50%; background:#EAF0FA; color:var(--azul);
+  font-size:13.5px; font-weight:800; display:flex; align-items:center; justify-content:center;}
+.gtxt{flex:1; font-size:14.5px; color:#2c333d; line-height:1.45; padding-top:3px;}
+.gpaso.ok{background:var(--verdebg); border-color:var(--verdeb);}
+.gpaso.ok .gnum{background:var(--verde); color:#fff;}
+.gpaso.ok .gtxt{color:#5f6b6b; text-decoration:line-through; text-decoration-color:rgba(46,125,50,.45);}
+.gpaso.ok .gk{opacity:.6;}
+/* lo que el sistema responde: no es una acción, no lleva casilla */
+.gres{display:flex; align-items:flex-start; margin:-2px 0 8px 39px; padding:9px 12px;
+  background:#FFF6DA; border:1px solid #F0D68A; border-radius:11px;
+  font-size:12.5px; color:#6b5a1e; line-height:1.45;}
+.gres svg{margin-top:1px;}
+
+/* teclas y números de opción resaltados */
+.gk{display:inline-block; min-width:22px; text-align:center; padding:1px 7px; margin:0 1px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px; font-weight:700;
+  color:#fff; background:#334660; border-radius:6px; border-bottom:2px solid #1b2637; line-height:1.5;
+  vertical-align:1px;}
+
+.gfin{display:flex; flex-direction:column; align-items:center; text-align:center; margin-top:18px;
+  background:#fff; border:1px solid var(--verdeb); border-radius:16px; padding:22px 18px;}
+.gfin > svg{color:var(--verde); background:var(--verdebg); border-radius:50%; padding:14px; box-sizing:content-box;}
+.gfin b{font-size:17px; font-weight:800; color:#17202e; margin-top:12px;}
+.gfin small{font-size:12.5px; color:var(--gris2); margin-top:3px;}
+.gfin .act{width:100%;}
+
+/* atajo desde el panel de carga al AS-400 */
+.gatajo{display:flex; align-items:center; gap:9px; width:100%; margin:10px 0 4px; padding:12px 13px;
+  background:#EAF0FA; border:1px solid #CBD9EE; border-radius:12px; color:var(--azul);
+  font-size:13.5px; font-weight:700; text-align:left;}
+.gatajo span{flex:1;}
+.gatajo i{font-style:normal; color:#8FA6C6; font-size:17px;}
+
+/* versión para imprimir o repartir */
+#guiasPrint{display:none;}
+#guiasPrint h1{font-size:17px; color:#1F3864; margin:0 0 2px;}
+#guiasPrint .gpsub{font-size:11px; color:#666; margin-bottom:14px;}
+#guiasPrint h2{font-size:13px; color:#fff; background:#1F3864; padding:5px 10px; border-radius:4px; margin:18px 0 4px;}
+#guiasPrint .gpnota{font-size:10.5px; color:#444; margin:0 0 8px;}
+#guiasPrint h3{font-size:12px; color:#1F3864; margin:12px 0 3px; page-break-after:avoid;}
+/* La numeracion se lleva con contador propio: los renglones de resultado no son un paso
+   y con la numeracion automatica del navegador igual consumian un numero, de modo que la
+   lista saltaba del 5 al 7. */
+#guiasPrint ol{font-size:11px; color:#222; line-height:1.5; margin:0 0 4px; padding-left:20px;
+  page-break-inside:avoid; list-style:none; counter-reset:paso;}
+#guiasPrint li{margin-bottom:2px; position:relative;}
+#guiasPrint li:not(.gpres){counter-increment:paso;}
+#guiasPrint li:not(.gpres)::before{content:counter(paso) "."; position:absolute; left:-20px;
+  width:17px; text-align:right; color:#555;}
+#guiasPrint .gpres{margin-left:-20px; color:#6b5a1e; font-style:italic;}
+@media print{
+  #guiasPrint, #guiasPrint *{visibility:visible;}
+  #guiasPrint{display:block; position:absolute; left:0; top:0; width:100%; padding:20px; background:#fff;}
+}
+/* el overlay bloquea el desplazamiento del fondo; al imprimir hay que soltarlo o el
+   documento sale cortado en la primera pantalla */
+body.imprimiendo-guias{overflow:visible !important;}
