@@ -366,7 +366,7 @@ body.con-aviso{padding-bottom:180px;}
 .pasosinst li{margin-bottom:6px;}
 
 /* ================= CÓMO SE HACE (AS-400 y SICOIN) ================= */
-#guias{position:fixed; inset:0; z-index:200; background:var(--fondo); display:flex; flex-direction:column;
+#guias, #abajas{position:fixed; inset:0; z-index:200; background:var(--fondo); display:flex; flex-direction:column;
   overscroll-behavior:contain;}
 .gtop{display:flex; align-items:center; gap:10px; padding:12px 14px; background:var(--azul); color:#fff;
   box-shadow:0 2px 10px rgba(0,0,0,.18);}
@@ -480,3 +480,94 @@ body.con-aviso{padding-bottom:180px;}
 /* el overlay bloquea el desplazamiento del fondo; al imprimir hay que soltarlo o el
    documento sale cortado en la primera pantalla */
 body.imprimiendo-guias{overflow:visible !important;}
+
+/* ================= ALTAS Y BAJAS DEL INVENTARIO ================= */
+/* Cada grupo lleva su color para distinguir de un vistazo si algo entra o sale. */
+.gsis-antes .gsisnom{background:var(--gris);}
+.gsis-alta .gsisnom{background:var(--verde);}
+.gsis-baja .gsisnom{background:var(--rojo);}
+.gsis-traslado .gsisnom{background:var(--teal);}
+.gcardic-antes{background:#EDEFF3; color:var(--gris);}
+.gcardic-alta{background:var(--verdebg); color:var(--verde);}
+.gcardic-baja{background:var(--rojobg); color:var(--rojo);}
+.gcardic-traslado{background:#E1F0F0; color:var(--teal);}
+
+/* título de cada bloque dentro de un caso */
+.abtit{font-size:12px; font-weight:800; letter-spacing:.5px; text-transform:uppercase;
+  color:var(--gris); margin:20px 2px 9px;}
+.abtit:first-child{margin-top:4px;}
+
+/* quién autoriza: es lo primero que se pregunta, así que va destacado */
+.abquien{background:#EAF0FA; border:1px solid #CBD9EE; border-left:4px solid var(--azul);
+  border-radius:12px; padding:12px 14px; margin-bottom:4px; font-size:13.5px; color:#28405f; line-height:1.5;}
+.abquientit{display:flex; align-items:center; font-size:11px; font-weight:800; letter-spacing:.6px;
+  text-transform:uppercase; color:var(--azul); margin-bottom:6px;}
+
+.abnota{display:flex; align-items:flex-start; background:#fff; border:1px solid var(--linea);
+  border-radius:12px; padding:11px 13px; margin:10px 0 4px; font-size:13px; color:#2c333d; line-height:1.5;}
+.abaviso{display:flex; align-items:flex-start; background:var(--naranjabg); border:1px solid var(--naranjab);
+  border-radius:12px; padding:11px 13px; margin:10px 0 4px; font-size:13px; color:#7A4508; line-height:1.5;}
+.abaviso svg{color:var(--naranja);}
+
+.ablista{margin:0 0 4px; padding-left:0; list-style:none;}
+.ablista li{position:relative; background:#fff; border:1px solid var(--linea); border-radius:12px;
+  padding:11px 13px 11px 30px; margin-bottom:7px; font-size:13.5px; color:#2c333d; line-height:1.5;}
+.ablista li::before{content:""; position:absolute; left:13px; top:18px; width:6px; height:6px;
+  border-radius:50%; background:var(--azul2);}
+
+/* enlace a otro caso de la misma guía */
+.ablink{color:var(--azul2); font-weight:700; border-bottom:1.5px solid rgba(47,84,150,.3); cursor:pointer;}
+.ablink:active{opacity:.6;}
+
+/* documentos del expediente: casilla cuadrada en vez de número */
+.gpaso.doc .gnum{border-radius:7px; background:#fff; border:2px solid #C7CEDA;}
+.gpaso.doc.ok .gnum{background:var(--verde); border-color:var(--verde);}
+
+/* respuesta de la herramienta de dictamen */
+.abresp{display:flex; align-items:flex-start; gap:12px; border-radius:14px; padding:15px 15px;
+  margin-bottom:4px; border:1px solid var(--linea); background:#fff;}
+.abresp > svg{flex:none; margin-top:1px;}
+.abresp b{display:block; font-size:15.5px; font-weight:800; line-height:1.3;}
+.abresp small{display:block; font-size:12.5px; margin-top:5px; line-height:1.5; color:#3c4652;}
+.abresp-si{background:#EAF0FA; border-color:#CBD9EE; color:var(--azul);}
+.abresp-no{background:var(--verdebg); border-color:var(--verdeb); color:var(--verde);}
+.abresp-ojo{background:var(--naranjabg); border-color:var(--naranjab); color:var(--naranja);}
+
+/* citas de la normativa al pie de cada caso */
+.abbase{margin-top:20px; padding:12px 13px; background:#F6F7FA; border:1px solid var(--linea);
+  border-radius:12px;}
+.abbase b{display:flex; align-items:center; font-size:11px; font-weight:800; letter-spacing:.5px;
+  text-transform:uppercase; color:var(--gris2); margin-bottom:7px;}
+.abbase span{display:block; font-size:12px; color:var(--gris); line-height:1.5;}
+.abbase span + span{margin-top:3px;}
+
+.abfuentes{margin-top:22px; padding-top:14px; border-top:1px solid var(--linea);
+  font-size:11.5px; color:var(--gris2); line-height:1.5;}
+
+/* versión para imprimir */
+#abPrint{display:none;}
+#abPrint h1{font-size:17px; color:#1F3864; margin:0 0 2px;}
+#abPrint .gpsub{font-size:11px; color:#666; margin-bottom:10px;}
+#abPrint h2{font-size:13px; color:#fff; background:#1F3864; padding:5px 10px; border-radius:4px; margin:18px 0 4px;}
+#abPrint h3{font-size:12px; color:#1F3864; margin:12px 0 3px; page-break-after:avoid;}
+#abPrint h4{font-size:10.5px; color:#444; margin:8px 0 2px; text-transform:uppercase; letter-spacing:.4px;}
+#abPrint .gpnota{font-size:10.5px; color:#333; margin:0 0 6px; line-height:1.45;}
+#abPrint ol, #abPrint ul{font-size:11px; color:#222; line-height:1.5; margin:0 0 4px; padding-left:20px;
+  page-break-inside:avoid;}
+#abPrint ol{list-style:none; counter-reset:paso;}
+#abPrint ol li{position:relative;}
+#abPrint ol li:not(.gpres){counter-increment:paso;}
+#abPrint ol li:not(.gpres)::before{content:counter(paso) "."; position:absolute; left:-20px;
+  width:17px; text-align:right; color:#555;}
+#abPrint li{margin-bottom:2px;}
+#abPrint .gpres{margin-left:-20px; color:#6b5a1e; font-style:italic; list-style:none;}
+#abPrint .abpbase{font-size:9.5px; color:#777; margin:4px 0 0; font-style:italic;}
+#abPrint .abtabla{width:100%; border-collapse:collapse; font-size:10px; margin:4px 0 8px;
+  page-break-inside:avoid;}
+#abPrint .abtabla th{background:#EEF2F8; color:#1F3864; text-align:left; padding:4px 6px;
+  border:1px solid #C7CEDA; font-size:9.5px;}
+#abPrint .abtabla td{padding:4px 6px; border:1px solid #D8DEE8; vertical-align:top;}
+@media print{
+  #abPrint, #abPrint *{visibility:visible;}
+  #abPrint{display:block; position:absolute; left:0; top:0; width:100%; padding:20px; background:#fff;}
+}

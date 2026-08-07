@@ -16,6 +16,11 @@
   var pila = [];          // funciones que cierran cada nivel abierto
   var ignorarPop = false; // evita procesar dos veces cuando el cierre lo inicia la interfaz
   var listo = false;
+  /* Mientras se ejecuta el cierre de un nivel por haber retrocedido, no se debe retirar
+     ningún otro: ese nivel ya salió de la pila. Sin esto, un cierre que llama a la misma
+     función que usa la interfaz para volver (por ejemplo abVolver) hacía que se cerraran
+     dos niveles de un solo toque de atrás. */
+  var cerrandoDesdeAtras = false;
 
   function nivelActual(){ return pila.length ? pila[pila.length-1] : null; }
 
@@ -34,7 +39,7 @@
 
   // La interfaz cerró algo por su cuenta: se retira su entrada del historial.
   function salir(tipo){
-    if(!listo) return;
+    if(!listo || cerrandoDesdeAtras) return;
     var top = nivelActual();
     if(!top) return;
     if(tipo && top.tipo !== tipo) return; // no corresponde a este nivel, no se toca
@@ -48,7 +53,7 @@
      que retrocede n pasos con un solo evento; llamar back() varias veces seguidas dejaría
      eventos sueltos que después cerrarían de más. */
   function salirVarios(tipos){
-    if(!listo) return;
+    if(!listo || cerrandoDesdeAtras) return;
     var n = 0;
     while(pila.length && tipos.indexOf(pila[pila.length-1].tipo) >= 0){ pila.pop(); n++; }
     if(!n) return;
@@ -60,7 +65,9 @@
     if(ignorarPop){ ignorarPop = false; return; }
     var nivel = pila.pop();
     if(nivel && typeof nivel.cerrar === "function"){
+      cerrandoDesdeAtras = true;
       try { nivel.cerrar(); } catch(e){}
+      cerrandoDesdeAtras = false;
     }
     // Si la pila queda vacía, el siguiente "atrás" sale de la app, como se espera.
   });
@@ -140,6 +147,30 @@
     envolver("guiasVolver", function(){
       var top = nivelActual();
       if(top && top.tipo === "guiasproc") salir("guiasproc");
+    });
+
+    /* Altas y bajas: tres niveles posibles — el listado, el caso abierto, y dentro de la
+       herramienta de dictamen, el tipo de bien elegido. Atrás retrocede uno por uno. */
+    envolver("abrirAltasBajas", null, function(){
+      entrar("abajas", function(){ if(typeof abCerrar === "function") abCerrar(); });
+    });
+    envolver("abCerrar", function(){
+      salirVarios(["abtipo", "abcaso", "abajas"]);
+    });
+    envolver("abAbrir", null, function(){
+      var top = nivelActual();
+      if(top && top.tipo === "abcaso") return;   // cambiar de caso no apila otro nivel
+      entrar("abcaso", function(){ if(typeof abVolver === "function") abVolver(); });
+    });
+    envolver("abTipo", null, function(){
+      var top = nivelActual();
+      if(top && top.tipo === "abtipo") return;   // cambiar de tipo tampoco
+      entrar("abtipo", function(){ if(typeof abVolver === "function") abVolver(); });
+    });
+    envolver("abVolver", function(){
+      var top = nivelActual();
+      if(top && top.tipo === "abtipo") salir("abtipo");
+      else if(top && top.tipo === "abcaso") salir("abcaso");
     });
   }
 
