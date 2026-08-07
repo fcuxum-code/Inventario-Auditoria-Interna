@@ -527,7 +527,9 @@ body.imprimiendo-guias{overflow:visible !important;}
 .abresp{display:flex; align-items:flex-start; gap:12px; border-radius:14px; padding:15px 15px;
   margin-bottom:4px; border:1px solid var(--linea); background:#fff;}
 .abresp > svg{flex:none; margin-top:1px;}
-.abresp b{display:block; font-size:15.5px; font-weight:800; line-height:1.3;}
+/* solo el titulo de la respuesta: con 'b' a secas tambien alcanzaba a las negritas
+   dentro del texto explicativo y las partia en bloque, agrandadas */
+.abresp > div > b{display:block; font-size:15.5px; font-weight:800; line-height:1.3;}
 .abresp small{display:block; font-size:12.5px; margin-top:5px; line-height:1.5; color:#3c4652;}
 .abresp-si{background:#EAF0FA; border-color:#CBD9EE; color:var(--azul);}
 .abresp-no{background:var(--verdebg); border-color:var(--verdeb); color:var(--verde);}
