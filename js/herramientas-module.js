@@ -132,7 +132,14 @@
       origOpenMenu.apply(this,arguments);
       var sheet=document.getElementById('sheet'); if(!sheet) return;
       if(sheet.querySelector('#herrMenuMarker')) return;
-      var anchor=sheet.querySelector('[onclick="abrirFusion()"]');
+      /* Antes se colgaba de la opción "Fusionar tarjetas duplicadas". Al quitarse esa opción
+         estas dos se iban al final del menú, debajo de Cerrar sesión, así que ahora se
+         cuelgan del encabezado "Herramientas", que es su sección. */
+      var anchor=null;
+      var secciones=sheet.querySelectorAll('.msec');
+      for(var i=0;i<secciones.length;i++){
+        if(/Herramientas/i.test(secciones[i].textContent)){ anchor=secciones[i]; break; }
+      }
       var html='<div class="mitem" onclick="herrAbrirUbicacion()"><span class="ic">'+icon('search',20)+'</span><div><b id="herrMenuMarker">Ver bienes por ubicación</b><small>Buscar todo lo que hay en un lugar</small></div></div>'
         +'<div class="mitem" onclick="herrAbrirAsignarLote()"><span class="ic">'+icon('layers',20)+'</span><div><b>Asignar tarjeta en lote</b><small>Por empleado o No. de tarjeta, varios bienes a la vez</small></div></div>';
       if(anchor) anchor.insertAdjacentHTML('afterend', html);

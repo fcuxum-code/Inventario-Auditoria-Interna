@@ -757,6 +757,8 @@ function logMovimiento(b, extra){
 const TIPO_MOV_TXT = {
   VERIFICACION: "Verificación de inventario",
   REASIGNACION: "Reasignado a otra persona",
+  // Fusionar tarjetas ya no se hace desde la app, pero los movimientos que quedaron
+  // registrados antes deben seguir leyéndose en el historial de cada bien.
   FUSION_TARJETAS: "Fusión de tarjetas duplicadas",
   HALLAZGO_ASIGNADO: "Asignado (era un hallazgo)",
   DESCARGADO: "Retirado de la tarjeta (ya no lo tenía)"
@@ -1295,56 +1297,6 @@ function pickTarjeta(id){
   const t = TARJETAS[id]; if(!t) return;
   curSes.tarjetaId=id; curSes.numero=t.numero||""; curSes.persona=t.responsable||""; curSes.empleado=t.empleado||""; curSes.correo=t.correo||"";
   closeMenu(); render();
-}
-
-/* ================= FUSIONAR TARJETAS DUPLICADAS ================= */
-let _fusion = {origen:null, destino:null};
-function abrirFusion(){ if(!requiereEdicion()) return; _fusion = {origen:null, destino:null}; renderFusionSheet(); }
-function renderFusionSheet(){
-  const list = tarjetasActivas();
-  function rowFor(t, campo){
-    const items = bienesDe(t.id);
-    return '<div class="tlist-item" onclick="fusionElegir(\''+campo+'\',\''+t.id+'\')"><div><b>'+esc(t.responsable||"(sin nombre)")+'</b>'
-      +'<small>Tarjeta '+esc(t.numero||"(pendiente)")+' · '+items.length+' bien(es)</small></div><span style="color:#B8C0CC">›</span></div>';
-  }
-  let h = '<div class="grip"></div><h3>🔀 Fusionar tarjetas duplicadas</h3>'
-    +'<div class="note">Use esto cuando la misma persona quedó con dos tarjetas (por escribir el nombre distinto, por ejemplo). Todos los bienes de la tarjeta A pasan a la tarjeta B, y A queda inactiva (no se borra, por auditoría).</div>';
-  h += '<label style="font-size:12px;font-weight:700;color:#5B6470;display:block;margin-top:10px">Tarjeta A (la que sobra)</label>';
-  if(_fusion.origen){ const t=TARJETAS[_fusion.origen]; h += '<div class="tpickbtn" style="margin:6px 0 10px">'+esc(t.responsable)+' — Tarjeta '+esc(t.numero||"(pendiente)")+'</div>'; }
-  else { h += '<div>'+list.map(function(t){return rowFor(t,'origen');}).join("")+'</div>'; }
-  if(_fusion.origen){
-    h += '<label style="font-size:12px;font-weight:700;color:#5B6470;display:block;margin-top:10px">Tarjeta B (a la que se une todo)</label>';
-    if(_fusion.destino){ const t=TARJETAS[_fusion.destino]; h += '<div class="tpickbtn" style="margin:6px 0 10px">'+esc(t.responsable)+' — Tarjeta '+esc(t.numero||"(pendiente)")+'</div>'; }
-    else { h += '<div>'+list.filter(function(t){return t.id!==_fusion.origen;}).map(function(t){return rowFor(t,'destino');}).join("")+'</div>'; }
-  }
-  if(_fusion.origen && _fusion.destino){ h += '<button class="act n" onclick="confirmarFusion()">Fusionar ahora</button>'; }
-  h += '<button class="act o" onclick="closeMenu()">Cancelar</button>';
-  document.getElementById("sheet").innerHTML = h;
-  showSheet();
-}
-function fusionElegir(campo,id){ _fusion[campo]=id; renderFusionSheet(); }
-function confirmarFusion(){
-  if(!requiereEdicion()) return;
-  const origen = TARJETAS[_fusion.origen], destino = TARJETAS[_fusion.destino];
-  if(!origen || !destino) return;
-  if(!confirm('¿Mover todos los bienes de "'+origen.responsable+'" (Tarj. '+(origen.numero||"pendiente")+') a "'+destino.responsable+'" (Tarj. '+(destino.numero||"pendiente")+')? No se puede deshacer.')) return;
-  const items = bienesDe(origen.id);
-  const batch = db.batch();
-  items.forEach(function(b){
-    batch.update(db.collection("bienes").doc(b.id), {
-      tarjetaId: destino.id, tarjetaNumero: destino.numero||"", responsable: destino.responsable,
-      actualizado: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    const movRef = db.collection("movimientos").doc();
-    batch.set(movRef, { codigo:b.codigo, tipoMovimiento:"FUSION_TARJETAS",
-      tarjetaAnteriorNumero: origen.numero||"", responsableAnterior: origen.responsable,
-      tarjetaNuevaNumero: destino.numero||"", responsableNuevo: destino.responsable,
-      estado:b.estado||"", ubicacion:b.ubicacion||"", observaciones:"Fusión de tarjetas duplicadas",
-      fecha: firebase.firestore.FieldValue.serverTimestamp(), fechaTxt: today(), capturadoPor: META.by||"" });
-  });
-  batch.update(db.collection("tarjetas").doc(origen.id), {activa:false, actualizada: firebase.firestore.FieldValue.serverTimestamp()});
-  batch.commit().then(function(){ toast("Fusionadas ✓ ("+items.length+" bienes movidos)"); closeMenu(); goHome(); })
-    .catch(function(){ toast("No se pudo fusionar"); });
 }
 
 function buscarBienPorCodigoOSiges(raw){
@@ -1909,12 +1861,12 @@ function openMenu(){
 
     + sec("Revisar")
     +'<div class="mitem" onclick="abrirAvanceUbicacion()"><span class="ic">'+icon('mapPin',20)+'</span><div><b>Avance por ubicación</b><small>Cuánto falta por verificar en cada lugar</small></div></div>'
-    +'<div class="mitem" onclick="abrirDiscrepancias()"><span class="ic">'+icon('alertTriangle',20)+'</span><div><b>Discrepancias</b><small>Todos los bienes marcados NO en un solo lugar</small></div></div>'
+    /* Discrepancias no se repite aquí: se abre desde su tarjeta en el panel de inicio. */
     +'<div class="mitem" onclick="abrirActividadReciente()"><span class="ic">'+icon('clock',20)+'</span><div><b>Actividad reciente</b><small>Últimos movimientos de todos los bienes</small></div></div>'
     +'<div class="mitem" onclick="abrirAsistente()"><span class="ic">'+icon('chat',20)+'</span><div><b>Asistente del inventario</b><small>Pregunte cantidades, valores o listados en lenguaje natural</small></div></div>'
 
+    /* Las opciones de esta sección las agrega js/herramientas-module.js. */
     + sec("Herramientas")
-    +'<div class="mitem" onclick="abrirFusion()"><span class="ic">'+icon('refreshCw',20)+'</span><div><b>Fusionar tarjetas duplicadas</b><small>Si la misma persona quedó con dos tarjetas</small></div></div>'
 
     + sec("Reportes")
     +'<div class="mitem" onclick="imprimirReporteEjecutivo()"><span class="ic">'+icon('clipboardCheck',20)+'</span><div><b>Reporte ejecutivo (PDF)</b><small>Resumen de una página: avance, diferencias y carga al AS-400</small></div></div>'
@@ -1926,7 +1878,6 @@ function openMenu(){
       +'<input id="gsin" type="url" value="'+esc(META.gsUrl||"")+'" placeholder="https://script.google.com/macros/s/…/exec" oninput="META.gsUrl=this.value; saveMeta();"></div>'
     +'<div class="mitem" onclick="verCodigoGS()"><span class="ic">'+icon('code',20)+'</span><div><b>Ver código para Apps Script</b><small>Cópielo y péguelo una sola vez</small></div></div>'
     +'<div class="mitem" onclick="probarGS()"><span class="ic">'+icon('zap',20)+'</span><div><b>Probar conexión de correo/fotos</b><small>'+(META.gsUrl?"Configurado":"Sin configurar")+'</small></div></div>'
-    +'<div class="mitem" onclick="enviarCorreoPrueba()"><span class="ic">'+icon('mail',20)+'</span><div><b>Enviar correo de prueba (con foto)</b><small>Para confirmar que la foto sí llega adjunta</small></div></div>'
 
     + sec("Cuenta")
     +'<div class="mitem" onclick="cerrarSesion()"><span class="ic">'+icon('logOut',20)+'</span><div><b>Cerrar sesión</b><small>'+esc(firebase.auth().currentUser?firebase.auth().currentUser.email:"")+'</small></div></div>'
@@ -1968,35 +1919,6 @@ function probarGS(){
     else toast("Sin conexión o mal configurado");
   });
 }
-function enviarCorreoPrueba(){
-  closeMenu();
-  if(!META.gsUrl){ toast("Primero pegue la URL de Apps Script"); return; }
-  const def = (firebase.auth().currentUser && firebase.auth().currentUser.email) || "";
-  pedirTexto("Correo de prueba", "¿A qué correo enviamos la prueba (con foto adjunta)?", def, "email", function(correo){
-    if(!correo) return;
-    toast("Verificando versión…");
-    verificarVersionGS().then(function(r){
-      if(!r.ok){ if(r.motivo==="desactualizado") avisoGSDesactualizado(); else toast("⚠️ No se pudo conectar con Apps Script."); return; }
-      toast("Enviando correo de prueba…");
-      const testB64 = "iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAACXBIWXMAAAsTAAALEwEAmpwYAAAA0UlEQVR4nO3XMQ6CQBCF4YdaeQEb44m8g6ewsPEy1nZ6BBs9giewsdEjeAJ6D2NhpQ0JZmB2Zwb+xEQTdb+ssMwCJRUYgAvQBXTgfsAA9MCFylwvsLGA57WzgAtwWzsBLwt4rZ2CJws4rB2FBws4rp0HYCyc9Q7My4Nmyz3wKrz1yYznWl94Y8lzL2biuXbAI3PWD8DBcu0FMBmgb8DAn9oZmA3QN2DgxeYd6IEbcAeewNXwrhbwWjsBLxbwXDsBLwt4qp2AJwt4qJ2AhwUcauc7HYA7cKid77QDDsC+dr7TB2SjLYktbMB2AAAAAElFTkSuQmCC";
-      const payload = { type:"notificar", correo: correo, persona:"Prueba de sistema",
-        tarjeta:"(prueba)", ubicacion:"(prueba de conexión)", fecha: today(), capturadoPor: META.by||"Sistema",
-        detalle: "• 512345 — Silla secretarial de prueba — Q450.00 — Estado: BUENO",
-        items: [{codigo:"512345", desc:"Silla secretarial de prueba", valor:450, estado:"BUENO"},
-                {codigo:"512346", desc:"Escritorio de prueba con gavetas", valor:1200, estado:"REGULAR"}],
-        fotos: [{name:"prueba.jpg", b64:testB64}] };
-      fetch(META.gsUrl, {method:"POST", body: JSON.stringify(payload)})
-        .then(function(r){ return r.json().catch(function(){ return null; }); })
-        .then(function(j){
-          if(j===null) toast("Enviado (no se pudo leer la respuesta, pero probablemente llegó). Revise "+correo);
-          else if(j.ok===false) toast("⚠️ Apps Script respondió con error: "+(j.error||"desconocido"));
-          else toast("✓ Enviado. Revise "+correo+" (y la carpeta de spam) en un minuto.");
-        })
-        .catch(function(){ toast("⚠️ No se pudo conectar. Revise la URL y que el acceso sea 'Cualquier persona'."); });
-    });
-  });
-}
-/* ================= AVANCE POR UBICACIÓN ================= */
 function repararUbicaciones(){
   if(!requiereEdicion()) return;
   const updates = [];
