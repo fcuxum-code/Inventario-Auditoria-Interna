@@ -172,6 +172,15 @@
       if(top && top.tipo === "abtipo") salir("abtipo");
       else if(top && top.tipo === "abcaso") salir("abcaso");
     });
+
+    // Tips y recomendaciones: una sola pantalla, atrás la cierra.
+    envolver("abrirTips", null, function(){
+      entrar("tips", function(){ if(typeof tipsCerrar === "function") tipsCerrar(); });
+    });
+    envolver("tipsCerrar", function(){
+      var top = nivelActual();
+      if(top && top.tipo === "tips") salir("tips");
+    });
   }
 
   /* Este archivo es el último que carga, así que las funciones que envuelve ya existen.
