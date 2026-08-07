@@ -573,3 +573,6 @@ body.imprimiendo-guias{overflow:visible !important;}
   #abPrint, #abPrint *{visibility:visible;}
   #abPrint{display:block; position:absolute; left:0; top:0; width:100%; padding:20px; background:#fff;}
 }
+/* renglon de "quienes intervienen" que dice que alguien NO interviene */
+.ablista li.abli-no{background:var(--verdebg); border-color:var(--verdeb); color:#3f5f42;}
+.ablista li.abli-no::before{background:var(--verde);}

@@ -37,19 +37,19 @@
     { id:"medico", nom:"Equipo médico-sanitario y de laboratorio",
       quien:"División de Mantenimiento", toxicos:true },
     { id:"produccion", nom:"Equipo de producción",
-      quien:"División de Mantenimiento", toxicos:"si" },
+      quien:"División de Mantenimiento", toxicos:"equipo" },
     { id:"comunicacion", nom:"Equipo de comunicación",
-      quien:"División de Mantenimiento", toxicos:"si" },
+      quien:"División de Mantenimiento", toxicos:"equipo" },
     { id:"transporte", nom:"Maquinaria y equipo de transporte, tracción y elevación",
       quien:"División de Transportes", toxicos:true },
     { id:"mobiliario", nom:"Mobiliario de oficina",
-      quien:null, toxicos:"si" },
+      quien:null, toxicos:false },
     { id:"educacional", nom:"Material educacional, cultural y recreativo",
-      quien:null, toxicos:"si" },
+      quien:null, toxicos:false },
     { id:"fungible", nom:"Bienes muebles fungibles",
-      quien:"fungible", toxicos:"si" },
+      quien:"fungible", toxicos:false },
     { id:"militar", nom:"Equipo militar (armas y municiones)",
-      quien:"militar", toxicos:"si" }
+      quien:"militar", toxicos:false }
   ];
 
   /* ---------- Los casos ----------
@@ -648,10 +648,20 @@
 
   /* ---------- herramienta: el trámite completo según el tipo de bien ----------
      El esqueleto de la baja por desuso es el mismo para todos (Acuerdo 1560, artículos 2 y
-     3), pero cambia en cuatro cosas según el tipo: si lleva dictamen y de quién, si el acta
-     administrativa lo sustituye, si interviene Auditoría Interna, y si obliga al tratamiento
-     de desechos. En vez de mandar a leer un procedimiento genérico y descontar mentalmente
-     lo que no aplica, aquí se arma la lista ya resuelta para el bien que se tiene enfrente. */
+     3), pero cambia según el tipo: si lleva dictamen y de quién, si el acta administrativa
+     lo sustituye, si interviene Auditoría Interna, y si obliga al tratamiento de desechos.
+     En vez de mandar a leer un procedimiento genérico y descontar mentalmente lo que no
+     aplica, aquí se arma la lista ya resuelta para el bien que se tiene enfrente.
+
+     Son tres bloques distintos y conviene no confundirlos:
+       1. Autorizar la baja (Acuerdo 1560, artículos 2 y 3) — para todos.
+       2. Ejecutar el destino, si es destrucción o desintegración (artículos 11 a 17) —
+          también para todos: cualquier bien puede terminar destruido.
+       3. Tratamiento de desechos tóxicos (Acuerdo 23/2025) — solo para EQUIPO. El
+          instructivo dice "equipo mecánico, eléctrico, electrónico, médico sanitario y de
+          laboratorio, vehículos, equipo de cómputo y cualquier otro EQUIPO que contenga
+          placa con circuitos electrónicos, ácidos o líquidos". Un escritorio o una silla no
+          son equipo, así que a mobiliario y a material educacional no les toca. */
 
   var P_INCOMPLETO = "Si el bien está incompleto y por eso se dificulta identificarlo contra el Módulo y el Sistema Auxiliar (plaqueta o etiqueta deteriorada, distintivos de la marca ilegibles, partes accesorias), faccione Acta Administrativa suscrita por la Autoridad Superior y el Encargado de Inventarios describiendo la dificultad, y adjunte su certificación a la solicitud";
   var P_SOLICITUD = "Conforme el expediente y remita la solicitud de autorización a la Subgerencia que corresponda";
@@ -662,8 +672,10 @@
   var P_CONTA     = "Envíe copia certificada de esa acta al Departamento de Contabilidad para los ajustes en el inventario general del Instituto";
   var P_REGISTRO  = "Registre la baja en el Módulo y en el Sistema Auxiliar; la aprobación la efectúa el Departamento de Contabilidad";
   var P_TARJETA   = "Descargue el bien de la tarjeta de responsabilidad solo hasta que la baja esté aprobada en el Módulo y en el Sistema Auxiliar";
-  var P_LISTADO   = "La máxima autoridad de la dependencia, con el Encargado de Inventarios, elabora un listado con la descripción de los bienes considerados en desuso";
+  var P_LISTADO   = "La máxima autoridad de la dependencia, bajo su responsabilidad y con la intervención del Encargado de Inventarios, elabora un listado con la descripción de los bienes considerados en desuso";
   var P_SUGIERE   = "> El dictamen debe indicar si los bienes son susceptibles de baja y, luego de la evaluación, sugerir si son objeto de permuta, donación, desintegración, acoplamiento o destrucción";
+
+  function esEquipo(t){ return t.toxicos === true || t.toxicos === "equipo"; }
 
   function rutaDe(t){
     if(t.quien === "militar"){
@@ -673,7 +685,7 @@
           "Atienda lo que establece la <b>Ley de Armas y Municiones</b>, Decreto 15-2009 del Congreso de la República de Guatemala, y su respectivo Reglamento",
           "> El artículo 4 del Acuerdo 1560 se agota en esa remisión: no fija pasos, plazos ni instancia dentro del Instituto"
         ],
-        extra:null,
+        destino:false,
         base:["Acuerdo 1560 de J.D., artículo 4","Ley de Armas y Municiones, Decreto 15-2009"] };
     }
     if(t.quien === "fungible"){
@@ -683,13 +695,9 @@
           "La Máxima Autoridad y el Encargado de Inventarios evalúan, bajo su estricta responsabilidad, si los bienes son susceptibles de darles de baja",
           "> No se requiere dictamen técnico ni la intervención del Departamento de Auditoría Interna",
           "Deje constancia de lo actuado en <b>Acta Administrativa</b>",
-          P_SOLICITUD,
-          P_CUSTODIA,
-          P_RESOLUCION,
-          P_REGISTRO,
-          P_TARJETA
+          P_SOLICITUD, P_CUSTODIA, P_RESOLUCION, P_REGISTRO, P_TARJETA
         ],
-        extra:{ tecnica:null, auditor:false },
+        destino:true,
         base:["Acuerdo 1560 de J.D., artículos 2 y 15","Manual 40/2019, numerales 18 y 28"] };
     }
     if(t.quien === null){
@@ -697,56 +705,85 @@
         pasos:[
           P_LISTADO,
           "<b>No se requiere dictamen previo.</b> Suscriba el <b>Acta Administrativa</b> entre la máxima autoridad y el Encargado de Inventarios de la dependencia interesada: eso es lo que documenta la baja en lugar del dictamen",
-          P_INCOMPLETO,
-          P_SOLICITUD,
-          P_CUSTODIA,
-          P_RESOLUCION,
-          P_AUDITOR,
-          P_ACTA,
-          P_CONTA,
-          P_REGISTRO,
-          P_TARJETA
+          P_INCOMPLETO, P_SOLICITUD, P_CUSTODIA, P_RESOLUCION, P_AUDITOR,
+          P_ACTA, P_CONTA, P_REGISTRO, P_TARJETA
         ],
-        extra:{ tecnica:null, auditor:true },
-        base:["Acuerdo 1560 de J.D., artículos 2, 3 y 16","Acuerdo 19/2025, numerales 17.1 y 19","Manual 40/2019, numerales 18 y 28"] };
+        destino:true,
+        base:["Acuerdo 1560 de J.D., artículos 2 y 3","Acuerdo 19/2025, numerales 17.1 y 19","Manual 40/2019, numerales 18 y 28"] };
     }
-    // con dictamen técnico
-    var pasos = [
-      P_LISTADO,
-      "Solicite el dictamen técnico a <b>la " + t.quien + "</b>",
-      P_SUGIERE
-    ];
-    if(t.toxicos === true){
-      pasos.push("> El dictamen debe indicar además los componentes que contengan desechos tóxicos y que requieran tratamiento especial por entidades certificadas y autorizadas (Acuerdo 23/2025, norma general 2)");
+    var pasos = [ P_LISTADO, "Solicite el dictamen técnico a <b>la " + t.quien + "</b>", P_SUGIERE ];
+    if(esEquipo(t)){
+      pasos.push("> El dictamen debe indicar además los componentes que contengan desechos tóxicos y que requieran tratamiento especial por entidades debidamente certificadas y autorizadas (Acuerdo 23/2025, norma general 2)");
     }
     pasos = pasos.concat([
       "> El dictamen debe considerar que los bienes observados físicamente son los que se relacionan con el Módulo y el Sistema Auxiliar, conforme a las justificaciones del Acta Administrativa",
       P_INCOMPLETO, P_SOLICITUD, P_CUSTODIA, P_RESOLUCION, P_AUDITOR,
       P_ACTA, P_CONTA, P_REGISTRO, P_TARJETA
     ]);
-    return { clave:"condictamen", pasos:pasos,
-      extra:{ tecnica:t.quien, auditor:true },
-      base:["Acuerdo 1560 de J.D., artículos 2, 3 y 14","Acuerdo 19/2025, numerales 17.1, 19 y 19.1","Manual 40/2019, numerales 18 y 28"] };
+    return { clave:"condictamen", pasos:pasos, destino:true,
+      base:["Acuerdo 1560 de J.D., artículos 2 y 3","Acuerdo 19/2025, numerales 17.1, 19 y 19.1","Manual 40/2019, numerales 18 y 28"] };
   }
 
-  function pasosExtra(t, ex){
+  /* Ejecutar el destino cuando es destrucción o desintegración. Vale para cualquier bien:
+     el Acuerdo 1560 no lo limita a los que generan desechos. */
+  function pasosDestino(t){
     var items = [
-      "Considere la normativa vigente que dicte lineamientos para el manejo de desechos tóxicos: es de aplicación obligatoria",
-      "Verifique que en el bien no permanezca visible ni legible ningún logotipo, número de serie, placa o señalamiento que lo relacione con el IGSS, para prevenir su eventual circulación dentro del territorio nacional",
-      "Solicite a <b>" + (ex.tecnica ? ("la " + ex.tecnica) : "la Subgerencia de Tecnología, la División de Mantenimiento o la División de Transportes, según corresponda") + "</b> la asignación de personal técnico que realice la extracción de los componentes tóxicos",
+      "> La destrucción procede después de dar cumplimiento a los artículos 3, 11 y 12 del Reglamento, y cuando por el deterioro sufrido ya no sea posible su uso. Es decir: primero hay que haber agotado la desintegración y el acoplamiento",
+      "Descarte la desintegración: procede si alguna Dependencia del Instituto lo solicitó previamente y el bien contiene piezas en buenas condiciones y funcionales para usarse como repuestos de otros bienes muebles que estén en uso",
+      "Descarte el acoplamiento: procede cuando el bien no puede funcionar por sí mismo pero, al combinarlo con otros aparatos o sistemas para formar una sola unidad, produce un resultado conveniente y ofrece servicio por algún tiempo más",
+      "> Tanto la desintegración como el acoplamiento se hacen constar en Acta Administrativa"
+    ];
+    if(esEquipo(t)){
+      items.push("Antes de destruir, cumpla el tratamiento de desechos tóxicos del bloque siguiente");
+    }
+    return items.concat([
+      "El Departamento de Auditoría Interna señala día y hora para llevar a cabo la desintegración o destrucción, y nombra con la debida antelación a un Auditor Interno",
+      "El Auditor Interno hace constar la destrucción de los bienes en acta pormenorizada",
+      "Legalice lo actuado por medio de Acta Administrativa, o según lo que proceda atendiendo a la naturaleza, importancia y valor de los bienes",
+      "> Si los materiales resultantes son aprovechables para reciclaje, la Subgerencia puede ordenar por Resolución su subasta pública, venta, donación o permuta (artículo 17)"
+    ]);
+  }
+
+  /* Tratamiento de desechos tóxicos: solo para equipo (Acuerdo 23/2025). */
+  function pasosToxicos(t){
+    return [
+      "Considere la normativa vigente que dicte lineamientos para el manejo de desechos tóxicos: es de aplicación obligatoria y hay que apegarse estrictamente a ella",
+      "Revise que el dictamen técnico incluya la descripción de los componentes considerados tóxicos para el medio ambiente",
+      "Verifique que en el bien no permanezca visible ni legible ningún logotipo, número de serie, placa o señalamiento similar que lo relacione con el IGSS, para prevenir su eventual circulación dentro del territorio nacional",
+      "Solicite a <b>la " + (t.quien || "dependencia técnica que corresponda") + "</b> la asignación de personal técnico que realice la extracción de los componentes tóxicos",
       "> Los componentes extraídos quedan bajo el resguardo de esa dependencia técnica",
       "Gestione con una entidad autorizada y debidamente certificada la disposición final de los componentes tóxicos extraídos",
       "Requiera la constancia de disposición correspondiente, como respaldo de que fueron retirados y manejados conforme a la normativa ambiental vigente"
     ];
-    if(ex.auditor){
-      items.push("El Departamento de Auditoría Interna señala día y hora, nombra con la debida antelación a un Auditor Interno, y este hace constar la destrucción en acta pormenorizada");
-    } else {
-      items.push("> Para los bienes fungibles el Acuerdo 1560 no prevé la intervención de Auditoría Interna (artículo 15)");
-    }
-    return items;
   }
 
-  /* Cuenta y dibuja un bloque de pasos marcables con su propia llave de guardado. */
+  /* Quiénes intervienen, resuelto para el tipo. Es la otra pregunta que se hace siempre. */
+  function intervienenEn(t){
+    if(t.quien === "militar"){
+      return ["<b>Máxima Autoridad</b> de la Dependencia y <b>Encargado de Inventarios</b> de la UAIAF",
+              "<b>Departamento Legal</b>, para encuadrar el trámite en la Ley de Armas y Municiones",
+              "> El Acuerdo 1560 no nombra a nadie más para este tipo de bien"];
+    }
+    var l = ["<b>Máxima Autoridad</b> de la Dependencia interesada: elabora el listado bajo su responsabilidad y suscribe las actas",
+             "<b>Encargado de Inventarios</b> de la UAIAF: interviene en el listado, arma el expediente y registra la baja en el Módulo y en el Sistema Auxiliar"];
+    if(t.quien && t.quien !== "fungible"){
+      l.push("<b>La " + t.quien + "</b>: emite el dictamen técnico"
+        + (esEquipo(t) ? ", indicando además los componentes con desechos tóxicos, y asigna al personal que los extrae" : ""));
+    }
+    l.push("<b>La Subgerencia</b> que corresponda según el numeral 17.1: emite la Resolución que autoriza, deniega o modifica, e indica el destino");
+    if(t.quien === "fungible"){
+      l.push("> <b>El Departamento de Auditoría Interna no interviene</b> en la evaluación ni en la baja de los bienes fungibles (artículo 15)");
+    } else {
+      l.push("<b>Departamento de Auditoría Interna</b>: nombra al Auditor que comprueba la existencia física, si la Subgerencia se lo requiere");
+    }
+    l.push("<b>Departamento de Auditoría Interna</b>: señala día y hora de la desintegración o destrucción y nombra al Auditor que la hace constar en acta pormenorizada (artículo 14)");
+    l.push("<b>Departamento de Contabilidad</b>: efectúa los ajustes en el inventario general y aprueba el registro de la baja");
+    if(esEquipo(t)){
+      l.push("<b>Entidad certificada y autorizada</b> para el manejo de desechos tóxicos: recibe los componentes extraídos y extiende la constancia de disposición");
+    }
+    return l;
+  }
+
   function bloqueMarcable(clave, titulo, items){
     var listos = marcados(clave);
     var h = '<div class="abtit">' + esca(titulo) + '</div><ol class="gpasos">';
@@ -773,34 +810,47 @@
   function accionesEn(items){
     return items.filter(function(x){ return !esResultado(x); }).length;
   }
+  /* Los bloques de un tipo, cada uno con su llave de guardado. */
+  function bloquesDe(t){
+    var r = rutaDe(t), out = [{ k:"p", nom:"1. Autorizar la baja", items:r.pasos }];
+    if(r.destino) out.push({ k:"d", nom:"2. Si el destino es destrucción o desintegración", items:pasosDestino(t) });
+    if(esEquipo(t)) out.push({ k:"x", nom:"3. Tratamiento de desechos tóxicos", items:pasosToxicos(t) });
+    return { ruta:r, bloques:out };
+  }
+  function totalDe(t){
+    var B = bloquesDe(t), tot = 0, hech = 0;
+    B.bloques.forEach(function(b){
+      tot += accionesEn(b.items);
+      hech += cuentaMarcable("tipo:" + t.id + ":" + b.k, b.items);
+    });
+    return { tot:tot, hech:hech, B:B };
+  }
 
   window.abReiniciarTipo = function(id){
     var a = leerAvance();
-    delete a["tipo:" + id + ":p"]; delete a["tipo:" + id + ":x"];
+    ["p","d","x"].forEach(function(k){ delete a["tipo:" + id + ":" + k]; });
     guardarAvance(a); pintar();
     if(typeof toast === "function") toast("Trámite en blanco otra vez");
   };
 
   function htmlTipos(){
     var h = '<div class="gintro">' + ic("helpCircle", 17, "margin-right:7px;color:var(--azul2)")
-      + 'Toque el tipo de bien y le arma el trámite de baja completo para ese caso: con dictamen '
-      + 'o sin él, con o sin Auditoría Interna, y con los pasos de desechos si le tocan.</div>';
+      + 'Toque el tipo de bien y le arma el trámite completo para ese caso: quiénes intervienen, '
+      + 'los pasos para autorizar la baja, los de la destrucción si procede, y los de desechos '
+      + 'tóxicos solo si al bien le tocan.</div>';
     h += TIPOS.map(function(t){
       var etq = t.quien === null ? "Sin dictamen; con acta administrativa"
         : t.quien === "fungible" ? "Sin dictamen ni Auditoría Interna"
         : t.quien === "militar" ? "Se rige por la Ley de Armas y Municiones"
         : "Dictamen de la " + t.quien;
-      var r = rutaDe(t);
-      var tot = accionesEn(r.pasos) + (r.extra ? accionesEn(pasosExtra(t, r.extra)) : 0);
-      var hech = cuentaMarcable("tipo:" + t.id + ":p", r.pasos)
-        + (r.extra ? cuentaMarcable("tipo:" + t.id + ":x", pasosExtra(t, r.extra)) : 0);
-      var enCurso = hech > 0 && hech < tot;
+      var x = totalDe(t);
+      var enCurso = x.hech > 0 && x.hech < x.tot;
       return '<button class="gcard' + (enCurso ? ' encurso' : '') + '" onclick="abTipo(\'' + t.id + '\')">'
         + '<span class="gcardtxt"><b>' + esca(t.nom) + '</b><small>' + esca(etq)
-        + (enCurso ? ' · va en el ' + hech + ' de ' + tot : '') + '</small></span>'
+        + (enCurso ? ' · va en el ' + x.hech + ' de ' + x.tot : '') + '</small></span>'
         + '<span class="gcardch">›</span></button>';
     }).join("");
-    h += '<div class="abfuentes">Acuerdo 1560 de Junta Directiva, artículos 2, 3, 4, 14 y 15 · '
+    h += '<div class="abfuentes">Acuerdo 1560 de Junta Directiva, artículos 2, 3, 4 y 11 a 17 · '
       + 'Acuerdo 19/2025 de Gerencia, numerales 17.1, 19 y 19.1 · Manual 40/2019, numerales 18 y 28 · '
       + 'Acuerdo 23/2025 de Gerencia.</div>';
     h += '<button class="act o" style="margin-top:14px" onclick="abVolver()">Volver</button>';
@@ -808,20 +858,15 @@
   }
 
   function htmlTipo(t){
-    var r = rutaDe(t);
-    var ex = r.extra ? pasosExtra(t, r.extra) : null;
-    var tot = accionesEn(r.pasos) + (ex ? accionesEn(ex) : 0);
-    var hech = cuentaMarcable("tipo:" + t.id + ":p", r.pasos)
-      + (ex ? cuentaMarcable("tipo:" + t.id + ":x", ex) : 0);
+    var x = totalDe(t), r = x.B.ruta;
     var h = "";
-    if(tot){
-      var pct = Math.round(hech / tot * 100);
-      h += '<div class="gprog"><div class="gprogtxt"><span>' + hech + ' de ' + tot + '</span>'
-        + (hech ? '<span class="gprogre" onclick="abReiniciarTipo(\'' + t.id + '\')">Empezar de nuevo</span>' : '')
+    if(x.tot){
+      var pct = Math.round(x.hech / x.tot * 100);
+      h += '<div class="gprog"><div class="gprogtxt"><span>' + x.hech + ' de ' + x.tot + '</span>'
+        + (x.hech ? '<span class="gprogre" onclick="abReiniciarTipo(\'' + t.id + '\')">Empezar de nuevo</span>' : '')
         + '</div><div class="gprogbar"><i style="width:' + pct + '%"></i></div></div>';
     }
 
-    /* La respuesta corta primero: es lo que se viene a consultar. Los pasos van debajo. */
     h += '<div class="abtit">Dictamen técnico</div>';
     if(t.quien === null){
       h += '<div class="abresp abresp-no">' + ic("check", 22)
@@ -837,23 +882,23 @@
         + '<small>Debe atenderse a lo que establece la <b>Ley de Armas y Municiones</b>, Decreto 15-2009 del Congreso de la República de Guatemala, y su respectivo Reglamento (Acuerdo 1560, artículo 4).</small></div></div>';
     } else {
       h += '<div class="abresp abresp-si">' + ic("clipboardCheck", 22)
-        + '<div><b>' + esca(t.quien) + '</b>'
+        + '<div><b>La ' + esca(t.quien) + '</b>'
         + '<small>Es quien emite el dictamen técnico para este tipo de bien (Acuerdo 1560, artículo 2).</small></div></div>';
     }
 
     h += '<div class="abtit">Desechos tóxicos</div>';
-    if(t.quien === "militar"){
+    if(t.toxicos === true){
       h += '<div class="abresp abresp-ojo">' + ic("alertTriangle", 22)
-        + '<div><b>Lo determina la ley especial</b>'
-        + '<small>El Acuerdo 23/2025 no alcanza a este tipo de bien por su nombre. El manejo lo fija la Ley de Armas y Municiones.</small></div></div>';
-    } else if(t.toxicos === true){
+        + '<div><b>Sí, y el Acuerdo 23/2025 lo nombra</b>'
+        + '<small>Antes de destruirlo hay que extraer los componentes tóxicos y gestionar su disposición final con una entidad certificada.</small></div></div>';
+    } else if(t.toxicos === "equipo"){
       h += '<div class="abresp abresp-ojo">' + ic("alertTriangle", 22)
-        + '<div><b>Sí, lleva tratamiento especial</b>'
-        + '<small>Este tipo de bien está listado en el Acuerdo 23/2025. Antes de destruirlo hay que extraer los componentes tóxicos y gestionar su disposición final con una entidad certificada.</small></div></div>';
+        + '<div><b>Solo si trae circuitos, ácidos o líquidos</b>'
+        + '<small>El Acuerdo 23/2025 no nombra este equipo, pero sí alcanza a <b>cualquier otro equipo que contenga placa con circuitos electrónicos, ácidos o líquidos</b>. Revise el bien antes de descartarlo.</small></div></div>';
     } else {
       h += '<div class="abresp abresp-no">' + ic("check", 22)
-        + '<div><b>Solo si contiene componentes de riesgo</b>'
-        + '<small>El Acuerdo 23/2025 no lista este tipo de bien por su nombre, pero sí alcanza a <b>cualquier equipo que contenga placa con circuitos electrónicos, ácidos o líquidos</b>.</small></div></div>';
+        + '<div><b>No aplica</b>'
+        + '<small>El Acuerdo 23/2025 rige para <b>equipo</b>: mecánico, eléctrico, electrónico, médico-sanitario y de laboratorio, vehículos, de cómputo, y cualquier otro equipo con placa de circuitos, ácidos o líquidos. Este tipo de bien no entra ahí.</small></div></div>';
     }
 
     if(r.aviso){
@@ -861,28 +906,40 @@
         + '<span>' + enlaces(r.aviso) + '</span></div>';
     }
 
-    h += bloqueMarcable("tipo:" + t.id + ":p", "Pasos para dar de baja este tipo de bien", r.pasos);
+    h += '<div class="abtit">Quiénes intervienen</div><ul class="ablista">'
+      + intervienenEn(t).map(function(y){
+          return esResultado(y)
+            ? '<li class="abli-no">' + enlaces(textoPaso(y)) + '</li>'
+            : '<li>' + enlaces(y) + '</li>';
+        }).join("") + '</ul>';
+
+    x.B.bloques.forEach(function(b){
+      h += bloqueMarcable("tipo:" + t.id + ":" + b.k, b.nom, b.items);
+      if(b.k === "d"){
+        h += '<div class="abnota">' + ic("helpCircle", 15, "margin-right:7px;flex:none;color:var(--azul2)")
+          + '<span>El destino lo indica la Resolución de la Subgerencia. Los demás destinos posibles '
+          + '(subasta, permuta, donación) están en [[destinos|Qué se puede hacer con el bien dado de baja]].</span></div>';
+        if(t.quien === "fungible"){
+          h += '<div class="abaviso">' + ic("alertTriangle", 15, "margin-right:7px;flex:none")
+            + '<span>Aquí los acuerdos no coinciden: el artículo 15 dice que en los bienes fungibles no interviene '
+            + 'Auditoría Interna, y el artículo 14 encarga a ese mismo Departamento señalar día y hora de la '
+            + 'destrucción, sin exceptuar a nadie. Confírmelo antes de programar una destrucción de fungibles.</span></div>';
+        }
+      }
+    });
 
     if(r.nota){
       h += '<div class="abnota">' + ic("helpCircle", 15, "margin-right:7px;flex:none;color:var(--azul2)")
         + '<span>' + enlaces(r.nota) + '</span></div>';
     }
 
-    if(ex){
-      h += bloqueMarcable("tipo:" + t.id + ":x", "Si el destino es destrucción o desintegración", ex);
-      h += '<div class="abnota">' + ic("helpCircle", 15, "margin-right:7px;flex:none;color:var(--azul2)")
-        + '<span>' + (t.toxicos === true
-            ? 'Estos pasos son obligatorios para este tipo de bien: está listado en el Acuerdo 23/2025.'
-            : 'Estos pasos aplican solo si el bien contiene placa con circuitos electrónicos, ácidos o líquidos.')
-        + ' El destino lo indica la Resolución; vea [[destinos|Qué se puede hacer con el bien dado de baja]].</span></div>';
-    }
-
     h += '<div class="abbase"><b>' + ic("book", 13, "margin-right:5px") + 'Base normativa</b>'
-      + r.base.map(function(x){ return '<span>' + esca(x) + '</span>'; }).join("")
-      + (ex ? '<span>Acuerdo 23/2025 de Gerencia, norma específica 1</span>' : '')
+      + r.base.map(function(y){ return '<span>' + esca(y) + '</span>'; }).join("")
+      + (r.destino ? '<span>Acuerdo 1560 de J.D., artículos 11, 12, 13, 14, 16 y 17</span>' : '')
+      + (esEquipo(t) ? '<span>Acuerdo 23/2025 de Gerencia, normas generales 2 y 3 y norma específica 1</span>' : '')
       + '</div>';
 
-    if(tot && hech >= tot){
+    if(x.tot && x.hech >= x.tot){
       h += '<div class="gfin">' + ic("check", 26) + '<b>Trámite completo</b>'
         + '<small>' + esca(t.nom) + '</small>'
         + '<button class="act o" style="margin-top:12px" onclick="abReiniciarTipo(\'' + t.id + '\')">Empezar otro</button>'
@@ -908,9 +965,11 @@
       var q = t.quien === null ? "No requiere; acta administrativa"
         : t.quien === "fungible" ? "No requiere; tampoco Auditoría Interna"
         : t.quien === "militar" ? "Ley de Armas y Municiones, Dto. 15-2009"
-        : t.quien;
-      h += '<tr><td>' + esca(t.nom) + '</td><td>' + esca(q) + '</td><td>'
-        + (t.toxicos === true ? "Sí" : "Solo si tiene circuitos, ácidos o líquidos")
+        : "La " + t.quien;
+      var tox = t.toxicos === true ? "Sí"
+        : t.toxicos === "equipo" ? "Solo si trae circuitos, ácidos o líquidos"
+        : "No aplica";
+      h += '<tr><td>' + esca(t.nom) + '</td><td>' + esca(q) + '</td><td>' + esca(tox)
         + '</td><td>' + NOMRUTA[rutaDe(t).clave] + '</td></tr>';
     });
     h += '</table>';
@@ -918,36 +977,35 @@
     /* Las cuatro rutas de baja, completas. Doce listas casi iguales no sirven en papel:
        se imprime una por ruta y la tabla de arriba dice cuál le toca a cada tipo. */
     var RUTAS = [
-      { letra:"A", nom:"Bienes que llevan dictamen técnico",
+      { letra:"A", nom:"Equipo que lleva dictamen técnico",
         pie:"Equipo de cómputo, mecánico, eléctrico, electrónico, médico-sanitario y de laboratorio, de producción, de comunicación, y maquinaria y equipo de transporte, tracción y elevación. Solicite el dictamen a la dependencia que indica la tabla.",
-        tipo:{ quien:"la dependencia que corresponda según la tabla", toxicos:true } },
+        tipo:{ id:"__A", nom:"Equipo con dictamen", quien:"dependencia que corresponda según la tabla", toxicos:true } },
       { letra:"B", nom:"Bienes que no llevan dictamen",
-        pie:"Mobiliario de oficina y material educacional, cultural y recreativo.",
-        tipo:{ quien:null, toxicos:"si" } },
+        pie:"Mobiliario de oficina y material educacional, cultural y recreativo. No les alcanza el Acuerdo 23/2025: no son equipo.",
+        tipo:{ id:"__B", nom:"Sin dictamen", quien:null, toxicos:false } },
       { letra:"C", nom:"Bienes muebles fungibles",
-        pie:"No llevan dictamen técnico ni intervención de Auditoría Interna.",
-        tipo:{ quien:"fungible", toxicos:"si" } },
+        pie:"No llevan dictamen técnico ni intervención de Auditoría Interna en la evaluación de la baja.",
+        tipo:{ id:"__C", nom:"Fungibles", quien:"fungible", toxicos:false } },
       { letra:"D", nom:"Equipo militar",
         pie:"Armas y municiones.",
-        tipo:{ quien:"militar", toxicos:"si" } }
+        tipo:{ id:"__D", nom:"Militar", quien:"militar", toxicos:false } }
     ];
     h += '<h2>Las cuatro rutas de baja por desuso</h2>';
     RUTAS.forEach(function(R){
-      var r = rutaDe(R.tipo);
+      var B = bloquesDe(R.tipo), r = B.ruta;
       h += '<h3>Ruta ' + R.letra + ' — ' + esca(R.nom) + '</h3>';
       h += '<p class="gpnota">' + esca(R.pie) + '</p>';
-      if(R.aviso || r.aviso) h += '<p class="gpnota">Atención: ' + (r.aviso || "") + '</p>';
-      h += '<ol>' + r.pasos.map(function(x){
-        return esResultado(x) ? '<li class="gpres">' + textoPaso(x) + '</li>' : '<li>' + x + '</li>';
-      }).join("") + '</ol>';
+      if(r.aviso) h += '<p class="gpnota">Atención: ' + r.aviso + '</p>';
+      h += '<h4>Quiénes intervienen</h4><ul>'
+        + intervienenEn(R.tipo).map(function(y){ return '<li>' + textoPaso(y) + '</li>'; }).join("")
+        + '</ul>';
+      B.bloques.forEach(function(b){
+        h += '<h4>' + esca(b.nom) + '</h4><ol>' + b.items.map(function(y){
+          return esResultado(y) ? '<li class="gpres">' + textoPaso(y) + '</li>' : '<li>' + y + '</li>';
+        }).join("") + '</ol>';
+      });
       if(r.nota) h += '<p class="gpnota">' + r.nota + '</p>';
-      if(r.extra){
-        h += '<h4>Si el destino es destrucción o desintegración</h4><ol>'
-          + pasosExtra(R.tipo, r.extra).map(function(x){
-              return esResultado(x) ? '<li class="gpres">' + textoPaso(x) + '</li>' : '<li>' + x + '</li>';
-            }).join("") + '</ol>';
-      }
-      h += '<p class="abpbase">' + esca(r.base.join(" \u00b7 ")) + '</p>';
+      h += '<p class="abpbase">' + esca(r.base.join(" · ")) + '</p>';
     });
 
     GRUPOS.forEach(function(g){
