@@ -267,12 +267,22 @@ function iniciarListeners(){
   }, function(e){ setSync("off","Error de sincronización"); }));
 
   _unsubs.push(db.collection("bienes").onSnapshot(function(snap){
-    snap.docChanges().forEach(function(ch){
+    const cambios = snap.docChanges();
+    cambios.forEach(function(ch){
       if(ch.type==="removed"){ delete BIENES[ch.doc.id]; }
       else { BIENES[ch.doc.id] = Object.assign({id:ch.doc.id}, ch.doc.data()); }
     });
     ready.b = true; afterFirstSync();
-    if(firstSyncDone){ refreshProgress(); renderPronto(); }
+    if(firstSyncDone){
+      refreshProgress();
+      // Si toda la tanda de cambios ya se pintó a mano (marcar SÍ/NO/estado en la ficha),
+      // el cambio ya está en pantalla: no se rehace toda la lista. Los cambios que vengan
+      // de otro dispositivo, o que no se pintaron puntualmente, sí redibujan normal.
+      const ids = cambios.map(function(c){ return c.doc.id; });
+      const todosLocales = ids.length>0 && ids.every(function(i){ return _pintadosLocal.has(i); });
+      ids.forEach(function(i){ _pintadosLocal.delete(i); });
+      if(!todosLocales) renderPronto();
+    }
   }, function(e){ setSync("off","Error de sincronización"); }));
 
   _unsubs.push(db.collection("hallazgos").onSnapshot(function(snap){
@@ -392,6 +402,10 @@ function goHome(){
 }
 function render(){
   if(!firstSyncDone) return;
+  // El Modo rápido tapa la pantalla por completo y trae su propio dibujado. Mientras esté
+  // abierto no tiene sentido rehacer la lista de fondo en cada SÍ/NO: es trabajo invisible
+  // que solo mete lentitud al verificar. Al cerrarse, mrCerrar() vuelve a llamar a render().
+  if(document.getElementById("mrap")) return;
   const v=document.getElementById("view");
   const fbtn = document.getElementById("filterbtn"); if(fbtn) fbtn.classList.toggle("on", filtrosActivos()||mostrarFiltros);
   mostrarBuscador(mode.view!=="ses"); // en "Nueva toma" el buscador no aplica y solo estorba
@@ -763,6 +777,41 @@ function toggleExtra(id){
   if(e.classList.toggle("open")) _extraAbiertos.add(id);
   else _extraAbiertos.delete(id);
 }
+/* ---------- Repintado puntual al verificar (velocidad) ----------
+   Verificar bien por bien es lo que más se usa. Antes, cada SÍ/NO/estado guardaba en la nube,
+   la sincronización en vivo disparaba render() y se rehacía TODA la lista de la ficha en cada
+   toque: con muchos bienes eso mete lentitud. Ahora, en la ficha de un responsable se actualiza
+   solo la tarjeta tocada y sus contadores, y se omite el render completo que traería el eco de
+   la nube (ese cambio ya está en pantalla). El resto de vistas siguen redibujando normal. */
+const _pintadosLocal = new Set();   // ids ya reflejados a mano; el eco de onSnapshot los ignora
+function actualizarContadoresPersona(){
+  const t = TARJETAS[mode.tarjetaId]; if(!t) return;
+  const list = bienesDe(t.id); const d = doneCount(list), n = list.length;
+  const fps = document.querySelectorAll("#view .filters .fp");
+  if(fps.length===3){
+    fps[0].textContent = "Todos ("+n+")";
+    fps[1].textContent = "Pendientes ("+(n-d)+")";
+    fps[2].textContent = "Hechos ("+d+")";
+  }
+}
+function repintarBienEnLista(id){
+  // Solo la vista de un responsable, sin búsqueda ni filtros de texto: es el camino de verificar.
+  if(mode.view!=="person" || mode.q || filtrosActivos() || mostrarFiltros) return false;
+  const el = document.getElementById("it_"+id);
+  const b = BIENES[id];
+  if(!el || !b) return false;
+  if(b.tarjetaId !== mode.tarjetaId) return false;            // el bien salió de esta tarjeta
+  if(mode.filter==="pend" && b.existe) return false;          // ya no va en el filtro "Pendientes"
+  if(mode.filter==="list" && !b.existe) return false;         // ya no va en el filtro "Hechos"
+  const tmp = document.createElement("div");
+  tmp.innerHTML = itemCard(b);
+  const nuevo = tmp.firstElementChild;
+  if(!nuevo) return false;
+  el.replaceWith(nuevo);
+  actualizarContadoresPersona();
+  loadThumbs();
+  return true;
+}
 function markExiste(id,val){
   if(!requiereEdicion()) return;
   const b = BIENES[id]; if(!b) return;
@@ -771,12 +820,18 @@ function markExiste(id,val){
   if(nuevo){ patch.fechaVerificacion = today(); patch.verificadoPor = META.by||""; }
   db.collection("bienes").doc(id).update(patch).catch(function(){ toast("No se pudo guardar (revise conexión)"); });
   logMovimiento(b, {tipoMovimiento:"VERIFICACION", estado:b.estado||"", existe:nuevo, ubicacion:b.ubicacion||"", observaciones:b.observaciones||""});
+  // reflejar de inmediato en memoria y en pantalla, sin esperar el eco de la nube
+  b.existe = nuevo;
+  if(nuevo){ b.fechaVerificacion = today(); b.verificadoPor = META.by||""; }
+  if(repintarBienEnLista(id)) _pintadosLocal.add(id); else renderPronto();
 }
 function markEstado(id,val){
   if(!requiereEdicion()) return;
   const b = BIENES[id]; if(!b) return;
   const nuevo = b.estado===val? "" : val;
   db.collection("bienes").doc(id).update({estado:nuevo, actualizado: firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){ toast("No se pudo guardar"); });
+  b.estado = nuevo;
+  if(repintarBienEnLista(id)) _pintadosLocal.add(id); else renderPronto();
 }
 function markCampo(id,campo,val){
   if(!requiereEdicion()) return;
