@@ -88,7 +88,7 @@ function abrirCategoriaPicker(id){
   } else {
     h += '<div class="note">Se calcula adivinando por palabras clave de la descripción — no es una clasificación oficial. Corríjala si no es correcta.</div>';
     h += CATEGORIAS_BIEN.map(function(c){
-      return '<div class="tlist-item" onclick="fijarCategoriaManual(\''+id+'\',\''+c.cod+'\')"><div><b>'+esc(c.nombre)+'</b></div>'+(actual===c.cod?'<span style="color:#2E7D32">✓</span>':'')+'</div>';
+      return '<div class="tlist-item" onclick="fijarCategoriaManual(\''+id+'\',\''+c.cod+'\')"><div><b>'+esc(c.nombre)+'</b></div>'+(actual===c.cod?'<span style="color:var(--verde)">✓</span>':'')+'</div>';
     }).join("");
     if(b.categoriaManual) h += '<button class="act o" style="margin-top:8px" onclick="fijarCategoriaManual(\''+id+'\',null)">Quitar corrección (volver a la automática)</button>';
   }
@@ -428,7 +428,7 @@ function render(){
       +'<div class="pmeta">Tarjeta '+esc(t.numero||"(pendiente)")+' '+chipTipo(t.tipo)
       +(t.correo?' <span class="pill-mail">✉️</span>':'')
       +(t.as400Actualizado?' <span class="chip c-as400">'+icon('check',10,'margin-right:2px')+'AS-400</span>':'')+'</div></div>'
-      +'<div style="color:#B8C0CC;font-size:20px">›</div></div>';
+      +'<div style="color:var(--chev);font-size:20px">›</div></div>';
   });
   v.innerHTML=h;
 }
@@ -452,8 +452,8 @@ function renderPendientes(v){
   });
   const viejos = pend.filter(function(b){ return chipPendienteViejo(b); }).length;
   let h='<button class="backbtn" onclick="goHome()">‹ Responsables</button>';
-  h+='<div style="margin:6px 2px 8px"><div style="font-size:18px;font-weight:800;color:#1F3864">'+icon('package',17,'margin-right:6px')+'Bienes pendientes de asignar</div>'
-    +'<div style="font-size:12.5px;color:#8A929C;margin-top:2px">Bienes ya ingresados al sistema (por ejemplo, importados de Excel) que todavía no tienen responsable. Asígnelos con 🧍 Nueva toma cuando visite a la persona.</div></div>';
+  h+='<div style="margin:6px 2px 8px"><div style="font-size:18px;font-weight:800;color:var(--titulo)">'+icon('package',17,'margin-right:6px')+'Bienes pendientes de asignar</div>'
+    +'<div style="font-size:12.5px;color:var(--gris2);margin-top:2px">Bienes ya ingresados al sistema (por ejemplo, importados de Excel) que todavía no tienen responsable. Asígnelos con 🧍 Nueva toma cuando visite a la persona.</div></div>';
   if(pend.length===0){ h+=emptyState('No hay bienes pendientes de asignar'); v.innerHTML=h; return; }
   if(viejos>0){ h+='<div class="warnbox">'+icon('alertTriangle',13,'margin-right:4px')+viejos+' bien(es) llevan '+UMBRAL_DIAS_PENDIENTE+' días o más sin asignar.</div>'; }
   h += pend.map(function(b){ return itemCard(b, false, chipPendienteViejo(b)); }).join("");
@@ -496,7 +496,7 @@ function abrirPendientesAS400(){
     h += pend.sort(function(a,b){ return (a.responsable||"").localeCompare(b.responsable||""); }).map(function(t){
       const items = bienesDe(t.id);
       return '<div class="tlist-item" onclick="closeMenu();openPerson(\''+t.id+'\')"><div><b>'+esc(t.responsable||"(sin nombre)")+'</b>'
-        + '<small>Tarjeta '+esc(t.numero||"(pendiente)")+' · '+items.length+' bien(es)</small></div><span style="color:#B8C0CC">›</span></div>';
+        + '<small>Tarjeta '+esc(t.numero||"(pendiente)")+' · '+items.length+' bien(es)</small></div><span style="color:var(--chev)">›</span></div>';
     }).join("");
   }
   if(listos.length){
@@ -533,8 +533,8 @@ function renderPerson(v){
   if(mode.filter==="list") show=list.filter(function(b){return b.existe;});
   show = show.slice().sort(function(a,b){return (a.codigo||"").localeCompare(b.codigo||"");});
   let h='<button class="backbtn" onclick="goHome()">‹ Responsables</button>';
-  h+='<div style="margin:6px 2px 2px"><div style="font-size:18px;font-weight:800;color:#17202e">'+esc(t.responsable||"(sin nombre)")+'</div>'
-    +'<div style="font-size:12.5px;color:#8A929C;margin-top:2px">Tarjeta '+esc(t.numero||"(pendiente)")+' · '+esc(t.puesto||"")+' '+chipTipo(t.tipo)+'</div>'
+  h+='<div style="margin:6px 2px 2px"><div style="font-size:18px;font-weight:800;color:var(--ink)">'+esc(t.responsable||"(sin nombre)")+'</div>'
+    +'<div style="font-size:12.5px;color:var(--gris2);margin-top:2px">Tarjeta '+esc(t.numero||"(pendiente)")+' · '+esc(t.puesto||"")+' '+chipTipo(t.tipo)+'</div>'
     +'<div style="margin-top:4px"><span class="moretog" onclick="editCorreoTarjeta(\''+t.id+'\')">✉️ '+(t.correo?esc(t.correo):"agregar correo")+'</span>'
     +' <span class="moretog" onclick="imprimirConstancia(\''+t.id+'\')">'+icon('download',13)+' Constancia (PDF)</span>'
     +(t.firmaRecibida?(' <span class="moretog" onclick="verFirma(\''+t.id+'\')">'+icon('check',13)+' Firmado'+(t.firmaFecha?(' ('+esc(t.firmaFecha)+')'):'')+'</span>'):'')
@@ -735,7 +735,7 @@ function itemCard(b, showOwner, extraChip){
           return '<button class="btn est e-'+cl+' '+(b.estado===e?"sel":"")+'" onclick="markEstado(\''+id+'\',\''+e+'\')">'+(e==="PARA BAJA"?"Baja":e.charAt(0)+e.slice(1).toLowerCase())+'</button>'; }).join("")
       +'</div>';
   return '<div class="item '+cls+'" id="it_'+id+'">'
-    +'<div class="itop"><span class="inv">'+esc(b.codigo)+(b.codigoSiges?' <small style="font-weight:600;color:#8A929C">· SIGES '+esc(b.codigoSiges)+'</small>':'')+'</span><span class="val">'+money(b.valor)+'</span></div>'
+    +'<div class="itop"><span class="inv">'+esc(b.codigo)+(b.codigoSiges?' <small style="font-weight:600;color:var(--gris2)">· SIGES '+esc(b.codigoSiges)+'</small>':'')+'</span><span class="val">'+money(b.valor)+'</span></div>'
     +'<div class="ochips">'+chipCategoria(b)+chipTipo(b.tipo)+nuevo+pendChip+dup+(extraChip||"")+'</div>'
     +descField
     +(b.existe==="NO UBICADO"?'<div class="warnbox">'+icon('alertTriangle',13,'margin-right:4px')+'Quedó marcado como “NO UBICADO”, opción que ya se retiró. Vuelva a marcarlo como SÍ o NO.</div>':'')
@@ -1084,8 +1084,8 @@ function pintarAsistChat(){
   const box = document.getElementById("asistChat"); if(!box) return;
   if(asistenteHistorial.length===0){ box.innerHTML = '<div class="hint">Aún no ha preguntado nada.</div>'; return; }
   box.innerHTML = asistenteHistorial.map(function(m){
-    return '<div style="margin-bottom:10px"><div style="font-weight:700;font-size:13.5px;color:#1F3864">'+esc(m.q)+'</div>'
-      + '<div style="font-size:13.5px;color:#333;margin-top:2px">'+esc(m.a)+'</div></div>';
+    return '<div style="margin-bottom:10px"><div style="font-weight:700;font-size:13.5px;color:var(--titulo)">'+esc(m.q)+'</div>'
+      + '<div style="font-size:13.5px;color:var(--ink);margin-top:2px">'+esc(m.a)+'</div></div>';
   }).join("");
   box.scrollTop = box.scrollHeight;
 }
@@ -1174,8 +1174,8 @@ function openHall(){ mode={view:"hall",tarjetaId:null,filter:"todos",q:""}; rese
 function renderHall(v){
   const list = Object.values(HALLAZGOS).sort(function(a,b){ return (b.creadoTs||0)-(a.creadoTs||0); });
   let h='<button class="backbtn" onclick="goHome()">‹ Responsables</button>';
-  h+='<div style="margin:6px 2px 8px"><div style="font-size:18px;font-weight:800;color:#7A4508">'+icon('camera',17,'margin-right:6px')+'Hallazgos</div>'
-    +'<div style="font-size:12.5px;color:#8A929C;margin-top:2px">Bienes encontrados que NO están en ninguna tarjeta.</div></div>';
+  h+='<div style="margin:6px 2px 8px"><div style="font-size:18px;font-weight:800;color:var(--naranja)">'+icon('camera',17,'margin-right:6px')+'Hallazgos</div>'
+    +'<div style="font-size:12.5px;color:var(--gris2);margin-top:2px">Bienes encontrados que NO están en ninguna tarjeta.</div></div>';
   h+='<button class="act n" style="margin:4px 0 14px" onclick="newHallazgo()">'+icon('plusCircle',16,'margin-right:6px')+'Agregar bien encontrado</button>';
   if(list.length===0) h+=emptyState('Aún no hay hallazgos anotados');
   else h+=list.map(hallCard).join("");
@@ -1279,7 +1279,7 @@ function sesSetLoc(l){ curSes.loc=l; render(); }
 function renderSession(v){
   const s = curSes; if(!s){ goHome(); return; }
   let h = '<button class="backbtn" onclick="cancelSession()">‹ Cancelar</button>';
-  h += '<div class="item" style="border-left-color:#1F3864"><div class="fform">';
+  h += '<div class="item" style="border-left-color:var(--titulo)"><div class="fform">';
   h += '<label>¿A qué tarjeta pasan estos bienes?</label>';
   h += '<div class="toggle2">'
     + '<div class="tbtn '+(s.tipo==="existente"?"sel":"")+'" onclick="sesSetTipo(\'existente\')">'+icon('refreshCw',15,'margin-right:5px')+'Tarjeta existente</div>'
@@ -1310,20 +1310,20 @@ function renderSession(v){
   h += '<div class="tools" style="margin-top:10px"><button class="fotobtn" id="fb_Lses" data-label="Foto del lugar" onclick="takePhoto(\'Lses\')">'+icon('camera',15)+' Foto del lugar</button>'
      + '<img class="thumb" id="th_Lses" style="display:none" onclick="viewPhoto(\'Lses\')"></div>';
   h += '<label style="margin-top:10px">Firma de recibido (opcional)</label>'
-     + '<div style="font-size:11.5px;color:#8A929C;margin-bottom:6px">Si el responsable está presente, que firme aquí como constancia de que recibió los bienes.</div>'
+     + '<div style="font-size:11.5px;color:var(--gris2);margin-bottom:6px">Si el responsable está presente, que firme aquí como constancia de que recibió los bienes.</div>'
      + '<canvas id="firmaPad" style="width:100%;height:140px;border:1.5px dashed #C7CEDA;border-radius:10px;background:#fff;touch-action:none;cursor:crosshair"></canvas>'
      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">'
-     + '<span style="font-size:11.5px;color:#8A929C" id="firmaEstado">Sin firmar</span>'
+     + '<span style="font-size:11.5px;color:var(--gris2)" id="firmaEstado">Sin firmar</span>'
      + '<span class="moretog" onclick="limpiarFirma()">Borrar firma</span></div>';
   h += '</div></div>';
   const precargados = s.items.filter(function(it){ return it.preexistente; }).length;
   const labelAdd = precargados
     ? '¿Falta algún bien? Agréguelo por número (nuevo, o que le pasaron de otra persona)'
     : 'Números de bien que tiene esta persona';
-  h += '<div class="item"><label style="font-size:12px;color:#5B6470;font-weight:700">'+labelAdd+'</label>'
+  h += '<div class="item"><label style="font-size:12px;color:var(--gris);font-weight:700">'+labelAdd+'</label>'
      + '<div style="display:flex;gap:8px;margin-top:6px"><input id="invin" style="flex:1;padding:12px;border:1.5px solid #E2E6EC;border-radius:10px;font-size:17px;font-weight:700" placeholder="Léalo del bien y escríbalo" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addInv();}">'
      + '<button class="act p" style="margin:0;width:auto;padding:0 18px" onclick="addInv()">Agregar</button></div>'
-     + '<div style="font-size:11.5px;color:#8A929C;margin-top:6px" id="sescount">'+sesResumenTxt()+'</div></div>';
+     + '<div style="font-size:11.5px;color:var(--gris2);margin-top:6px" id="sescount">'+sesResumenTxt()+'</div></div>';
   if(s.tarjetaId && precargados){
     h += '<div class="hint" style="margin:2px 2px 8px">Abajo están los bienes de esta tarjeta, ya marcados <b>Aún lo tiene</b>. Cambie a <b>Ya no lo tiene</b> los que la persona ya no tenga.</div>';
   }
@@ -1400,7 +1400,7 @@ function openTarjetaPicker(){
 }
 function tpickRow(t){
   return '<div class="tlist-item" onclick="pickTarjeta(\''+t.id+'\')"><div><b>'+esc(t.responsable||"(sin nombre)")+'</b>'
-    +'<small>Tarjeta '+esc(t.numero||"(pendiente)")+' · '+esc(t.puesto||"")+'</small></div><span style="color:#B8C0CC">›</span></div>';
+    +'<small>Tarjeta '+esc(t.numero||"(pendiente)")+' · '+esc(t.puesto||"")+'</small></div><span style="color:var(--chev)">›</span></div>';
 }
 function filterTpick(){
   const q = document.getElementById("tpq").value.toLowerCase();
@@ -1830,7 +1830,7 @@ function procesarFilasImportadas(rows, nombreHoja, totalHojas){
     +(invalidos?('<br>'+invalidos+' fila(s) con un valor que no parece número de inventario, se omiten.'):'')+'</div>'
     +'<div style="max-height:220px;overflow:auto;border:1px solid #E2E6EC;border-radius:9px;margin-top:8px">'
     + nuevos.slice(0,30).map(function(n){ return '<div style="padding:8px 10px;border-bottom:1px solid #F0F2F6;font-size:13px"><b>'+esc(n.codigo)+'</b> — '+esc(n.descripcion||"(sin descripción)")+'</div>'; }).join("")
-    + (nuevos.length>30?('<div style="padding:8px 10px;font-size:12px;color:#8A929C">…y '+(nuevos.length-30)+' más</div>'):'')
+    + (nuevos.length>30?('<div style="padding:8px 10px;font-size:12px;color:var(--gris2)">…y '+(nuevos.length-30)+' más</div>'):'')
     +'</div>'
     +'<button class="act g" onclick="confirmarImportacion()">✓ Importar '+nuevos.length+' bien(es)</button>'
     +'<button class="act o" onclick="closeMenu()">Cancelar</button>';
@@ -1987,7 +1987,7 @@ const GS_CODE =
 '    + "<th style=\\"border:1px solid #ccc;padding:6px 8px;text-align:left\\">Estado</th>"\n'+
 '    + "<th style=\\"border:1px solid #ccc;padding:6px 8px;text-align:left\\">Foto</th>"\n'+
 '    + "</tr>" + filas + "</table>";\n'+
-'  var html = "<div style=\\"font-family:Arial,sans-serif;color:#222;font-size:14px\\">"\n'+
+'  var html = "<div style=\\"font-family:Arial,sans-serif;color:var(--ink);font-size:14px\\">"\n'+
 '    + "<p>Estimado(a) <b>" + d.persona + "</b>,</p>"\n'+
 '    + "<p>Le informamos que el/los siguiente(s) bien(es) de inventario ha(n) sido cargado(s) a su tarjeta de responsabilidad:</p>"\n'+
 '    + tabla\n'+
@@ -1996,7 +1996,7 @@ const GS_CODE =
 '    + "<b>Fecha:</b> " + d.fecha + "<br>"\n'+
 '    + "<b>Registrado por:</b> " + (d.capturadoPor || "Auditoria Interna") + "</p>"\n'+
 '    + (d.fotos && d.fotos.length ? "<p>Se adjunta(n) " + d.fotos.length + " fotografia(s) de referencia. Tambien puede verlas desde los enlaces de la tabla.</p>" : "")\n'+
-'    + "<p style=\\"color:#666\\">Si considera que esta asignacion es incorrecta, comuniquese con Auditoria Interna.<br>"\n'+
+'    + "<p style=\\"color:var(--gris)\\">Si considera que esta asignacion es incorrecta, comuniquese con Auditoria Interna.<br>"\n'+
 '    + "Este es un mensaje automatico, por favor no responda a este correo.</p></div>";\n'+
 '  var cuerpo = "Estimado(a) " + d.persona + ",\\n\\n" + (d.detalle||"") + "\\n\\nTarjeta: " + (d.tarjeta||"") + " | Ubicacion: " + (d.ubicacion||"") + " | Fecha: " + d.fecha;\n'+
 '  var opciones = { htmlBody: html };\n'+

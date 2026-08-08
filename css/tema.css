@@ -1,0 +1,179 @@
+/* ================= TARJETAS INTERACTIVAS + MODO OSCURO =================
+   Este archivo carga de último, así que gana en el orden del cascade. Trae dos cosas:
+   1) Un poco de vida a las tarjetas: elevación al pasar el mouse (escritorio) y respuesta
+      al toque (móvil), con transiciones suaves.
+   2) Modo oscuro completo: se redefinen los tokens de color y se corrigen las superficies
+      y textos que traían color fijo. Respeta la preferencia del sistema y un interruptor
+      manual (Auto / Claro / Oscuro) que se guarda en el dispositivo. */
+
+/* Tokens que faltaban (los usan estilos en línea del JS y el modo oscuro). */
+:root{ --chev:#B8C0CC; --titulo:#1F3864; --hoverbg:rgba(20,30,60,.04); }
+
+/* Control segmentado del tema en el menú (Auto / Claro / Oscuro) */
+.temactl{ display:flex; gap:2px; background:var(--fondo); border:1px solid var(--linea); border-radius:10px; padding:2px; flex:none; }
+.temabtn{ border:none; background:transparent; color:var(--gris); font-size:12px; font-weight:700; padding:6px 9px; border-radius:8px; transition:background .15s ease, color .15s ease; }
+.temabtn.sel{ background:var(--card); color:var(--titulo); box-shadow:var(--shadow-sm,0 1px 2px rgba(0,0,0,.08)); }
+#temaRow{ cursor:default; }
+
+/* ---------- Tarjetas y controles más interactivos (ambos temas) ---------- */
+.item, .kpicard, .hzrow, .as400box, .tlist-item, .tpickbtn, .prow, #resumenAlerta, .mitem{
+  transition: transform .13s ease, box-shadow .2s ease, border-color .2s ease, background-color .18s ease !important;
+}
+@media (hover:hover){
+  .item:hover{ transform:translateY(-2px); box-shadow:var(--shadow-md,0 6px 20px rgba(20,30,60,.10)) !important; }
+  .kpicard:not(.static):hover, .hzrow:hover, .as400box:not(.on):hover,
+  .tlist-item:hover, .tpickbtn:hover, .prow:hover, #resumenAlerta:hover{
+    transform:translateY(-2px); box-shadow:var(--shadow-md,0 6px 20px rgba(20,30,60,.12)) !important; cursor:pointer;
+  }
+  .mitem:hover{ background:var(--hoverbg); }
+}
+/* respuesta al toque: las filas/tarjetas de un solo toque se hunden un poco */
+.kpicard:not(.static):active, .hzrow:active, .as400box:not(.on):active,
+.tlist-item:active, .tpickbtn:active, .prow:active, #resumenAlerta:active{ transform:scale(.98); }
+.btn:active, .act:active, .fp:active, .mitem:active, .moretog:active, .fabbar button:active, .backbtn:active{ transform:scale(.97); }
+@media (prefers-reduced-motion:reduce){
+  .item, .kpicard, .hzrow, .as400box, .tlist-item, .tpickbtn, .prow, #resumenAlerta, .mitem{ transition:none !important; }
+  .item:hover, .kpicard:hover, .hzrow:hover, .as400box:hover, .prow:hover, #resumenAlerta:hover{ transform:none !important; }
+}
+
+/* ======================= MODO OSCURO — tokens ======================= */
+:root[data-theme="dark"]{
+  --fondo:#0f1522; --card:#1a2233; --linea:#2b3648;
+  --ink:#e7ecf4; --muted:#9aa6b8;
+  --gris:#aeb7c6; --gris2:#8b95a6; --chev:#616d80;
+  --titulo:#a9c2ee; --azul:#3f6bb0; --azul2:#5c86d1; --teal:#4aa3a3;
+  --verde:#5cc466; --verdebg:#173320; --verdeb:#2f5c37;
+  --rojo:#e0616c; --rojobg:#3a1618; --rojob:#5e2a2e;
+  --naranja:#d69454; --naranjabg:#382914; --naranjab:#5c4527;
+  --amar:#e0c874; --amarbg:#332c12;
+  --hoverbg:rgba(255,255,255,.05);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.45);
+  --shadow-md:0 6px 20px rgba(0,0,0,.55);
+  --shadow-lg:0 12px 34px rgba(0,0,0,.65);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --fondo:#0f1522; --card:#1a2233; --linea:#2b3648;
+    --ink:#e7ecf4; --muted:#9aa6b8;
+    --gris:#aeb7c6; --gris2:#8b95a6; --chev:#616d80;
+    --titulo:#a9c2ee; --azul:#3f6bb0; --azul2:#5c86d1; --teal:#4aa3a3;
+    --verde:#5cc466; --verdebg:#173320; --verdeb:#2f5c37;
+    --rojo:#e0616c; --rojobg:#3a1618; --rojob:#5e2a2e;
+    --naranja:#d69454; --naranjabg:#382914; --naranjab:#5c4527;
+    --amar:#e0c874; --amarbg:#332c12;
+    --hoverbg:rgba(255,255,255,.05);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.45);
+    --shadow-md:0 6px 20px rgba(0,0,0,.55);
+    --shadow-lg:0 12px 34px rgba(0,0,0,.65);
+    color-scheme: dark;
+  }
+}
+
+/* ======================= MODO OSCURO — superficies ======================= */
+/* Se agrupan las reglas para claro-explícito y automático-por-sistema. */
+:root[data-theme="dark"] body,
+:root:not([data-theme="light"]) body{ }  /* placeholder, se detalla abajo con @media */
+
+:root[data-theme="dark"] body{ background:var(--fondo) !important; color:var(--ink) !important; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) body{ background:var(--fondo) !important; color:var(--ink) !important; } }
+
+/* Un solo bloque de correcciones, reutilizado por los dos selectores del tema. */
+[data-theme="dark"] .btn{ background:var(--card); color:var(--ink); border-color:var(--linea); }
+[data-theme="dark"] .sheet, [data-theme="dark"] #sheet{ background:var(--card); }
+[data-theme="dark"] .backbtn{ background:var(--card); color:var(--ink); border-color:var(--linea); }
+[data-theme="dark"] .desc{ color:var(--ink); }
+[data-theme="dark"] .fabbar{ background:var(--card); border-top-color:var(--linea); }
+[data-theme="dark"] .searchbar input,
+[data-theme="dark"] .fform input, [data-theme="dark"] .extra input,
+[data-theme="dark"] .sheet .fld input, [data-theme="dark"] #invin,
+[data-theme="dark"] textarea.csv, [data-theme="dark"] .tpickbtn, [data-theme="dark"] .tlist-item,
+[data-theme="dark"] .tpickbtn input, [data-theme="dark"] #tpq{
+  background:var(--card) !important; color:var(--ink) !important; border-color:var(--linea) !important;
+}
+[data-theme="dark"] .kpicard:active, [data-theme="dark"] .as400box:active{ background:#20293c; }
+[data-theme="dark"] .hzrow{ background:linear-gradient(135deg,#2a2013,#382914); border-color:var(--naranjab); }
+[data-theme="dark"] .mrcod{ color:var(--ink); }
+[data-theme="dark"] .mrdesc{ color:#c9d2df; }
+[data-theme="dark"] .mrbody, [data-theme="dark"] #mrap{ background:var(--fondo); }
+[data-theme="dark"] .mracc{ background:var(--card); border-top-color:var(--linea); }
+[data-theme="dark"] .mrestbtn{ background:var(--card); color:var(--ink); }
+[data-theme="dark"] .note, [data-theme="dark"] .hint, [data-theme="dark"] .emptysub, [data-theme="dark"] .powner{ color:var(--gris); }
+[data-theme="dark"] .item.yano{ background:#2a1a1c; }
+[data-theme="dark"] .gbody, [data-theme="dark"] #guias, [data-theme="dark"] #abajas, [data-theme="dark"] #tips{ background:var(--fondo); }
+[data-theme="dark"] .gcard, [data-theme="dark"] .gpaso, [data-theme="dark"] .tipcard, [data-theme="dark"] .abcard, [data-theme="dark"] .ablista, [data-theme="dark"] .abbase{ background:var(--card); border-color:var(--linea); color:var(--ink); }
+[data-theme="dark"] .migoverlay{ background:var(--fondo); }
+[data-theme="dark"] .pmodal{ background:rgba(0,0,0,.85); }
+[data-theme="dark"] .toast{ background:#0b0f18; }
+[data-theme="dark"] canvas#firmaPad{ background:#fff; }  /* la firma va sobre blanco a propósito */
+
+/* ---------- Repetir para "automático por sistema" (sin data-theme explícito) ---------- */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .btn{ background:var(--card); color:var(--ink); border-color:var(--linea); }
+  :root:not([data-theme="light"]) .sheet, :root:not([data-theme="light"]) #sheet{ background:var(--card); }
+  :root:not([data-theme="light"]) .backbtn{ background:var(--card); color:var(--ink); border-color:var(--linea); }
+  :root:not([data-theme="light"]) .desc{ color:var(--ink); }
+  :root:not([data-theme="light"]) .fabbar{ background:var(--card); border-top-color:var(--linea); }
+  :root:not([data-theme="light"]) .searchbar input,
+  :root:not([data-theme="light"]) .fform input, :root:not([data-theme="light"]) .extra input,
+  :root:not([data-theme="light"]) .sheet .fld input, :root:not([data-theme="light"]) #invin,
+  :root:not([data-theme="light"]) textarea.csv, :root:not([data-theme="light"]) .tpickbtn,
+  :root:not([data-theme="light"]) .tlist-item, :root:not([data-theme="light"]) #tpq{
+    background:var(--card) !important; color:var(--ink) !important; border-color:var(--linea) !important;
+  }
+  :root:not([data-theme="light"]) .kpicard:active, :root:not([data-theme="light"]) .as400box:active{ background:#20293c; }
+  :root:not([data-theme="light"]) .hzrow{ background:linear-gradient(135deg,#2a2013,#382914); border-color:var(--naranjab); }
+  :root:not([data-theme="light"]) .mrcod{ color:var(--ink); }
+  :root:not([data-theme="light"]) .mrdesc{ color:#c9d2df; }
+  :root:not([data-theme="light"]) .mrbody, :root:not([data-theme="light"]) #mrap{ background:var(--fondo); }
+  :root:not([data-theme="light"]) .mracc{ background:var(--card); border-top-color:var(--linea); }
+  :root:not([data-theme="light"]) .mrestbtn{ background:var(--card); color:var(--ink); }
+  :root:not([data-theme="light"]) .note, :root:not([data-theme="light"]) .hint,
+  :root:not([data-theme="light"]) .emptysub, :root:not([data-theme="light"]) .powner{ color:var(--gris); }
+  :root:not([data-theme="light"]) .item.yano{ background:#2a1a1c; }
+  :root:not([data-theme="light"]) .gbody, :root:not([data-theme="light"]) #guias,
+  :root:not([data-theme="light"]) #abajas, :root:not([data-theme="light"]) #tips{ background:var(--fondo); }
+  :root:not([data-theme="light"]) .gcard, :root:not([data-theme="light"]) .gpaso,
+  :root:not([data-theme="light"]) .tipcard, :root:not([data-theme="light"]) .abcard,
+  :root:not([data-theme="light"]) .ablista, :root:not([data-theme="light"]) .abbase{ background:var(--card); border-color:var(--linea); color:var(--ink); }
+  :root:not([data-theme="light"]) .migoverlay{ background:var(--fondo); }
+  :root:not([data-theme="light"]) canvas#firmaPad{ background:#fff; }
+}
+
+/* Correcciones extra: superficies/textos con color fijo en ui-redesign.css o styles.css
+   que el token por sí solo no alcanza (llevan !important o color fijo). */
+[data-theme="dark"] .prow{ background:var(--card) !important; }
+[data-theme="dark"] #search, [data-theme="dark"] .searchbar input{ background:var(--card) !important; color:var(--ink) !important; }
+[data-theme="dark"] .kpilbl{ color:var(--ink); }
+[data-theme="dark"] .as400bartop b, [data-theme="dark"] .as400box b{ color:var(--ink); }
+[data-theme="dark"] .as400bar:active{ background:#20293c; }
+[data-theme="dark"] .prow:hover{ border-color:#3a4658 !important; }
+[data-theme="dark"] .pname{ color:var(--ink); }
+[data-theme="dark"] .ring::before{ background:var(--card); }
+[data-theme="dark"] .inv{ color:var(--ink); }
+[data-theme="dark"] .fp:not(.on){ background:var(--card); border-color:var(--linea); color:var(--gris); }
+[data-theme="dark"] .warnbox{ background:#2a2410; border-color:var(--amarbg); color:#e0c874; }
+[data-theme="dark"] .abaviso{ background:#382914; color:#e6c49a; }
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .inv{ color:var(--ink); }
+  :root:not([data-theme="light"]) .fp:not(.on){ background:var(--card); border-color:var(--linea); color:var(--gris); }
+  :root:not([data-theme="light"]) .warnbox{ background:#2a2410; border-color:var(--amarbg); color:#e0c874; }
+  :root:not([data-theme="light"]) .abaviso{ background:#382914; color:#e6c49a; }
+  :root:not([data-theme="light"]) .prow{ background:var(--card) !important; }
+  :root:not([data-theme="light"]) #search, :root:not([data-theme="light"]) .searchbar input{ background:var(--card) !important; color:var(--ink) !important; }
+  :root:not([data-theme="light"]) .kpilbl{ color:var(--ink); }
+  :root:not([data-theme="light"]) .as400bartop b, :root:not([data-theme="light"]) .as400box b{ color:var(--ink); }
+  :root:not([data-theme="light"]) .as400bar:active{ background:#20293c; }
+  :root:not([data-theme="light"]) .pname{ color:var(--ink); }
+  :root:not([data-theme="light"]) .ring::before{ background:var(--card); }
+}
+
+/* Al imprimir, los tokens vuelven a claro para que el reporte salga bien aunque
+   la app esté en modo oscuro. */
+@media print{
+  :root, :root[data-theme="dark"]{
+    --fondo:#F1F3F7; --card:#FFFFFF; --linea:#E2E6EC; --ink:#182338;
+    --gris:#5B6470; --gris2:#8A929C; --chev:#B8C0CC; --titulo:#1F3864;
+    color-scheme: light;
+  }
+}
