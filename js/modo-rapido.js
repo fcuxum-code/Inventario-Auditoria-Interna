@@ -62,17 +62,20 @@
         + (b.existe? '<div class="mrya">Ya estaba marcado como '+esc(b.existe)+'</div>' : '')
       + '</div>'
       + '<div class="mracc">'
-        + (marcado
-            ? '<div class="mrestlbl">¿En qué estado está?</div><div class="mrest">'
-              + ['BUENO','REGULAR','MALO','PARA BAJA'].map(function(e){
-                  var etq = e==="PARA BAJA" ? "Para baja" : e.charAt(0)+e.slice(1).toLowerCase();
-                  return '<button class="mrestbtn'+(b.estado===e?' sel':'')+'" onclick="mrEstado(\''+e+'\')">'+esc(etq)+'</button>';
-                }).join("")
-              + '</div><button class="mrsig" onclick="mrSiguiente()">Siguiente '+icon('check',16)+'</button>'
-            : '<div class="mrsino">'
-              + '<button class="mrbtn si" onclick="mrMarcar(\'SÍ\')">'+icon('check',30)+'<span>SÍ</span><small>está aquí</small></button>'
-              + '<button class="mrbtn no" onclick="mrMarcar(\'NO\')">'+icon('x',30)+'<span>NO</span><small>no está</small></button>'
-              + '</div>')
+        + '<div class="mrsino">'
+          + '<button class="mrbtn si" onclick="mrMarcar(\'SÍ\')">'+icon('check',30)+'<span>SÍ</span><small>está aquí</small></button>'
+          + '<button class="mrbtn no" onclick="mrMarcar(\'NO\')">'+icon('x',30)+'<span>NO</span><small>no está</small></button>'
+          + '</div>'
+        + '<div class="mrestopt">'
+          + '<div class="mrestlbl">o toque el estado — marca SÍ y avanza</div>'
+          + '<div class="mrest">'
+          + ['BUENO','REGULAR','MALO','PARA BAJA'].map(function(e){
+              var etq = e==="PARA BAJA" ? "Para baja" : e.charAt(0)+e.slice(1).toLowerCase();
+              var cl = e==="PARA BAJA" ? "baja" : e.toLowerCase();
+              return '<button class="mrestbtn e-'+cl+(b.estado===e?' sel':'')+'" onclick="mrMarcarEstado(\''+e+'\')">'+esc(etq)+'</button>';
+            }).join("")
+          + '</div>'
+          + '</div>'
         + '<div class="mrnav">'
           + (idx>0 ? '<span class="mrlink" onclick="mrAtras()">‹ Anterior</span>' : '<span></span>')
           + '<span class="mrlink" onclick="mrSaltar()">Saltar por ahora ›</span>'
@@ -100,30 +103,37 @@
       + '</div>';
   }
 
-  window.mrMarcar = function(val){
-    var b = cola[idx]; if(!b) return;
+  function guardarVerif(b, val, estado){
     var patch = { existe: val, actualizado: firebase.firestore.FieldValue.serverTimestamp(),
                   fechaVerificacion: today(), verificadoPor: (META.by||"") };
+    if(estado) patch.estado = estado;
     firebase.firestore().collection("bienes").doc(b.id).update(patch)
       .catch(function(){ toast("No se pudo guardar (revise conexión)"); });
     if(typeof logMovimiento==="function"){
-      logMovimiento(b, {tipoMovimiento:"VERIFICACION", estado:b.estado||"", existe:val,
+      logMovimiento(b, {tipoMovimiento:"VERIFICACION", estado: estado||b.estado||"", existe:val,
                         ubicacion:b.ubicacion||"", observaciones:b.observaciones||""});
     }
-    if(BIENES[b.id]){ BIENES[b.id].existe = val; } // reflejar de inmediato, sin esperar la nube
-    if(val==="SÍ"){ hechos.si++; pintar(); }       // queda pidiendo el estado físico
-    else { hechos.no++; avanzar(); }
-  };
+    if(BIENES[b.id]){ BIENES[b.id].existe = val; if(estado) BIENES[b.id].estado = estado; } // reflejar ya, sin esperar la nube
+  }
 
-  window.mrEstado = function(e){
+  // SÍ o NO: un solo toque, marca y pasa al siguiente. El estado es opcional.
+  window.mrMarcar = function(val){
     var b = cola[idx]; if(!b) return;
-    firebase.firestore().collection("bienes").doc(b.id)
-      .update({estado:e, actualizado: firebase.firestore.FieldValue.serverTimestamp()})
-      .catch(function(){ toast("No se pudo guardar"); });
-    if(BIENES[b.id]){ BIENES[b.id].estado = e; }
+    guardarVerif(b, val);
+    if(val==="SÍ") hechos.si++; else hechos.no++;
     avanzar();
   };
 
+  // Tocar un estado = "está aquí, en este estado": marca SÍ + estado y avanza (un solo toque).
+  window.mrMarcarEstado = function(e){
+    var b = cola[idx]; if(!b) return;
+    guardarVerif(b, "SÍ", e);
+    hechos.si++;
+    avanzar();
+  };
+
+  // Compatibilidad con nombres anteriores.
+  window.mrEstado = window.mrMarcarEstado;
   window.mrSiguiente = function(){ avanzar(); };
   window.mrSaltar = function(){ hechos.saltados++; avanzar(); };
   window.mrAtras = function(){ if(idx>0){ idx--; pintar(); } };
