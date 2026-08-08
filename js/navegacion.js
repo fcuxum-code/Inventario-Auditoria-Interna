@@ -16,6 +16,14 @@
   var pila = [];          // funciones que cierran cada nivel abierto
   var ignorarPop = false; // evita procesar dos veces cuando el cierre lo inicia la interfaz
   var listo = false;
+  /* salir() difiere su history.back() un microtask. Muchas opciones del menú hacen
+     "closeMenu();abrirX()": eso es un salir() seguido de un entrar() en el mismo turno.
+     Si salir() hiciera back() (asíncrono) y entrar() hiciera pushState() (síncrono) en el
+     mismo turno, las dos operaciones compiten y dejan el historial corrupto (un back
+     posterior podía salirse de la app). Con el diferido, entrar() alcanza a fusionar el
+     salir() pendiente en un solo replaceState: se cierra un nivel y se abre otro sin
+     cambiar la profundidad del historial. Si nadie entra, el back() corre en el microtask. */
+  var salidasPendientes = 0;
   /* Mientras se ejecuta el cierre de un nivel por haber retrocedido, no se debe retirar
      ningún otro: ese nivel ya salió de la pila. Sin esto, un cierre que llama a la misma
      función que usa la interfaz para volver (por ejemplo abVolver) hacía que se cerraran
@@ -34,6 +42,13 @@
       return;
     }
     pila.push({tipo:tipo, cerrar:cerrar});
+    if(salidasPendientes > 0){
+      // Un salir() del mismo turno quedó pendiente (patrón "closeMenu();abrirX()"):
+      // en vez de back()+pushState —que compiten— se reemplaza la entrada actual.
+      salidasPendientes--;
+      try { history.replaceState({inv:pila.length}, ""); } catch(e){}
+      return;
+    }
     try { history.pushState({inv:pila.length}, ""); } catch(e){}
   }
 
@@ -44,8 +59,15 @@
     if(!top) return;
     if(tipo && top.tipo !== tipo) return; // no corresponde a este nivel, no se toca
     pila.pop();
-    ignorarPop = true;
-    try { history.back(); } catch(e){ ignorarPop = false; }
+    // Se difiere el back() (ver nota arriba): si en el mismo turno entra otro nivel,
+    // entrar() lo fusiona en un replaceState y no se toca el historial físicamente.
+    salidasPendientes++;
+    Promise.resolve().then(function(){
+      if(salidasPendientes <= 0) return;   // ya lo consumió un entrar()
+      salidasPendientes--;
+      ignorarPop = true;
+      try { history.back(); } catch(e){ ignorarPop = false; }
+    });
   }
 
   /* Cerrar de un golpe varios niveles seguidos (salir de las guías estando dentro de un
