@@ -368,6 +368,11 @@
 .mrbtn.no:active{box-shadow:0 0 0 3px var(--rojobg);}
 @media (prefers-reduced-motion: reduce){ .mrbody{animation:none;} }
 
+/* ---- Nueva toma: bienes precargados de la tarjeta ---- */
+.tienetog{margin-top:8px;}
+.item.yano{opacity:.78; background:#FCF4F4; border-left-color:#B23B3B;}
+.item.yano .inv{text-decoration:line-through; color:#8A929C;}
+
 /* ================= ESCRITORIO: columna centrada y alineada =================
    La app nació para el teléfono. En pantallas anchas, en vez de estirarse de lado a lado,
    se centra en una columna cómoda y todas las barras se alinean con el contenido. */

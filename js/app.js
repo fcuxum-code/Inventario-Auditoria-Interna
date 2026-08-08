@@ -1256,7 +1256,15 @@ function newSession(){
   mode.view="ses"; mode.q=""; resetFiltrosBusqueda(); document.getElementById("search").value=""; render(); window.scrollTo(0,0);
 }
 function cancelSession(){ fotoDel("Lses"); curSes=null; goHome(); }
-function sesSetTipo(t){ curSes.tipo=t; if(t==="nueva"){ curSes.tarjetaId=null; } render(); }
+function sesSetTipo(t){
+  curSes.tipo=t;
+  if(t==="nueva"){
+    curSes.tarjetaId=null;
+    // los precargados pertenecen a una tarjeta concreta; al pasar a "nueva" se retiran
+    curSes.items = curSes.items.filter(function(it){ return !it.preexistente; });
+  }
+  render();
+}
 function sesAutollenar(){
   if(!curSes || curSes.tipo!=="nueva") return;
   const m = buscarTarjetaPorNombre(curSes.persona);
@@ -1308,12 +1316,19 @@ function renderSession(v){
      + '<span style="font-size:11.5px;color:#8A929C" id="firmaEstado">Sin firmar</span>'
      + '<span class="moretog" onclick="limpiarFirma()">Borrar firma</span></div>';
   h += '</div></div>';
-  h += '<div class="item"><label style="font-size:12px;color:#5B6470;font-weight:700">Números de bien que tiene esta persona</label>'
+  const precargados = s.items.filter(function(it){ return it.preexistente; }).length;
+  const labelAdd = precargados
+    ? '¿Falta algún bien? Agréguelo por número (nuevo, o que le pasaron de otra persona)'
+    : 'Números de bien que tiene esta persona';
+  h += '<div class="item"><label style="font-size:12px;color:#5B6470;font-weight:700">'+labelAdd+'</label>'
      + '<div style="display:flex;gap:8px;margin-top:6px"><input id="invin" style="flex:1;padding:12px;border:1.5px solid #E2E6EC;border-radius:10px;font-size:17px;font-weight:700" placeholder="Léalo del bien y escríbalo" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addInv();}">'
      + '<button class="act p" style="margin:0;width:auto;padding:0 18px" onclick="addInv()">Agregar</button></div>'
-     + '<div style="font-size:11.5px;color:#8A929C;margin-top:6px"><span id="sescount">'+s.items.length+'</span> bien(es) en esta toma</div></div>';
+     + '<div style="font-size:11.5px;color:#8A929C;margin-top:6px" id="sescount">'+sesResumenTxt()+'</div></div>';
+  if(s.tarjetaId && precargados){
+    h += '<div class="hint" style="margin:2px 2px 8px">Abajo están los bienes de esta tarjeta, ya marcados <b>Aún lo tiene</b>. Cambie a <b>Ya no lo tiene</b> los que la persona ya no tenga.</div>';
+  }
   h += '<div id="sesitems">'+s.items.map(sesItemCard).join("")+'</div>';
-  h += '<button class="act g" onclick="saveSession()">✓ Guardar toma y enviar correo (<span id="sessavecount">'+s.items.length+'</span> bienes)</button>';
+  h += '<button class="act g" onclick="saveSession()">✓ Guardar toma y enviar correo (<span id="sessavecount">'+sesConteo().tiene+'</span> bienes)</button>';
   v.innerHTML = h; loadThumbs();
   setTimeout(initFirmaPad, 50);
 }
@@ -1358,11 +1373,19 @@ function limpiarFirma(){
   if(curSes) curSes.firmaB64=null;
   initFirmaPad();
 }
+function sesConteo(){
+  const tiene = curSes.items.filter(function(it){ return it.tiene!==false; }).length;
+  return { tiene:tiene, yano:curSes.items.length-tiene, total:curSes.items.length };
+}
+function sesResumenTxt(){
+  const c = sesConteo();
+  return c.tiene+' con la persona' + (c.yano? (' · '+c.yano+' ya no') : '');
+}
 function renderSesItems(){
   const c=document.getElementById("sesitems"); if(!c){ render(); return; }
   c.innerHTML = curSes.items.map(sesItemCard).join("");
-  const cc=document.getElementById("sescount"); if(cc) cc.textContent=curSes.items.length;
-  const sc=document.getElementById("sessavecount"); if(sc) sc.textContent=curSes.items.length;
+  const cc=document.getElementById("sescount"); if(cc) cc.textContent=sesResumenTxt();
+  const sc=document.getElementById("sessavecount"); if(sc) sc.textContent=sesConteo().tiene;
   loadThumbs();
 }
 function openTarjetaPicker(){
@@ -1386,9 +1409,26 @@ function filterTpick(){
   });
   document.getElementById("tpicklist").innerHTML = list.map(tpickRow).join("") || '<div class="empty">Sin resultados</div>';
 }
+// Construye un ítem de toma a partir de un bien que la tarjeta YA tiene (precargado).
+function sesItemDeBien(b){
+  return { iid: "i"+Date.now()+Math.random().toString(36).slice(2,7), codigo: b.codigo,
+    desc: b.descripcion||"", valor: b.valor||0, esNuevo:false, estabaPendiente:false,
+    origenTarjetaId: b.tarjetaId||null, origenTarjetaNumero: b.tarjetaNumero||"", origenResponsable: b.responsable||"",
+    tipoOrig: b.tipo||"INDIVIDUAL", estado: b.estado||"", obs: b.observaciones||"",
+    preexistente:true, tiene:true, foto:0, fotoUrl: b.fotoUrl||undefined };
+}
 function pickTarjeta(id){
   const t = TARJETAS[id]; if(!t) return;
   curSes.tarjetaId=id; curSes.numero=t.numero||""; curSes.persona=t.responsable||""; curSes.empleado=t.empleado||""; curSes.correo=t.correo||"";
+  // Se cargan abajo todos los bienes que la tarjeta ya tiene, marcados "aún lo tiene", para
+  // confirmarlos en vez de teclearlos. Se retiran los precargados de una tarjeta anterior y no
+  // se duplica lo que el usuario ya haya agregado a mano.
+  curSes.items = curSes.items.filter(function(it){ return !it.preexistente; });
+  var yaEn = {}; curSes.items.forEach(function(it){ yaEn[bienDocId(it.codigo)]=true; });
+  var pre = bienesDe(id).filter(function(b){ return !yaEn[bienDocId(b.codigo)]; })
+    .sort(function(a,b){ return (a.codigo||"").localeCompare(b.codigo||""); })
+    .map(sesItemDeBien);
+  curSes.items = pre.concat(curSes.items);
   closeMenu(); render();
 }
 
@@ -1441,9 +1481,11 @@ function asignarPendiente(id){
   }, 60);
 }
 function sesItemCard(it){
+  const yaNo = it.preexistente && it.tiene===false;
   let badge;
   if(it.esNuevo){ badge='<span class="chip c-hz">NUEVO · no está en el sistema</span>'; }
   else if(it.estabaPendiente){ badge='<span class="chip c-ind">PENDIENTE · se asigna ahora por primera vez</span>'; }
+  else if(it.preexistente){ badge='<span class="chip c-ind">Ya en esta tarjeta</span>'; }
   else {
     let esTraslado;
     if(curSes.tipo==="nueva"){ esTraslado = true; }
@@ -1451,23 +1493,41 @@ function sesItemCard(it){
     badge = '<span class="chip '+(esTraslado?"c-dup":"c-ind")+'">'+(esTraslado?"TRASLADO":"YA ESTABA AQUÍ")+'</span>'
       + '<div class="powner">Estaba cargado a: '+esc(it.origenResponsable||"—")+' (Tarj. '+esc(it.origenTarjetaNumero||"—")+')</div>';
   }
-  return '<div class="item" style="border-left-color:'+(it.esNuevo?"#B5651D":"#1F3864")+'">'
-    +'<div class="itop"><span class="inv">'+esc(it.codigo)+'</span></div>'
-    +'<div class="ochips">'+badge+'</div>'
-    +(it.esNuevo
-      ? '<input type="text" value="'+esc(it.desc||"")+'" oninput="sesItemDesc(\''+it.iid+'\',this.value)" placeholder="Descripción del bien *" style="width:100%;padding:9px 11px;border:1.4px solid #E2E6EC;border-radius:9px;font-size:14px;margin:4px 0 2px">'
-      : (it.desc?'<div class="desc">'+esc(it.desc)+'</div>':''))
-    +'<div class="bgrp estado">'
+  // Bienes precargados: interruptor "Aún lo tiene / Ya no lo tiene".
+  const toggle = it.preexistente
+    ? '<div class="bgrp tienetog">'
+        +'<button class="btn b-si '+(!yaNo?"sel":"")+'" onclick="sesItemTiene(\''+it.iid+'\',true)">'+icon('check',15)+' Aún lo tiene</button>'
+        +'<button class="btn b-no '+(yaNo?"sel":"")+'" onclick="sesItemTiene(\''+it.iid+'\',false)">'+icon('x',15)+' Ya no lo tiene</button>'
+      +'</div>'
+    : '';
+  // Cuerpo (estado, foto, observación) solo si el bien se queda con la persona.
+  let cuerpo;
+  if(yaNo){
+    cuerpo = '<div class="abaviso" style="margin-top:8px">'+icon('logOut',13,'margin-right:4px')
+      +'Al guardar pasará a <b>Pendientes de asignar</b> (o queda con quien ya lo tenga registrado).</div>';
+  } else {
+    cuerpo = '<div class="bgrp estado">'
       +['BUENO','REGULAR','MALO','PARA BAJA'].map(function(e){ const cl=e==="PARA BAJA"?"baja":e.toLowerCase();
         return '<button class="btn est e-'+cl+' '+(it.estado===e?"sel":"")+'" onclick="sesItemEstado(\''+it.iid+'\',\''+e+'\')">'+(e==="PARA BAJA"?"Baja":e.charAt(0)+e.slice(1).toLowerCase())+'</button>'; }).join("")
     +'</div>'
     +'<div class="tools"><button class="fotobtn" id="fb_A'+it.iid+'" onclick="takePhoto(\'A'+it.iid+'\')">'+icon('camera',15)+' Foto</button>'
       +'<img class="thumb" id="th_A'+it.iid+'" style="display:none" onclick="viewPhoto(\'A'+it.iid+'\')">'
        +(it.fotoUrl?'<a class="drivefoto" href="'+it.fotoUrl+'" target="_blank" rel="noopener"><img class="dthumb" src="'+driveThumbUrl(it.fotoUrl)+'" loading="lazy" alt="foto">🖼️ Ver foto</a>':'')
-      +'<span class="moretog" style="color:var(--rojo)" onclick="delSesItem(\''+it.iid+'\')">'+icon('trash',13)+' Quitar</span></div>'
-    +'<div class="extra open" style="margin-top:8px"><input type="text" value="'+esc(it.obs||"")+'" oninput="sesItemObs(\''+it.iid+'\',this.value)" placeholder="Observación (opcional)"></div>'
+      +(it.preexistente?'':'<span class="moretog" style="color:var(--rojo)" onclick="delSesItem(\''+it.iid+'\')">'+icon('trash',13)+' Quitar</span>')
+    +'</div>'
+    +'<div class="extra open" style="margin-top:8px"><input type="text" value="'+esc(it.obs||"")+'" oninput="sesItemObs(\''+it.iid+'\',this.value)" placeholder="Observación (opcional)"></div>';
+  }
+  return '<div class="item'+(yaNo?' yano':'')+'" style="border-left-color:'+(it.esNuevo?"#B5651D":(yaNo?"#B23B3B":"#1F3864"))+'">'
+    +'<div class="itop"><span class="inv">'+esc(it.codigo)+'</span></div>'
+    +'<div class="ochips">'+badge+'</div>'
+    +(it.esNuevo
+      ? '<input type="text" value="'+esc(it.desc||"")+'" oninput="sesItemDesc(\''+it.iid+'\',this.value)" placeholder="Descripción del bien *" style="width:100%;padding:9px 11px;border:1.4px solid #E2E6EC;border-radius:9px;font-size:14px;margin:4px 0 2px">'
+      : (it.desc?'<div class="desc">'+esc(it.desc)+'</div>':''))
+    +toggle
+    +cuerpo
   +'</div>';
 }
+function sesItemTiene(iid,val){ const it=curSes.items.find(function(x){return x.iid===iid;}); if(!it) return; it.tiene = (val!==false); renderSesItems(); }
 function sesItemEstado(iid,val){ const it=curSes.items.find(function(x){return x.iid===iid;}); if(!it) return; it.estado = it.estado===val?"":val; renderSesItems(); }
 function sesItemObs(iid,val){ const it=curSes.items.find(function(x){return x.iid===iid;}); if(it) it.obs=val; }
 function sesItemDesc(iid,val){ const it=curSes.items.find(function(x){return x.iid===iid;}); if(it) it.desc=val; }
@@ -1515,6 +1575,29 @@ function saveSession(){
     s.items.forEach(function(it){
       const cn = bienDocId(it.codigo);
       const ref = db.collection("bienes").doc(cn);
+      // "Ya no lo tiene": si el bien sigue en ESTA tarjeta, se suelta a Pendientes de asignar
+      // (guardando de quién era). Si ya lo tiene otra persona (lo trasladaron), se respeta.
+      if(it.preexistente && it.tiene===false){
+        const actual = BIENES[cn];
+        if(actual && actual.tarjetaId === dest.id){
+          batch.set(ref, {
+            tarjetaId:null, tarjetaNumero:"", responsable:"", existe:"",
+            tarjetaAnteriorNumero: actual.tarjetaNumero||dest.numero||"",
+            responsableAnterior: actual.responsable||s.persona||"",
+            actualizado: firebase.firestore.FieldValue.serverTimestamp()
+          }, {merge:true});
+          const movRefD = db.collection("movimientos").doc();
+          batch.set(movRefD, {
+            codigo: it.codigo, tipoMovimiento:"DESCARGADO",
+            tarjetaAnteriorNumero: actual.tarjetaNumero||dest.numero||"", responsableAnterior: actual.responsable||s.persona||"",
+            tarjetaNuevaNumero:"", responsableNuevo:"",
+            estado: actual.estado||"", ubicacion: actual.ubicacion||"", observaciones: it.obs||"Ya no lo tenía en la toma física",
+            fecha: firebase.firestore.FieldValue.serverTimestamp(), fechaTxt: nowTxt, capturadoPor: META.by||""
+          });
+        }
+        // si ya está con otra persona o en pendientes, no se toca (queda vinculado a quien lo tenga)
+        return;
+      }
       const huboTraslado = !it.esNuevo && it.origenTarjetaId && it.origenTarjetaId!==dest.id;
       const tieneFoto = !!(it.fotoB64 || it.foto);
       const datosBien = {
