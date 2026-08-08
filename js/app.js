@@ -218,12 +218,41 @@ function arrancar(){
 /* Al guardar en lote (por ejemplo marcar 20 pendientes de una tarjeta) la nube responde
    varias veces seguidas y cada respuesta redibujaba toda la pantalla. Se agrupan en un solo
    dibujado por cuadro de animación: se ve igual de inmediato y trabaja mucho menos. */
+/* Además, no se redibuja mientras la persona está escribiendo en un campo. Redibujar en
+   ese momento destruye el campo: se pierde el foco, en el teléfono se cierra el teclado y
+   el bloque de "Ubicación / observación" se cerraba a media captura, así que solo daba
+   tiempo de llenar un dato. El dibujado queda pendiente y se hace al salir del campo. */
 let _pedidoRender = false;
+let _renderPendiente = false;
+function escribiendo(){
+  const a = document.activeElement;
+  if(!a) return false;
+  const t = (a.tagName || "").toLowerCase();
+  if(t !== "input" && t !== "textarea" && t !== "select") return false;
+  const v = document.getElementById("view");
+  return !!(v && v.contains(a));
+}
 function renderPronto(){
   if(_pedidoRender) return;
   _pedidoRender = true;
-  requestAnimationFrame(function(){ _pedidoRender = false; render(); });
+  // se decide dentro del cuadro de animación: al pasar de un campo a otro el foco viaja
+  // un instante por el vacío, y para entonces ya se posó en el campo nuevo
+  requestAnimationFrame(function(){
+    _pedidoRender = false;
+    if(escribiendo()){ _renderPendiente = true; return; }
+    _renderPendiente = false;
+    render();
+  });
 }
+/* Al salir de un campo se atiende lo que hubiera quedado pendiente. Se espera un momento
+   porque pasar de un campo a otro también dispara este evento. */
+document.addEventListener("focusout", function(){
+  if(!_renderPendiente) return;
+  setTimeout(function(){
+    if(!_renderPendiente || escribiendo()) return;
+    renderPronto();
+  }, 150);
+}, true);
 let _unsubs = [];
 function detenerListeners(){ _unsubs.forEach(function(fn){ try{ fn(); }catch(e){} }); _unsubs=[]; }
 function iniciarListeners(){
@@ -710,7 +739,7 @@ function itemCard(b, showOwner, extraChip){
       +(!soloLectura && b.existe==="NO" && b.tarjetaId?'<span class="moretog" style="color:var(--naranja)" onclick="descargarBien(\''+id+'\')">'+icon('logOut',13)+' Quitar de la tarjeta</span>':'')
       +(!soloLectura && b.esNuevo?'<span class="moretog" style="color:var(--rojo)" onclick="borrarBien(\''+id+'\')">'+icon('trash',13)+' Borrar</span>':'')
     +'</div>'
-    +'<div class="extra" id="ex_'+id+'">'
+    +'<div class="extra'+(_extraAbiertos.has(id)?" open":"")+'" id="ex_'+id+'">'
       +'<label>Ubicación física real</label><input type="text" value="'+esc(b.ubicacion||"")+'" '+(soloLectura?'readonly':'onchange="markCampo(\''+id+'\',\'ubicacion\',this.value)"')+' placeholder="Ej. Oficina 3">'
       +'<label>Observaciones</label><input type="text" value="'+esc(b.observaciones||"")+'" '+(soloLectura?'readonly':'onchange="markCampo(\''+id+'\',\'observaciones\',this.value)"')+' placeholder="Ej. sin serie visible">'
     +'</div>'
@@ -724,7 +753,16 @@ function borrarBien(id){
   fotoDel("B"+id);
   db.collection("bienes").doc(id).delete().then(function(){ toast("Registro borrado ✓"); }).catch(function(){ toast("No se pudo borrar"); });
 }
-function toggleExtra(id){ const e=document.getElementById("ex_"+id); if(e) e.classList.toggle("open"); }
+/* Qué fichas tienen abierto el bloque de "Ubicación / observación". Antes esto vivía solo
+   como una clase en el DOM, y como cada guardado redibuja la pantalla, el bloque se cerraba
+   solo: se escribía la ubicación, al pasar a observaciones desaparecía. */
+const _extraAbiertos = new Set();
+function toggleExtra(id){
+  const e = document.getElementById("ex_"+id);
+  if(!e) return;
+  if(e.classList.toggle("open")) _extraAbiertos.add(id);
+  else _extraAbiertos.delete(id);
+}
 function markExiste(id,val){
   if(!requiereEdicion()) return;
   const b = BIENES[id]; if(!b) return;
