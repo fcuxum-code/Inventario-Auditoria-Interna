@@ -1,0 +1,4 @@
+# Archivos del harness de pruebas locales (no forman parte de la app)
+__test_*.html
+mock-firebase.js
+mock-seed.js
