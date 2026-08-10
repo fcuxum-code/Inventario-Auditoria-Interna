@@ -1303,10 +1303,6 @@ function renderSession(v){
   }
   h += '<label>No. de empleado (opcional)</label><input id="sp_emp" value="'+esc(s.empleado)+'" oninput="curSes.empleado=this.value" inputmode="numeric">';
   h += '<label>Correo electrónico (para el aviso automático)</label><input id="sp_mail" type="email" value="'+esc(s.correo)+'" oninput="curSes.correo=this.value" placeholder="nombre@igss.gob.gt">';
-  h += '<label>Ubicación *</label><div class="bgrp" style="flex-direction:column;gap:7px">';
-  LOCS.forEach(function(L){ h+='<button class="btn '+(s.loc===L?"b-si sel":"")+'" style="text-align:left;font-size:13px;display:flex;align-items:center;gap:8px" onclick="sesSetLoc(\''+esc(L)+'\')">'
-    + icon(s.loc===L?'check':'mapPin',15) + esc(L)+'</button>'; });
-  h += '</div>';
   h += '<div class="tools" style="margin-top:10px"><button class="fotobtn" id="fb_Lses" data-label="Foto del lugar" onclick="takePhoto(\'Lses\')">'+icon('camera',15)+' Foto del lugar</button>'
      + '<img class="thumb" id="th_Lses" style="display:none" onclick="viewPhoto(\'Lses\')"></div>';
   h += '<label style="margin-top:10px">Firma de recibido (opcional)</label>'
@@ -1324,6 +1320,7 @@ function renderSession(v){
      + '<div style="display:flex;gap:8px;margin-top:6px"><input id="invin" style="flex:1;padding:12px;border:1.5px solid #E2E6EC;border-radius:10px;font-size:17px;font-weight:700" placeholder="Léalo del bien y escríbalo" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addInv();}">'
      + '<button class="act p" style="margin:0;width:auto;padding:0 18px" onclick="addInv()">Agregar</button></div>'
      + '<div style="font-size:11.5px;color:var(--gris2);margin-top:6px" id="sescount">'+sesResumenTxt()+'</div></div>';
+  h += '<div class="sestotal" id="sestotal">'+sesTotalTxt()+'</div>';
   if(s.tarjetaId && precargados){
     h += '<div class="hint" style="margin:2px 2px 8px">Abajo están los bienes de esta tarjeta, ya marcados <b>Aún lo tiene</b>. Cambie a <b>Ya no lo tiene</b> los que la persona ya no tenga.</div>';
   }
@@ -1381,10 +1378,19 @@ function sesResumenTxt(){
   const c = sesConteo();
   return c.tiene+' con la persona' + (c.yano? (' · '+c.yano+' ya no') : '');
 }
+function sesTotalValor(){
+  return curSes.items.filter(function(it){ return it.tiene!==false; })
+    .reduce(function(a,it){ return a + Number(it.valor||0); }, 0);
+}
+function sesTotalTxt(){
+  const c = sesConteo();
+  return 'Total de la tarjeta: '+c.tiene+' bien'+(c.tiene===1?'':'es')+' · '+money(sesTotalValor());
+}
 function renderSesItems(){
   const c=document.getElementById("sesitems"); if(!c){ render(); return; }
   c.innerHTML = curSes.items.map(sesItemCard).join("");
   const cc=document.getElementById("sescount"); if(cc) cc.textContent=sesResumenTxt();
+  const st=document.getElementById("sestotal"); if(st) st.textContent=sesTotalTxt();
   const sc=document.getElementById("sessavecount"); if(sc) sc.textContent=sesConteo().tiene;
   loadThumbs();
 }
@@ -1563,7 +1569,6 @@ function saveSession(){
   if(!requiereEdicion()) return;
   const s = curSes;
   if(!s.persona || !s.persona.trim()){ toast("Escriba el nombre del responsable"); return; }
-  if(!s.loc){ toast("Elija la ubicación"); return; }
   if(s.items.length===0){ toast("Agregue al menos un número de bien"); return; }
   toast("Guardando…");
   resolverTarjetaDestino(s).then(function(dest){
@@ -1604,7 +1609,7 @@ function saveSession(){
         codigo: it.codigo, descripcion: it.desc||it.codigo, valor: it.valor||0,
         tarjetaId: dest.id, tarjetaNumero: dest.numero||"", responsable: s.persona,
         tipo: it.esNuevo? "INDIVIDUAL": (it.tipoOrig||"INDIVIDUAL"),
-        ubicacion: s.loc, estado: it.estado||"", existe: "SÍ",
+        estado: it.estado||"", existe: "SÍ",
         fechaVerificacion: nowTxt, verificadoPor: META.by||"",
         esNuevo: !!it.esNuevo, observaciones: it.obs||"", notaDuplicado: "",
         tarjetaAnteriorNumero: huboTraslado? (it.origenTarjetaNumero||"") : "",
@@ -1619,7 +1624,7 @@ function saveSession(){
         codigo: it.codigo, tipoMovimiento: it.esNuevo?"HALLAZGO_ASIGNADO":"REASIGNACION",
         tarjetaAnteriorNumero: it.origenTarjetaNumero||"", responsableAnterior: it.origenResponsable||"",
         tarjetaNuevaNumero: dest.numero||"", responsableNuevo: s.persona,
-        estado: it.estado||"", ubicacion: s.loc, observaciones: it.obs||"",
+        estado: it.estado||"", ubicacion: (BIENES[cn]&&BIENES[cn].ubicacion)||"", observaciones: it.obs||"",
         fecha: firebase.firestore.FieldValue.serverTimestamp(), fechaTxt: nowTxt, capturadoPor: META.by||""
       });
       // Mover la foto de la toma (clave temporal) a la clave permanente del bien, para que no se pierda al ver el bien después
