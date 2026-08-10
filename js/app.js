@@ -1303,7 +1303,7 @@ function renderSession(v){
   }
   h += '<label>No. de empleado (opcional)</label><input id="sp_emp" value="'+esc(s.empleado)+'" oninput="curSes.empleado=this.value" inputmode="numeric">';
   h += '<label>Correo electrónico (para el aviso automático)</label><input id="sp_mail" type="email" value="'+esc(s.correo)+'" oninput="curSes.correo=this.value" placeholder="nombre@igss.gob.gt">';
-  h += '<div class="tools" style="margin-top:10px"><button class="fotobtn" id="fb_Lses" data-label="Foto del lugar" onclick="takePhoto(\'Lses\')">'+icon('camera',15)+' Foto del lugar</button>'
+  h += '<div class="tools" style="margin-top:10px"><button class="fotobtn" id="fb_Lses" data-label="Foto de la persona" onclick="takePhoto(\'Lses\')">'+icon('camera',15)+' Foto de la persona</button>'
      + '<img class="thumb" id="th_Lses" style="display:none" onclick="viewPhoto(\'Lses\')"></div>';
   h += '<label style="margin-top:10px">Firma de recibido (opcional)</label>'
      + '<div style="font-size:11.5px;color:var(--gris2);margin-bottom:6px">Si el responsable está presente, que firme aquí como constancia de que recibió los bienes.</div>'
@@ -1670,7 +1670,7 @@ function notificarPersona(s, numeroReal){
     if(it.fotoB64){ fotoPromesas.push(Promise.resolve({name: it.fotoName||("BIEN_"+it.codigo+".jpg"), b64: it.fotoB64})); }
     else if(it.foto){ fotoPromesas.push(fotoGet("A"+it.iid).then(function(r){ return r?{name:r.name,b64:r.b64}:null; }).catch(function(){return null;})); }
   });
-  if(s.fotoB64){ fotoPromesas.push(Promise.resolve({name: s.fotoName||"LUGAR.jpg", b64: s.fotoB64})); }
+  if(s.fotoB64){ fotoPromesas.push(Promise.resolve({name: s.fotoName||"PERSONA.jpg", b64: s.fotoB64})); }
   else if(s.foto){ fotoPromesas.push(fotoGet("Lses").then(function(r){ return r?{name:r.name,b64:r.b64}:null; }).catch(function(){return null;})); }
   if(s.firmaB64){ fotoPromesas.push(Promise.resolve({name: "FIRMA_"+sanit(s.persona)+".jpg", b64: s.firmaB64})); }
   const conFoto = fotoPromesas.length;
@@ -1918,7 +1918,7 @@ function sanit(s){ return String(s||"").replace(/[^A-Za-z0-9._-]/g,"_").slice(0,
 function fotoName(k){
   if(k[0]==="B"){ const b=BIENES[k.slice(1)]; return "INV_"+sanit(b?b.codigo:k.slice(1))+"_T"+sanit(b?b.tarjetaNumero:"")+".jpg"; }
   if(k[0]==="H"){ return "HALLAZGO_"+sanit(k.slice(1))+".jpg"; }
-  if(k==="Lses"){ return "LUGAR_"+sanit(curSes?curSes.loc:"")+"_"+sanit(curSes?curSes.persona:"")+"_"+Date.now()+".jpg"; }
+  if(k==="Lses"){ return "PERSONA_"+sanit(curSes?curSes.persona:"")+"_"+Date.now()+".jpg"; }
   if(k[0]==="A"){ const it=curSes?curSes.items.find(function(x){return x.iid===k.slice(1);}):null; return "BIEN_"+sanit(it?it.codigo:k.slice(1))+"_"+sanit(curSes?curSes.persona:"")+".jpg"; }
   return "FOTO_"+sanit(k)+".jpg";
 }
@@ -1932,7 +1932,7 @@ function driveThumbUrl(u){ if(!u) return ""; var m=String(u).match(/[-\w]{25,}/)
     function refreshFotoUI(k){
   fotoGet(k).then(function(r){
     const btn=document.getElementById("fb_"+k), th=document.getElementById("th_"+k);
-    // Se respeta la etiqueta propia del botón (p. ej. "Foto del lugar"); antes se perdía al refrescar.
+    // Se respeta la etiqueta propia del botón (p. ej. "Foto de la persona"); antes se perdía al refrescar.
     if(btn){ const etq=btn.getAttribute("data-label")||"Foto";
       btn.classList.toggle("has",!!r); btn.innerHTML=icon('camera',15)+(r?' '+etq+' '+icon('check',13,'margin-left:2px'):' '+etq); }
     if(th){ if(r){ th.src="data:image/jpeg;base64,"+r.b64; th.style.display=""; } else th.style.display="none"; }
