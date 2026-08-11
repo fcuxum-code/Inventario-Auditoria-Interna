@@ -536,7 +536,8 @@ function renderPerson(v){
   h+='<div style="margin:6px 2px 2px"><div style="font-size:18px;font-weight:800;color:var(--ink)">'+esc(t.responsable||"(sin nombre)")+'</div>'
     +'<div style="font-size:12.5px;color:var(--gris2);margin-top:2px">Tarjeta '+esc(t.numero||"(pendiente)")+' · '+esc(t.puesto||"")+' '+chipTipo(t.tipo)+'</div>'
     +'<div style="margin-top:4px"><span class="moretog" onclick="editCorreoTarjeta(\''+t.id+'\')">✉️ '+(t.correo?esc(t.correo):"agregar correo")+'</span>'
-    +' <span class="moretog" onclick="imprimirConstancia(\''+t.id+'\')">'+icon('download',13)+' Constancia (PDF)</span>'
+    +' <span class="moretog" onclick="compartirConstancia(\''+t.id+'\')">'+icon('share',13)+' Compartir constancia (PDF)</span>'
+    +' <span class="moretog" onclick="descargarConstancia(\''+t.id+'\')">'+icon('download',13)+' Descargar</span>'
     +(t.firmaRecibida?(' <span class="moretog" onclick="verFirma(\''+t.id+'\')">'+icon('check',13)+' Firmado'+(t.firmaFecha?(' ('+esc(t.firmaFecha)+')'):'')+'</span>'):'')
     +'</div></div>'
     + as400Control(t);
