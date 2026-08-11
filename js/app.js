@@ -533,9 +533,12 @@ function renderPerson(v){
   if(mode.filter==="list") show=list.filter(function(b){return b.existe;});
   show = show.slice().sort(function(a,b){return (a.codigo||"").localeCompare(b.codigo||"");});
   let h='<button class="backbtn" onclick="goHome()">‹ Responsables</button>';
+  const esProvisional = t.provisional || !t.numero;
   h+='<div style="margin:6px 2px 2px"><div style="font-size:18px;font-weight:800;color:var(--ink)">'+esc(t.responsable||"(sin nombre)")+'</div>'
-    +'<div style="font-size:12.5px;color:var(--gris2);margin-top:2px">Tarjeta '+esc(t.numero||"(pendiente)")+' · '+esc(t.puesto||"")+' '+chipTipo(t.tipo)+'</div>'
-    +'<div style="margin-top:4px"><span class="moretog" onclick="editCorreoTarjeta(\''+t.id+'\')">✉️ '+(t.correo?esc(t.correo):"agregar correo")+'</span>'
+    +'<div style="font-size:12.5px;color:var(--gris2);margin-top:2px">Tarjeta '+esc(t.numero||"(pendiente)")+' · '+esc(t.puesto||"")+' '+chipTipo(t.tipo)+(esProvisional?' <span class="chip c-dup">PROVISIONAL</span>':'')+'</div>'
+    +'<div style="margin-top:4px">'
+    +(esProvisional && puedeEditar()?'<span class="moretog" style="color:var(--naranja)" onclick="asignarNumeroTarjeta(\''+t.id+'\')">'+icon('plusCircle',13)+' Asignar número de tarjeta</span> ':'')
+    +'<span class="moretog" onclick="editCorreoTarjeta(\''+t.id+'\')">✉️ '+(t.correo?esc(t.correo):"agregar correo")+'</span>'
     +' <span class="moretog" onclick="compartirConstancia(\''+t.id+'\')">'+icon('share',13)+' Compartir constancia (PDF)</span>'
     +' <span class="moretog" onclick="descargarConstancia(\''+t.id+'\')">'+icon('download',13)+' Descargar</span>'
     +(t.firmaRecibida?(' <span class="moretog" onclick="verFirma(\''+t.id+'\')">'+icon('check',13)+' Firmado'+(t.firmaFecha?(' ('+esc(t.firmaFecha)+')'):'')+'</span>'):'')
@@ -1253,7 +1256,7 @@ function delHallazgo(id){
 function newSession(){
   if(!requiereEdicion()) return;
   fotoDel("Lses");
-  curSes = { tipo:"existente", tarjetaId:null, numero:"", persona:"", empleado:"", correo:"", loc:"", foto:0, items:[], firmaB64:null };
+  curSes = { tipo:"existente", tarjetaId:null, numero:"", persona:"", empleado:"", correo:"", loc:"", foto:0, items:[], firmaB64:null, provisional:false };
   mode.view="ses"; mode.q=""; resetFiltrosBusqueda(); document.getElementById("search").value=""; render(); window.scrollTo(0,0);
 }
 function cancelSession(){ fotoDel("Lses"); curSes=null; goHome(); }
@@ -1277,6 +1280,7 @@ function sesAutollenar(){
   render();
 }
 function sesSetLoc(l){ curSes.loc=l; render(); }
+function sesSetProvisional(v){ curSes.provisional=!!v; if(v) curSes.numero=""; render(); }
 function renderSession(v){
   const s = curSes; if(!s){ goHome(); return; }
   let h = '<button class="backbtn" onclick="cancelSession()">‹ Cancelar</button>';
@@ -1291,14 +1295,21 @@ function renderSession(v){
        + (s.tarjetaId ? ('Tarjeta '+esc(s.numero||"(pendiente)")+' — '+esc(TARJETAS[s.tarjetaId]?TARJETAS[s.tarjetaId].responsable:"")) : "Toque para elegir la tarjeta")
        + '<span class="sub">'+(s.tarjetaId? "Puede cambiar el responsable abajo si la persona cambió":"Buscar por número o nombre actual")+'</span></button>';
     if(s.tarjetaId){
-      h += '<label>Responsable (el mismo, o escriba uno nuevo si cambió)</label>'
-         + '<input id="sp_persona" value="'+esc(s.persona)+'" oninput="curSes.persona=this.value">';
+      h += '<label>Responsable (el mismo, o elija otro si cambió)</label>'
+         + '<input id="sp_persona" value="'+esc(s.persona)+'" oninput="curSes.persona=this.value">'
+         + '<button class="act o" style="margin-top:6px" onclick="abrirPersonaPicker()">'+icon('users',15,'margin-right:6px')+'Elegir persona del listado</button>';
     }
   } else {
-    h += '<label>No. de tarjeta nuevo (déjelo vacío si aún no lo asignan)</label>'
-       + '<input id="sp_numero" value="'+esc(s.numero)+'" oninput="curSes.numero=this.value" placeholder="Ej. 40960">';
+    h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:6px"><input type="checkbox" '+(s.provisional?"checked":"")+' onchange="sesSetProvisional(this.checked)" style="width:auto"> Tarjeta provisional (aún no tiene número)</label>';
+    if(s.provisional){
+      h += '<div class="note">Se creará una tarjeta <b>provisional</b> sin número. Cuando tenga el número real, se lo asigna desde la ficha del responsable (botón "Asignar número de tarjeta").</div>';
+    } else {
+      h += '<label>No. de tarjeta nuevo (déjelo vacío si aún no lo asignan)</label>'
+         + '<input id="sp_numero" value="'+esc(s.numero)+'" oninput="curSes.numero=this.value" placeholder="Ej. 40960">';
+    }
     h += '<label>Responsable (persona) *</label>'
-       + '<input id="sp_persona" value="'+esc(s.persona)+'" oninput="curSes.persona=this.value" onblur="sesAutollenar()" placeholder="Nombre completo">';
+       + '<input id="sp_persona" value="'+esc(s.persona)+'" oninput="curSes.persona=this.value" onblur="sesAutollenar()" placeholder="Nombre completo">'
+       + '<button class="act o" style="margin-top:6px" onclick="abrirPersonaPicker()">'+icon('users',15,'margin-right:6px')+'Elegir persona del listado</button>';
     const coincide = s.persona ? buscarTarjetaPorNombre(s.persona) : null;
     if(coincide) h += '<div class="pill-mail">✓ Ya existe una tarjeta con el nombre exacto "'+esc(coincide.responsable)+'" y sin número asignado — se le agregarán estos bienes ahí (mismo correo, mismo empleado).</div>';
   }
@@ -1439,6 +1450,66 @@ function pickTarjeta(id){
   closeMenu(); render();
 }
 
+/* ---------- Elegir persona del listado (evita reescribir el nombre) ---------- */
+function _sinAcentos(s){ return String(s==null?"":s).toLowerCase().normalize("NFD").replace(new RegExp("[\u0300-\u036f]","g"),""); }
+function personasParaElegir(){
+  const mapa = {};
+  if(typeof listaPersonal==="function"){
+    listaPersonal().forEach(function(p){ const k=norm(p.nombre); if(k) mapa[k]={nombre:p.nombre, empleado:p.empleado||"", correo:p.correo||""}; });
+  }
+  Object.values(TARJETAS).forEach(function(t){
+    if(t.activa===false) return; const k=norm(t.responsable); if(!k) return;
+    if(!mapa[k]) mapa[k]={nombre:t.responsable, empleado:t.empleado||"", correo:t.correo||""};
+    else { if(!mapa[k].empleado) mapa[k].empleado=t.empleado||""; if(!mapa[k].correo) mapa[k].correo=t.correo||""; }
+  });
+  return Object.keys(mapa).map(function(k){ return mapa[k]; }).sort(function(a,b){ return (a.nombre||"").localeCompare(b.nombre||""); });
+}
+function abrirPersonaPicker(){
+  if(typeof asegurarPersonal==="function"){ asegurarPersonal(_pintarPersonaPicker); } else { _pintarPersonaPicker(); }
+}
+function _pintarPersonaPicker(){
+  const lista = personasParaElegir();
+  window.__ppVista = lista;
+  const h = '<div class="grip"></div><h3>Elegir persona</h3>'
+    + '<div class="note">Elija a la persona del listado para no reescribir el nombre y evitar duplicados. Si no está, cierre y escríbalo a mano.</div>'
+    + '<div class="fld"><input id="ppq" type="text" placeholder="Buscar por nombre o No. de empleado…" oninput="filterPersonaPick()" style="width:100%;padding:11px 13px;border:1.5px solid var(--linea);border-radius:10px;font-size:16px"></div>'
+    + '<div id="ppicklist">' + (lista.length? lista.map(ppickRow).join("") : '<div class="empty">No hay personal cargado todavía</div>') + '</div>'
+    + '<button class="act o" onclick="closeMenu()">Cancelar</button>';
+  document.getElementById("sheet").innerHTML = h; showSheet();
+  setTimeout(function(){ const q=document.getElementById("ppq"); if(q) q.focus(); }, 150);
+}
+function ppickRow(p, i){
+  return '<div class="tlist-item" onclick="pickPersona('+i+')"><div><b>'+esc(p.nombre)+'</b>'
+    + '<small>'+(p.empleado?('No. '+esc(p.empleado)):'sin No. de empleado')+(p.correo?(' · '+esc(p.correo)):'')+'</small></div><span style="color:var(--chev)">›</span></div>';
+}
+function filterPersonaPick(){
+  const q = _sinAcentos(document.getElementById("ppq").value);
+  const f = (window.__ppVista||[]).filter(function(p){ return !q || _sinAcentos(p.nombre).indexOf(q)>=0 || _sinAcentos(p.empleado).indexOf(q)>=0; });
+  window.__ppFiltrada = f;
+  document.getElementById("ppicklist").innerHTML = f.length ? f.map(ppickRow).join("") : '<div class="empty">Sin resultados</div>';
+}
+function pickPersona(i){
+  const fuente = (document.getElementById("ppq") && document.getElementById("ppq").value) ? (window.__ppFiltrada||[]) : (window.__ppVista||[]);
+  const p = fuente[i]; if(!p || !curSes) return;
+  curSes.persona = p.nombre;
+  if(p.empleado) curSes.empleado = p.empleado;
+  if(p.correo)   curSes.correo   = p.correo;
+  closeMenu(); render();
+}
+
+/* ---------- Asignar el número real a una tarjeta provisional ---------- */
+function asignarNumeroTarjeta(id){
+  if(!requiereEdicion()) return;
+  const t = TARJETAS[id]; if(!t) return;
+  pedirTexto("Asignar número de tarjeta", "Escriba el número real de la tarjeta de responsabilidad de "+(t.responsable||"esta persona")+".", t.numero||"", "text", function(val){
+    const num = (val||"").trim(); if(!num) return;
+    const batch = db.batch();
+    batch.set(db.collection("tarjetas").doc(id), { numero:num, provisional:false, actualizada: firebase.firestore.FieldValue.serverTimestamp() }, {merge:true});
+    bienesDe(id).forEach(function(b){ batch.update(db.collection("bienes").doc(b.id), { tarjetaNumero:num }); });
+    batch.commit().then(function(){ toast("Número de tarjeta asignado ✓"); }).catch(function(){ toast("No se pudo guardar (revise conexión)"); });
+  });
+}
+
 function buscarBienPorCodigoOSiges(raw){
   const cn = bienDocId(raw);
   if(BIENES[cn]) return BIENES[cn];
@@ -1562,7 +1633,7 @@ function resolverTarjetaDestino(s){
   const ref = db.collection("tarjetas").doc(tid);
   return ref.set({
     numero: numeroFinal, responsable: s.persona, empleado: s.empleado||"", correo: s.correo||"",
-    puesto: "", tipo: "INDIVIDUAL", activa: true,
+    puesto: "", tipo: "INDIVIDUAL", activa: true, provisional: !numeroFinal,
     creada: firebase.firestore.FieldValue.serverTimestamp(), actualizada: firebase.firestore.FieldValue.serverTimestamp()
   }, {merge:true}).then(function(){ return {id:ref.id, numero:numeroFinal}; });
 }

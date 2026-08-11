@@ -25,6 +25,18 @@
   window.listaNombresPersonal=function(){
     return PERSONAL.filter(function(p){return p.activo!==false;}).map(function(p){return p.nombre;}).filter(Boolean);
   };
+  // Lista de personal activo con sus datos, para elegir a la persona en "Nueva toma" y no
+  // reescribir el nombre (evita duplicados por diferencias de escritura).
+  window.listaPersonal=function(){
+    return PERSONAL.filter(function(p){return p.activo!==false && p.nombre;}).map(function(p){
+      return { nombre:p.nombre, empleado:p.noEmpleado||"", correo:p.correo||"", puesto:p.cargo||"" };
+    });
+  };
+  // Asegura que el personal esté cargado (por si aún no se abrió esa pantalla).
+  window.asegurarPersonal=function(cb){
+    if(PERSONAL.length){ if(cb) cb(); return; }
+    cargarPersonal(function(){ if(cb) cb(); });
+  };
 
   window.openPersonal=function(){ var view=document.getElementById('view'); if(!view)return;
     if(typeof mostrarBuscador==='function') mostrarBuscador(false);
