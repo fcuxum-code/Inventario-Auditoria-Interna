@@ -414,7 +414,9 @@ function render(){
   if(mode.view==="hall") return renderHall(v);
   if(mode.view==="ses") return renderSession(v);
   if(mode.view==="pend") return renderPendientes(v);
-  const tarjs = tarjetasActivas();
+  // Las tarjetas que se quedaron sin bienes (todo reasignado, p. ej. al pasar a una provisional
+  // o al cambiar de tarjeta) desaparecen de la lista: ya no hay nada que revisar en ellas.
+  const tarjs = tarjetasActivas().filter(function(t){ return bienesDe(t.id).length > 0; });
   let h = renderPanelMetricas();
   h+='<div class="hzrow" onclick="openHall()"><span class="ic">'+icon('camera',22)+'</span>'
     +'<div style="flex:1"><b>Hallazgos: bienes encontrados sin tarjeta</b><small>Toque Hallazgo para anotar uno</small></div>'
@@ -1409,7 +1411,7 @@ function renderSesItems(){
   loadThumbs();
 }
 function openTarjetaPicker(){
-  const list = tarjetasActivas();
+  const list = tarjetasActivas().filter(function(t){ return bienesDe(t.id).length > 0; });
   let h = '<div class="grip"></div><h3>Elegir tarjeta existente</h3>'
     + '<div class="fld"><input id="tpq" type="text" placeholder="Buscar por número o nombre…" oninput="filterTpick()" style="width:100%;padding:11px 13px;border:1.5px solid #E2E6EC;border-radius:10px;font-size:16px"></div>'
     + '<div id="tpicklist">' + list.map(tpickRow).join("") + '</div>'
@@ -1425,7 +1427,8 @@ function tpickRow(t){
 function filterTpick(){
   const q = document.getElementById("tpq").value.toLowerCase();
   const list = tarjetasActivas().filter(function(t){
-    return (t.numero||"").toLowerCase().indexOf(q)>=0 || (t.responsable||"").toLowerCase().indexOf(q)>=0;
+    return bienesDe(t.id).length > 0 &&
+      ((t.numero||"").toLowerCase().indexOf(q)>=0 || (t.responsable||"").toLowerCase().indexOf(q)>=0);
   });
   document.getElementById("tpicklist").innerHTML = list.map(tpickRow).join("") || '<div class="empty">Sin resultados</div>';
 }
