@@ -425,7 +425,7 @@ function render(){
     h+='<div class="prow" onclick="openPerson(\''+t.id+'\')">'
       +'<div class="ring" style="--p:'+p+'"><span class="ringtxt">'+d+'/'+n+'</span></div>'
       +'<div class="pinfo"><div class="pname">'+esc(t.responsable||"(sin nombre)")+'</div>'
-      +'<div class="pmeta">Tarjeta '+esc(t.numero||"(pendiente)")+' '+chipTipo(t.tipo)
+      +'<div class="pmeta">Tarjeta '+(t.numero?esc(t.numero):(t.provisional?"provisional":"(pendiente)"))+' '+chipTipo(t.tipo)
       +(t.correo?' <span class="pill-mail">✉️</span>':'')
       +(t.as400Actualizado?' <span class="chip c-as400">'+icon('check',10,'margin-right:2px')+'AS-400</span>':'')+'</div></div>'
       +'<div style="color:var(--chev);font-size:20px">›</div></div>';
@@ -1275,7 +1275,8 @@ function sesAutollenar(){
   if(m){
     if(!curSes.correo) curSes.correo = m.correo||"";
     if(!curSes.empleado) curSes.empleado = m.empleado||"";
-    if(!curSes.numero && m.numero) curSes.numero = m.numero;
+    // en una provisional no se toma el número de la tarjeta real de la persona
+    if(!curSes.provisional && !curSes.numero && m.numero) curSes.numero = m.numero;
   }
   render();
 }
@@ -1310,8 +1311,9 @@ function renderSession(v){
     h += '<label>Responsable (persona) *</label>'
        + '<input id="sp_persona" value="'+esc(s.persona)+'" oninput="curSes.persona=this.value" onblur="sesAutollenar()" placeholder="Nombre completo">'
        + '<button class="act o" style="margin-top:6px" onclick="abrirPersonaPicker()">'+icon('users',15,'margin-right:6px')+'Elegir persona del listado</button>';
-    const coincide = s.persona ? buscarTarjetaPorNombre(s.persona) : null;
+    const coincide = (s.persona && !s.provisional) ? buscarTarjetaPorNombre(s.persona) : null;
     if(coincide) h += '<div class="pill-mail">✓ Ya existe una tarjeta con el nombre exacto "'+esc(coincide.responsable)+'" y sin número asignado — se le agregarán estos bienes ahí (mismo correo, mismo empleado).</div>';
+    if(s.provisional && s.persona && buscarTarjetaPorNombre(s.persona)) h += '<div class="note">Esta persona ya tiene otra tarjeta; la provisional se crea <b>aparte</b> y no toca la existente.</div>';
   }
   h += '<label>No. de empleado (opcional)</label><input id="sp_emp" value="'+esc(s.empleado)+'" oninput="curSes.empleado=this.value" inputmode="numeric">';
   h += '<label>Correo electrónico (para el aviso automático)</label><input id="sp_mail" type="email" value="'+esc(s.correo)+'" oninput="curSes.correo=this.value" placeholder="nombre@igss.gob.gt">';
@@ -1418,7 +1420,7 @@ function openTarjetaPicker(){
 }
 function tpickRow(t){
   return '<div class="tlist-item" onclick="pickTarjeta(\''+t.id+'\')"><div><b>'+esc(t.responsable||"(sin nombre)")+'</b>'
-    +'<small>Tarjeta '+esc(t.numero||"(pendiente)")+' · '+esc(t.puesto||"")+'</small></div><span style="color:var(--chev)">›</span></div>';
+    +'<small>Tarjeta '+(t.numero?esc(t.numero):(t.provisional?"provisional":"(pendiente)"))+' · '+esc(t.puesto||"")+'</small></div><span style="color:var(--chev)">›</span></div>';
 }
 function filterTpick(){
   const q = document.getElementById("tpq").value.toLowerCase();
@@ -1622,6 +1624,17 @@ function resolverTarjetaDestino(s){
       responsable: s.persona, empleado: s.empleado||"", correo: s.correo||"",
       actualizada: firebase.firestore.FieldValue.serverTimestamp()
     }, {merge:true}).then(function(){ return {id:s.tarjetaId, numero:s.numero||""}; });
+  }
+  // Provisional explícita: SIEMPRE una tarjeta aparte, aunque la persona ya tenga otra.
+  // Se usa un id único para no pisar ninguna tarjeta existente (ni la real ni otra provisional).
+  if(s.provisional){
+    const tidP = "PROV_"+bienDocId(s.persona)+"_"+Date.now();
+    const refP = db.collection("tarjetas").doc(tidP);
+    return refP.set({
+      numero: "", responsable: s.persona, empleado: s.empleado||"", correo: s.correo||"",
+      puesto: "", tipo: "INDIVIDUAL", activa: true, provisional: true,
+      creada: firebase.firestore.FieldValue.serverTimestamp(), actualizada: firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge:true}).then(function(){ return {id:tidP, numero:""}; });
   }
   let tid = tarjetaDocId(s.numero);
   let numeroFinal = s.numero||"";
