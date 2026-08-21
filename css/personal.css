@@ -1,0 +1,186 @@
+/* ================= MÓDULO PERSONAL =================
+   Estilos propios del listado y la ficha de empleado. Antes todo iba en estilos
+   en línea dentro del JS con colores fijos (#fff, #1F3864...), por lo que en modo
+   oscuro las tarjetas quedaban blancas con texto casi ilegible. Aquí se usan solo
+   los tokens del tema (--card, --ink, --linea...), así que ambos modos funcionan
+   sin duplicar reglas. Carga después de tema.css para ganar el cascade. */
+
+/* ---------- Encabezado del listado ---------- */
+.per-head{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin:10px 2px 8px; }
+.per-head h2{ margin:0; color:var(--titulo); font-size:20px; }
+.per-head .per-count{ font-size:13px; color:var(--gris2); font-weight:600; }
+
+/* ---------- Buscador ---------- */
+.per-search{ position:relative; margin-bottom:10px; }
+.per-search input{
+  width:100%; padding:12px 14px 12px 40px; box-sizing:border-box;
+  border:1.5px solid var(--linea); border-radius:12px; font-size:15px;
+  background:var(--card); color:var(--ink,#1a1f26);
+  transition:border-color .18s ease, box-shadow .18s ease;
+}
+.per-search input:focus{ outline:none; border-color:var(--azul2); box-shadow:0 0 0 3px color-mix(in srgb, var(--azul2) 18%, transparent); }
+.per-search input::placeholder{ color:var(--gris2); }
+.per-search .per-searchic{ position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--gris2); pointer-events:none; font-size:15px; }
+
+/* ---------- Filtros (control segmentado) ---------- */
+.per-tabs{ display:flex; gap:3px; background:var(--fondo); border:1px solid var(--linea); border-radius:12px; padding:3px; margin-bottom:12px; }
+.perTab{
+  flex:1; text-align:center; padding:9px 6px; border-radius:9px; cursor:pointer;
+  font-weight:700; font-size:13px; color:var(--gris); background:transparent;
+  transition:background .16s ease, color .16s ease, box-shadow .16s ease;
+  display:flex; align-items:center; justify-content:center; gap:5px;
+}
+.perTab:hover{ color:var(--titulo); }
+.perTab.sel{ background:var(--card); color:var(--titulo); box-shadow:var(--shadow-sm,0 1px 2px rgba(20,30,60,.10)); }
+.perTab .per-tabn{ font-size:11px; font-weight:800; opacity:.65; }
+
+/* ---------- Botón agregar ---------- */
+.per-add{
+  width:100%; padding:13px; border:none; border-radius:12px; cursor:pointer;
+  background:var(--verde); color:#fff; font-weight:700; font-size:15px; margin-bottom:12px;
+  display:flex; align-items:center; justify-content:center; gap:7px;
+  box-shadow:var(--shadow-sm,0 1px 2px rgba(20,30,60,.10));
+  transition:filter .16s ease, transform .13s ease;
+}
+.per-add:hover{ filter:brightness(1.07); }
+.per-add:active{ transform:scale(.985); }
+
+/* ---------- Tarjeta de empleado ---------- */
+.per-card{
+  display:flex; align-items:center; gap:12px; cursor:pointer;
+  background:var(--card); border:1px solid var(--linea); border-radius:14px;
+  padding:12px 13px; margin-bottom:9px;
+  border-left:4px solid var(--verde);
+  transition:transform .13s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.per-card:hover{ transform:translateY(-2px); box-shadow:var(--shadow-md,0 6px 20px rgba(20,30,60,.12)); }
+.per-card:active{ transform:scale(.985); }
+.per-card.baja{ border-left-color:var(--rojo); background:var(--rojobg); border-color:var(--rojob); }
+.per-card .per-body{ flex:1; min-width:0; }
+.per-card .per-nombre{
+  font-weight:700; color:var(--titulo); font-size:15px; line-height:1.25;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.per-card .per-linea{
+  font-size:12.5px; color:var(--gris); margin-top:3px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.per-card .per-chev{ flex:none; color:var(--chev); font-size:20px; line-height:1; }
+
+/* ---------- Avatar ---------- */
+.per-avatar{ position:relative; flex:0 0 auto; }
+.per-avatar .per-av-img, .per-avatar .per-av-ini{
+  border-radius:50%; overflow:hidden; display:block;
+  background:var(--fondo); border:2px solid var(--linea); box-sizing:border-box;
+}
+.per-avatar .per-av-img{ object-fit:cover; }
+.per-avatar .per-av-ini{
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg, var(--azul2), var(--azul));
+  color:#fff; font-weight:800; letter-spacing:.5px; border-color:transparent;
+}
+/* Punto de estado sobre el avatar */
+.per-avatar .per-dot{
+  position:absolute; right:0; bottom:0; width:13px; height:13px; border-radius:50%;
+  background:var(--verde); border:2.5px solid var(--card); box-sizing:border-box;
+}
+.per-avatar .per-dot.off{ background:var(--rojo); }
+
+/* ---------- Chips de metadatos ---------- */
+.per-chips{ display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+.per-chip{
+  display:inline-flex; align-items:center; gap:4px;
+  background:var(--fondo); border:1px solid var(--linea); color:var(--gris);
+  border-radius:7px; padding:2px 8px; font-size:11.5px; font-weight:600; white-space:nowrap;
+}
+.per-chip.azul{ background:color-mix(in srgb, var(--azul2) 12%, transparent); border-color:color-mix(in srgb, var(--azul2) 30%, transparent); color:var(--azul2); }
+.per-chip.verde{ background:var(--verdebg); border-color:var(--verdeb); color:var(--verde); }
+.per-chip.roja{ background:var(--rojobg); border-color:var(--rojob); color:var(--rojo); }
+
+/* ---------- Estado vacío ---------- */
+.per-vacio{ text-align:center; padding:34px 18px; color:var(--gris2); }
+.per-vacio .per-vacio-ic{ font-size:38px; line-height:1; opacity:.5; }
+.per-vacio .per-vacio-t{ font-weight:700; color:var(--gris); margin-top:10px; font-size:15px; }
+.per-vacio .per-vacio-s{ font-size:13px; margin-top:4px; }
+
+/* ================= FICHA / FORMULARIO ================= */
+.per-form{ padding:8px 2px 24px; }
+.per-form h2{ margin:10px 2px; color:var(--titulo); }
+
+/* Bloque de foto */
+.per-foto-box{ display:flex; flex-direction:column; align-items:center; margin:14px 0 6px; }
+.per-foto-acc{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; justify-content:center; }
+.per-fbtn{
+  display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+  padding:9px 13px; border-radius:10px; font-weight:700; font-size:13px;
+  border:1px solid transparent; transition:filter .16s ease, transform .13s ease;
+}
+.per-fbtn:active{ transform:scale(.97); }
+.per-fbtn.prim{ background:var(--azul); color:#fff; }
+.per-fbtn.sec{ background:var(--fondo); color:var(--titulo); border-color:var(--linea); }
+.per-fbtn.del{ background:var(--card); color:var(--rojo); border-color:var(--linea); }
+.per-fbtn:hover{ filter:brightness(1.06); }
+
+/* Campos */
+.per-fld{ display:block; margin-top:12px; }
+.per-fld > .per-lbl{ font-size:12.5px; color:var(--gris); font-weight:600; display:block; margin-bottom:4px; }
+.per-fld input{
+  width:100%; padding:11px 12px; box-sizing:border-box;
+  border:1.5px solid var(--linea); border-radius:10px; font-size:15px;
+  background:var(--card); color:var(--ink,#1a1f26);
+  transition:border-color .18s ease, box-shadow .18s ease;
+}
+.per-fld input:focus{ outline:none; border-color:var(--azul2); box-shadow:0 0 0 3px color-mix(in srgb, var(--azul2) 18%, transparent); }
+.per-fld .per-hint{ font-size:11.5px; color:var(--gris2); margin-top:4px; display:block; }
+
+/* Agrupador de sección */
+.per-sec{ margin-top:20px; border-top:1px solid var(--linea); padding-top:14px; }
+.per-sec > h3{ margin:0 0 10px; color:var(--titulo); font-size:15.5px; display:flex; align-items:center; gap:7px; }
+
+/* Interruptor activo/baja */
+.per-switch{
+  display:flex; align-items:center; gap:10px; margin-top:14px; cursor:pointer;
+  background:var(--fondo); border:1px solid var(--linea); border-radius:12px; padding:12px 13px;
+}
+.per-switch input{ width:19px; height:19px; accent-color:var(--verde); flex:none; }
+.per-switch > span{ display:block; }
+.per-switch .per-sw-t{ display:block; font-weight:700; color:var(--titulo); font-size:14px; }
+.per-switch .per-sw-s{ display:block; font-size:12px; color:var(--gris2); margin-top:2px; line-height:1.35; }
+
+/* Botones de acción del formulario */
+.per-guardar{
+  width:100%; padding:14px; border:none; border-radius:12px; cursor:pointer;
+  background:var(--verde); color:#fff; font-weight:700; font-size:15px; margin-top:18px;
+  transition:filter .16s ease, transform .13s ease;
+}
+.per-guardar:hover{ filter:brightness(1.07); }
+.per-guardar:active{ transform:scale(.985); }
+.per-toggle{
+  width:100%; padding:12px; border:1px solid var(--linea); border-radius:12px; cursor:pointer;
+  background:var(--card); color:var(--rojo); font-weight:700; font-size:14px; margin-top:9px;
+  transition:background .16s ease;
+}
+.per-toggle:hover{ background:var(--hoverbg); }
+
+/* Avisos */
+.per-aviso{ border-radius:12px; padding:12px 14px; margin-top:16px; }
+.per-aviso.roja{ background:var(--rojobg); border:1px solid var(--rojob); }
+.per-aviso.roja b{ color:var(--rojo); }
+.per-aviso .per-aviso-s{ font-size:12.5px; color:var(--gris); margin-top:3px; }
+
+/* Bienes asignados */
+.per-bien{ border:1px solid var(--linea); border-radius:11px; padding:9px 11px; margin-bottom:7px; background:var(--card); }
+.per-bien .per-bien-h{ display:flex; justify-content:space-between; gap:8px; align-items:center; }
+.per-bien .per-bien-cod{ font-weight:700; color:var(--ink,#17202e); font-size:14px; }
+.per-bien .per-bien-est{ font-size:11.5px; font-weight:700; white-space:nowrap; }
+.per-bien .per-bien-desc{ font-size:12.5px; color:var(--gris); margin-top:3px; }
+.per-bien .per-bien-val{ font-size:11.5px; color:var(--gris2); margin-top:3px; }
+.per-tarj-h{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin:12px 0 7px; }
+.per-tarj-h b{ font-size:13px; color:var(--titulo); }
+.per-tarj-h .per-vf{ font-size:12px; color:var(--azul2); font-weight:700; cursor:pointer; white-space:nowrap; }
+.per-resumen{ font-size:12.5px; color:var(--gris); margin-bottom:6px; }
+
+@media (prefers-reduced-motion:reduce){
+  .per-card, .per-add, .per-fbtn, .per-guardar, .perTab, .per-search input, .per-fld input{ transition:none !important; }
+  .per-card:hover, .per-card:active{ transform:none !important; }
+}
