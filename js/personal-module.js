@@ -12,6 +12,52 @@
     var d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3])); if(isNaN(d))return null;
     return Math.floor((Date.now()-d.getTime())/86400000); }
   function tset(s){ var o={}; String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).forEach(function(w){ if(w&&!STOP[w])o[w]=1; }); return o; }
+  // ---- Foto de empleado: se guarda como dataURL JPEG comprimido en el campo "foto" ----
+  var perFotoActual='';
+  function comprimirImagen(file,cb){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var img=new Image();
+      img.onload=function(){
+        var max=480,w=img.width,h=img.height;
+        if(w>h){ if(w>max){ h=Math.round(h*max/w); w=max; } }
+        else    { if(h>max){ w=Math.round(w*max/h); h=max; } }
+        try{
+          var c=document.createElement('canvas'); c.width=w; c.height=h;
+          c.getContext('2d').drawImage(img,0,0,w,h);
+          cb(c.toDataURL('image/jpeg',0.8));
+        }catch(err){ console.error(err); cb(null); }
+      };
+      img.onerror=function(){ cb(null); };
+      img.src=e.target.result;
+    };
+    reader.onerror=function(){ cb(null); };
+    reader.readAsDataURL(file);
+  }
+  function inicialNombre(n){ var s=String(n||'').trim(); return s?s.charAt(0).toUpperCase():'?'; }
+  function avatarHtml(p,size){
+    size=size||46;
+    if(p&&p.foto){
+      return '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;overflow:hidden;flex:0 0 auto;background:#EAEEF4;border:1px solid #e6e9f0">'
+        +'<img src="'+esc(p.foto)+'" alt="" style="width:100%;height:100%;object-fit:cover;display:block"></div>';
+    }
+    return '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;flex:0 0 auto;background:#3B4E6B;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:'+Math.round(size*0.42)+'px">'+esc(inicialNombre(p&&p.nombre))+'</div>';
+  }
+  function pintarPreviewFoto(){
+    var wrap=document.getElementById('pf_fotoWrap'); if(!wrap)return;
+    wrap.innerHTML=avatarHtml({foto:perFotoActual,nombre:(document.getElementById('pf_nombre')||{}).value},96);
+    var qb=document.getElementById('pf_fotoQuitar'); if(qb)qb.style.display=perFotoActual?'inline-block':'none';
+  }
+  window.perFotoSeleccionar=function(input){
+    var f=input&&input.files&&input.files[0]; if(!f){return;}
+    if(!/^image\//.test(f.type)){ if(window.toast)toast('Selecciona una imagen'); input.value=''; return; }
+    comprimirImagen(f,function(dataUrl){
+      input.value='';
+      if(!dataUrl){ if(window.toast)toast('No se pudo procesar la imagen'); return; }
+      perFotoActual=dataUrl; pintarPreviewFoto();
+    });
+  };
+  window.perFotoQuitar=function(){ perFotoActual=''; pintarPreviewFoto(); };
   function esActivo(nombre){ if(!PACTIVOS)return true; var ns=tset(nombre),ka=Object.keys(ns); if(!ka.length)return true;
     return PACTIVOS.some(function(p){ var i=0,kb=Object.keys(p); ka.forEach(function(t){if(p[t])i++;}); return (i/Math.min(ka.length,kb.length))>=0.6; }); }
   function cargarPersonal(cb){ db().collection('personal').orderBy('nombre').get().then(function(s){
@@ -60,10 +106,13 @@
     var tit=document.getElementById('perTitulo'); if(tit){ var na=PERSONAL.filter(function(p){return p.activo!==false;}).length; tit.innerHTML='Personal &middot; '+PERSONAL.length+' <small style="color:#5E7196;font-weight:600">('+na+' activos)</small>'; }
     cont.innerHTML=arr.map(function(p){ var ina=p.activo===false;
       var fb=ina?fmtFechaISO(p.fechaBaja):'';
-      return '<div style="background:'+(ina?'#FFF4F4':'#fff')+';border:1px solid '+(ina?'#F3C6C6':'#e6e9f0')+';border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer" onclick="editarPersonal(\''+esc(p.__id)+'\')">'
+      return '<div style="background:'+(ina?'#FFF4F4':'#fff')+';border:1px solid '+(ina?'#F3C6C6':'#e6e9f0')+';border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer;display:flex;gap:12px;align-items:center" onclick="editarPersonal(\''+esc(p.__id)+'\')">'
+        +avatarHtml(p,46)
+        +'<div style="flex:1;min-width:0">'
         +'<div style="font-weight:700;color:#1F3864">'+esc(p.nombre)+(ina?' <span style="color:#c0392b;font-size:12px">&#9679; baja'+(fb?' desde '+esc(fb):'')+'</span>':'')+'</div>'
         +'<div style="font-size:12.5px;color:#5E7196">No. '+esc(p.noEmpleado)+' &middot; '+esc(p.cargo||'-')+' &middot; Renglón '+esc(p.renglon||'-')+'</div>'
-        +'<div style="font-size:12.5px;color:#5E7196">'+esc(p.correo||'sin correo')+(p.dpi?' &middot; DPI '+esc(p.dpi):'')+'</div></div>';
+        +'<div style="font-size:12.5px;color:#5E7196">'+esc(p.correo||'sin correo')+(p.dpi?' &middot; DPI '+esc(p.dpi):'')+'</div>'
+        +'</div></div>';
     }).join('')||'<div style="color:#5E7196;padding:10px">Sin resultados</div>'; }
   function tarjetasDePersonal(p){
     if(!p||typeof TARJETAS!=='object') return [];
@@ -117,10 +166,21 @@
       +'<b style="color:#c0392b">&#9888;&#65039; '+n+' bien(es) siguen a su nombre</b>'
       +'<div style="font-size:12.5px;color:#7a3b3b;margin-top:3px">'+cuando+'. Hay que reasignar estos bienes a otro responsable.</div></div>'; }
   window.editarPersonal=function(id){ var p=id?PERSONAL.find(function(x){return x.__id===id;}):{renglon:'011',cargo:'',noEmpleado:'',nombre:'',dpi:'',correo:'',activo:true,fechaBaja:''}; if(!p)return;
+    perFotoActual=p.foto||'';
     var view=document.getElementById('view');
     function f(l,k,val,tipo){ return '<label style="display:block;font-size:12.5px;color:#5E7196;margin-top:8px">'+l+'<input type="'+(tipo||'text')+'" id="pf_'+k+'" value="'+esc(val||'')+'" style="width:100%;padding:10px;border:1px solid #cdd6e4;border-radius:9px;margin-top:3px;box-sizing:border-box"></label>'; }
+    var fotoBox='<div style="display:flex;flex-direction:column;align-items:center;margin:10px 0 4px">'
+      +'<div id="pf_fotoWrap">'+avatarHtml(p,96)+'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center">'
+        +'<label style="display:inline-flex;align-items:center;gap:5px;padding:9px 12px;border-radius:9px;background:#3B4E6B;color:#fff;font-weight:700;font-size:13px;cursor:pointer">&#128247; Tomar foto'
+          +'<input type="file" accept="image/*" capture="user" onchange="perFotoSeleccionar(this)" style="display:none"></label>'
+        +'<label style="display:inline-flex;align-items:center;gap:5px;padding:9px 12px;border-radius:9px;background:#EAEEF4;color:#1F3864;font-weight:700;font-size:13px;cursor:pointer">&#128444;&#65039; Subir foto'
+          +'<input type="file" accept="image/*" onchange="perFotoSeleccionar(this)" style="display:none"></label>'
+        +'<button type="button" id="pf_fotoQuitar" onclick="perFotoQuitar()" style="display:'+(perFotoActual?'inline-block':'none')+';padding:9px 12px;border:1px solid #cdd6e4;border-radius:9px;background:#fff;color:#c0392b;font-weight:700;font-size:13px;cursor:pointer">Quitar</button>'
+      +'</div></div>';
     view.innerHTML='<div style="padding:8px 2px"><button class="backbtn" onclick="openPersonal()">&lsaquo; Personal</button>'
       +'<h2 style="margin:10px 2px;color:#1F3864">'+(id?'Editar empleado':'Nuevo empleado')+'</h2>'
+      +fotoBox
       +f('Nombre completo','nombre',p.nombre)+f('No. de empleado','noEmpleado',p.noEmpleado)+f('Renglón','renglon',p.renglon)+f('Cargo nominal','cargo',p.cargo)+f('DPI','dpi',p.dpi)+f('Correo','correo',p.correo)
       +'<label style="display:block;margin-top:12px;font-size:13px;color:#1F3864"><input type="checkbox" id="pf_activo" '+(p.activo!==false?'checked':'')+'> Empleado activo</label>'
       +f('Fecha de baja (dejar vacía si sigue laborando)','fechaBaja',p.fechaBaja,'date')
@@ -136,7 +196,7 @@
     var act=document.getElementById('pf_activo').checked;
     // Si sigue activo no puede quedar fecha de baja; si se marca de baja sin fecha, se asume hoy.
     var fBaja=act?'':(g('fechaBaja')||hoyISO());
-    var data={nombre:nom,noEmpleado:noEmp,renglon:g('renglon'),cargo:g('cargo'),dpi:g('dpi'),correo:g('correo'),activo:act,fechaBaja:fBaja,actualizado:new Date().toISOString()};
+    var data={nombre:nom,noEmpleado:noEmp,renglon:g('renglon'),cargo:g('cargo'),dpi:g('dpi'),correo:g('correo'),foto:perFotoActual||'',activo:act,fechaBaja:fBaja,actualizado:new Date().toISOString()};
     var docId=id||noEmp.replace(/[^\w-]/g,'_'); if(!id)data.creado=new Date().toISOString();
     db().collection('personal').doc(docId).set(data,{merge:true}).then(function(){toast('Empleado guardado');cargarPersonal(openPersonal);}).catch(function(e){toast('Error al guardar');console.error(e);}); };
   function aplicarBaja(id,activo,fechaBaja){
