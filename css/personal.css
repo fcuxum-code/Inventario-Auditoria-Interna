@@ -184,3 +184,45 @@
   .per-card, .per-add, .per-fbtn, .per-guardar, .perTab, .per-search input, .per-fld input{ transition:none !important; }
   .per-card:hover, .per-card:active{ transform:none !important; }
 }
+
+/* Botón de reasignación dentro del aviso de baja pendiente */
+.per-reasignar{
+  width:100%; margin-top:11px; padding:11px; cursor:pointer;
+  border:none; border-radius:10px; background:var(--rojo); color:#fff;
+  font-weight:700; font-size:14px;
+  transition:filter .16s ease, transform .13s ease;
+}
+.per-reasignar:hover{ filter:brightness(1.08); }
+.per-reasignar:active{ transform:scale(.985); }
+
+/* ---------- Panel de antigüedad (aniversarios del mes) ---------- */
+.per-panel{
+  background:var(--card); border:1px solid var(--linea); border-radius:14px;
+  padding:12px 13px; margin-bottom:12px;
+}
+.per-panel-t{ font-weight:700; color:var(--titulo); font-size:13.5px; margin-bottom:9px; }
+.per-aniv-fila{
+  display:flex; align-items:center; gap:10px; cursor:pointer;
+  padding:6px 4px; border-radius:9px; transition:background .16s ease;
+}
+.per-aniv-fila:hover{ background:var(--hoverbg); }
+.per-aniv-info{ flex:1; min-width:0; }
+.per-aniv-nom{ font-size:13.5px; font-weight:600; color:var(--titulo); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.per-aniv-sub{ font-size:11.5px; color:var(--gris2); margin-top:1px; }
+.per-aniv-mas{ font-size:12px; color:var(--gris2); padding:5px 4px 0; }
+.per-panel-falta{
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap; cursor:pointer;
+  margin-top:10px; padding-top:10px; border-top:1px solid var(--linea);
+  font-size:12.5px; color:var(--gris); font-weight:600;
+}
+.per-panel-falta .per-panel-ver{ margin-left:auto; color:var(--azul2); font-weight:700; white-space:nowrap; }
+.per-panel-falta:hover{ color:var(--titulo); }
+
+/* Indicador de filtro activo */
+.per-filtro-act{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  background:var(--amarbg); border:1px solid var(--naranjab); border-radius:11px;
+  padding:10px 12px; margin-bottom:11px; font-size:12.5px; color:var(--gris);
+}
+.per-filtro-act b{ color:var(--amar); }
+.per-filtro-act .per-filtro-x{ margin-left:auto; color:var(--azul2); font-weight:700; cursor:pointer; white-space:nowrap; }

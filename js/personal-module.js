@@ -60,6 +60,7 @@
     reader.onerror=function(){ cb(null); };
     reader.readAsDataURL(file);
   }
+  function plBien(n){ return n+(n===1?' bien':' bienes'); }
   function inicialNombre(n){
     // Iniciales del nombre y del primer apellido: "JUAN PEREZ" -> "JP"
     var ps=String(n||'').trim().split(/\s+/).filter(Boolean);
@@ -138,9 +139,49 @@
     });
     pintarPersonal(); };
   window.filtrarPersonal=function(){ pintarPersonal(); };
+  /* ===== PANEL DE ANTIGÜEDAD =====
+     La fecha de ingreso sirve para trámites (bono de antigüedad, días de vacaciones,
+     reconocimientos), así que conviene ver de un vistazo quién cumple años de servicio
+     este mes y a quién le falta el dato. Solo aparece si hay algo que mostrar. */
+  var MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  function aniversariosDelMes(){
+    var hoy=new Date(), mes=hoy.getMonth(), anio=hoy.getFullYear(), diaHoy=hoy.getDate();
+    return PERSONAL.filter(function(p){ return p.activo!==false && p.fechaIngreso; })
+      .map(function(p){
+        var d=parseISO(p.fechaIngreso); if(!d||d.getMonth()!==mes)return null;
+        var cumple=anio-d.getFullYear(); if(cumple<=0)return null; // ingresó este mismo año
+        return {p:p, dia:d.getDate(), anios:cumple, estado:(d.getDate()<diaHoy?'pasado':(d.getDate()===diaHoy?'hoy':'proximo'))};
+      }).filter(Boolean)
+      .sort(function(a,b){ return a.dia-b.dia; });
+  }
+  function panelAntiguedad(){
+    var aniv=aniversariosDelMes();
+    var sinFecha=PERSONAL.filter(function(p){ return p.activo!==false && !p.fechaIngreso; }).length;
+    if(!aniv.length && !sinFecha) return '';
+    var filas=aniv.slice(0,4).map(function(a){
+      var etq = a.estado==='hoy' ? '<span class="per-chip verde">&#127881; hoy</span>'
+              : a.estado==='pasado' ? '<span class="per-chip">'+a.dia+' '+MESES[new Date().getMonth()].slice(0,3)+'</span>'
+              : '<span class="per-chip azul">'+a.dia+' '+MESES[new Date().getMonth()].slice(0,3)+'</span>';
+      return '<div class="per-aniv-fila" onclick="editarPersonal(\''+esc(a.p.__id)+'\')">'
+        +avatarHtml(a.p,30,true)
+        +'<div class="per-aniv-info"><div class="per-aniv-nom">'+esc(a.p.nombre)+'</div>'
+        +'<div class="per-aniv-sub">cumple '+a.anios+(a.anios===1?' año':' años')+' de servicio</div></div>'
+        +etq+'</div>';
+    }).join('');
+    var masAniv = aniv.length>4 ? '<div class="per-aniv-mas">y '+(aniv.length-4)+' más este mes</div>' : '';
+    var cab = aniv.length
+      ? '<div class="per-panel-t">&#127874; Aniversarios de '+MESES[new Date().getMonth()]+'</div>' : '';
+    var falta = sinFecha
+      ? '<div class="per-panel-falta" onclick="perSetFiltro(\'sinfecha\')">&#9888;&#65039; '
+        +sinFecha+(sinFecha===1?' empleado activo sin fecha de ingreso':' empleados activos sin fecha de ingreso')
+        +' <span class="per-panel-ver">Ver &rsaquo;</span></div>' : '';
+    return '<div class="per-panel">'+cab+filas+masAniv+falta+'</div>';
+  }
+
   function pintarPersonal(){ var cont=document.getElementById('perList'); if(!cont)return;
     var q=((document.getElementById('perSearch')||{}).value||'').toLowerCase().trim();
     var arr=PERSONAL.filter(function(p){ if(perFiltro==='activos'&&p.activo===false)return false; if(perFiltro==='inactivos'&&p.activo!==false)return false;
+      if(perFiltro==='sinfecha'&&(p.activo===false||p.fechaIngreso))return false;
       return !q||(p.nombre||'').toLowerCase().indexOf(q)>=0||(p.noEmpleado||'').toLowerCase().indexOf(q)>=0
         ||(p.correo||'').toLowerCase().indexOf(q)>=0||(p.cargo||'').toLowerCase().indexOf(q)>=0; });
 
@@ -152,14 +193,18 @@
     var setN=function(id,n){ var e=document.getElementById(id); if(e)e.textContent=n; };
     setN('perN_todos',PERSONAL.length); setN('perN_activos',nAct); setN('perN_inactivos',nIna);
 
+    var panel=(perFiltro==='sinfecha')
+      ? '<div class="per-filtro-act">Mostrando solo <b>sin fecha de ingreso</b>'
+        +'<span class="per-filtro-x" onclick="perSetFiltro(\'todos\')">Quitar filtro</span></div>'
+      : panelAntiguedad();
     if(!arr.length){
-      cont.innerHTML='<div class="per-vacio"><div class="per-vacio-ic">&#128101;</div>'
+      cont.innerHTML=panel+'<div class="per-vacio"><div class="per-vacio-ic">&#128101;</div>'
         +'<div class="per-vacio-t">'+(q?'Sin coincidencias':'Nada por aquí')+'</div>'
         +'<div class="per-vacio-s">'+(q?'No hay empleados que coincidan con “'+esc(q)+'”.':'Agregue al primer empleado con el botón de arriba.')+'</div></div>';
       return;
     }
 
-    cont.innerHTML=arr.map(function(p){ var ina=p.activo===false;
+    cont.innerHTML=panel+arr.map(function(p){ var ina=p.activo===false;
       var fb=ina?fmtFechaISO(p.fechaBaja):'';
       // La antigüedad se congela en la fecha de baja cuando el empleado ya no labora.
       var ant=antiguedadCorta(p.fechaIngreso, ina?p.fechaBaja:'');
@@ -201,7 +246,7 @@
       totalBienes+=items.length;
       items.forEach(function(b){ totalQ+=Number(b.valor||0); });
       var head='<div class="per-tarj-h">'
-        +'<b>Tarjeta '+esc(t.numero||'(pendiente)')+' &middot; '+items.length+' bien(es)</b>'
+        +'<b>Tarjeta '+esc(t.numero||'(pendiente)')+' &middot; '+plBien(items.length)+'</b>'
         +'<span class="per-vf" onclick="openPerson(\''+t.id+'\')">Ver ficha &rsaquo;</span></div>';
       var rows=items.length?items.map(function(b){
         return '<div class="per-bien">'
@@ -213,7 +258,7 @@
       }).join(''):'<div class="per-bien-val" style="padding:4px 2px">Tarjeta sin bienes cargados.</div>';
       return head+rows;
     }).join('');
-    var resumen='<div class="per-resumen">'+totalBienes+' bien(es) en '+tarjs.length+' tarjeta(s)'
+    var resumen='<div class="per-resumen">'+plBien(totalBienes)+' en '+tarjs.length+(tarjs.length===1?' tarjeta':' tarjetas')
       +(totalQ?' &middot; Q'+totalQ.toLocaleString('es-GT',{minimumFractionDigits:2})+' en total':'')+'</div>';
     return resumen+bloques;
   }
@@ -225,10 +270,120 @@
     var n=(typeof BIENES==='object'?Object.values(BIENES):[]).filter(function(b){return ids[b.tarjetaId];}).length;
     if(!n) return '';
     var d=diasDesde(p.fechaBaja);
-    var cuando=p.fechaBaja?('Está de baja desde el '+esc(fmtFechaISO(p.fechaBaja))+(d!==null&&d>0?' ('+d+' día(s))':'')):'Está de baja (sin fecha registrada)';
+    var cuando=p.fechaBaja?('Está de baja desde el '+esc(fmtFechaISO(p.fechaBaja))+(d!==null&&d>0?' ('+d+(d===1?' día':' días')+')':'')):'Está de baja (sin fecha registrada)';
     return '<div class="per-aviso roja">'
-      +'<b>&#9888;&#65039; '+n+' bien(es) siguen a su nombre</b>'
-      +'<div class="per-aviso-s">'+cuando+'. Hay que reasignar estos bienes a otro responsable.</div></div>'; }
+      +'<b>&#9888;&#65039; '+plBien(n)+(n===1?' sigue':' siguen')+' a su nombre</b>'
+      +'<div class="per-aviso-s">'+cuando+'. Hay que reasignar estos bienes a otro responsable.</div>'
+      +((typeof puedeEditar!=='function'||puedeEditar())
+        ? '<button class="per-reasignar" onclick="perReasignar(\''+esc(p.__id)+'\')">&#8644; Reasignar '+(n===1?'este bien':'estos bienes')+'</button>' : '')
+      +'</div>'; }
+  /* ===== REASIGNACIÓN DE BIENES EN UN TOQUE =====
+     Cuando alguien causa baja, sus bienes siguen a su nombre hasta que alguien más los
+     reciba. Antes el aviso solo decía "hay que reasignar"; ahora deja hacerlo aquí mismo.
+     Se sigue el mismo camino que usa "Nueva toma" en app.js: se actualiza cada bien con
+     su nueva tarjeta y responsable, y se registra un movimiento REASIGNACION por bien,
+     para que el historial de cada bien no pierda el rastro de dónde venía. */
+  function bienesDePersonal(p){
+    var tarjs=tarjetasDePersonal(p); if(!tarjs.length) return [];
+    var ids={}; tarjs.forEach(function(t){ ids[t.id]=1; });
+    return (typeof BIENES==='object'?Object.values(BIENES):[]).filter(function(b){ return ids[b.tarjetaId]; });
+  }
+  // Tarjeta a la que llegarán los bienes. Si la persona ya tiene una, se reutiliza;
+  // si no, se crea provisional (sin número) igual que hace resolverTarjetaDestino en app.js.
+  function resolverDestino(dest){
+    var previa = (typeof buscarTarjetaPorNombre==='function') ? buscarTarjetaPorNombre(dest.nombre) : null;
+    if(previa) return Promise.resolve({id:previa.id, numero:previa.numero||''});
+    var docId = 'PEND_'+((typeof bienDocId==='function')?bienDocId(dest.nombre):normNombre(dest.nombre).replace(/[^\w-]/g,'_'));
+    var ts=firebase.firestore.FieldValue.serverTimestamp();
+    return db().collection('tarjetas').doc(docId).set({
+      numero:'', responsable:dest.nombre, empleado:dest.noEmpleado||'', correo:dest.correo||'',
+      puesto:dest.cargo||'', tipo:'INDIVIDUAL', activa:true, provisional:true,
+      creada:ts, actualizada:ts
+    },{merge:true}).then(function(){ return {id:docId, numero:''}; });
+  }
+
+  window.perReasignar=function(origenId){
+    if(typeof requiereEdicion==='function' && !requiereEdicion())return;
+    var org=PERSONAL.find(function(x){return x.__id===origenId;}); if(!org)return;
+    var bienes=bienesDePersonal(org);
+    if(!bienes.length){ toast('Esta persona ya no tiene bienes a su nombre'); return; }
+    var candidatos=PERSONAL.filter(function(x){ return x.activo!==false && x.nombre && x.__id!==origenId; })
+      .sort(function(a,b){ return (a.nombre||'').localeCompare(b.nombre||''); });
+    if(!candidatos.length){ toast('No hay empleados activos para recibir los bienes'); return; }
+    var sheet=document.getElementById('sheet'); if(!sheet){ toast('No se puede abrir el selector'); return; }
+    sheet.innerHTML='<div class="grip"></div><h3>Reasignar '+plBien(bienes.length)+'</h3>'
+      +'<div class="note">Salen de <b>'+esc(org.nombre)+'</b>. Elija quién los recibe; queda registrado el movimiento de cada bien.</div>'
+      +'<input id="perReasQ" placeholder="Buscar empleado..." oninput="perReasFiltrar()" autocomplete="off"'
+        +' style="width:100%;padding:11px;border:1.4px solid var(--linea);border-radius:9px;font-size:15px;margin-top:10px;box-sizing:border-box;background:var(--card);color:var(--ink,#1a1f26)">'
+      +'<div id="perReasLista" style="max-height:46vh;overflow:auto;margin-top:10px">'+perReasFilas(candidatos,origenId)+'</div>'
+      +'<button class="act o" onclick="closeMenu()">Cancelar</button>';
+    window.__perReasCands=candidatos; window.__perReasOrigen=origenId;
+    if(typeof showSheet==='function') showSheet();
+  };
+  function perReasFilas(arr,origenId){
+    if(!arr.length) return '<div class="per-vacio" style="padding:18px"><div class="per-vacio-s">Sin coincidencias</div></div>';
+    return arr.map(function(c){
+      return '<div class="per-card" style="margin-bottom:7px" onclick="perReasConfirmar(\''+esc(origenId)+'\',\''+esc(c.__id)+'\')">'
+        +avatarHtml(c,40,true)
+        +'<div class="per-body"><div class="per-nombre">'+esc(c.nombre)+'</div>'
+        +'<div class="per-linea">'+esc(c.cargo||'Sin cargo')+(c.noEmpleado?' · No. '+esc(c.noEmpleado):'')+'</div></div>'
+        +'<div class="per-chev">&rsaquo;</div></div>';
+    }).join('');
+  }
+  window.perReasFiltrar=function(){
+    var q=((document.getElementById('perReasQ')||{}).value||'').toLowerCase().trim();
+    var arr=(window.__perReasCands||[]).filter(function(c){
+      return !q||(c.nombre||'').toLowerCase().indexOf(q)>=0||(c.cargo||'').toLowerCase().indexOf(q)>=0||(c.noEmpleado||'').toLowerCase().indexOf(q)>=0; });
+    var cont=document.getElementById('perReasLista'); if(cont)cont.innerHTML=perReasFilas(arr,window.__perReasOrigen);
+  };
+  window.perReasConfirmar=function(origenId,destinoId){
+    var org=PERSONAL.find(function(x){return x.__id===origenId;});
+    var dst=PERSONAL.find(function(x){return x.__id===destinoId;});
+    if(!org||!dst)return;
+    var n=bienesDePersonal(org).length;
+    if(!confirm('¿Pasar '+plBien(n)+' de '+org.nombre+' a '+dst.nombre+'?\n\nSe registrará el movimiento de cada bien.')) return;
+    if(typeof closeMenu==='function') closeMenu();
+    perEjecutarReasignacion(org,dst);
+  };
+  function perEjecutarReasignacion(org,dst){
+    var bienes=bienesDePersonal(org);
+    if(!bienes.length){ toast('Ya no hay bienes que reasignar'); return; }
+    toast('Reasignando '+plBien(bienes.length)+'...');
+    resolverDestino(dst).then(function(destino){
+      var ts=firebase.firestore.FieldValue.serverTimestamp();
+      var fechaTxt=(typeof today==='function')?today():fmtFechaISO(hoyISO());
+      var quien=(typeof META==='object'&&META&&META.by)||'';
+      // Firestore admite 500 operaciones por lote y cada bien usa 2 (el bien y su
+      // movimiento), así que se parte de 200 en 200 para no pasarse.
+      var grupos=[]; for(var i=0;i<bienes.length;i+=200) grupos.push(bienes.slice(i,i+200));
+      return grupos.reduce(function(cadena,grupo){
+        return cadena.then(function(){
+          var lote=db().batch();
+          grupo.forEach(function(b){
+            var idBien=b.id||b.__id||((typeof bienDocId==='function')?bienDocId(b.codigo):b.codigo);
+            lote.set(db().collection('bienes').doc(idBien),{
+              tarjetaId:destino.id, tarjetaNumero:destino.numero||'', responsable:dst.nombre,
+              tarjetaAnteriorNumero:b.tarjetaNumero||'', responsableAnterior:b.responsable||org.nombre,
+              actualizado:ts
+            },{merge:true});
+            lote.set(db().collection('movimientos').doc(),{
+              codigo:b.codigo, tipoMovimiento:'REASIGNACION',
+              tarjetaAnteriorNumero:b.tarjetaNumero||'', responsableAnterior:b.responsable||org.nombre,
+              tarjetaNuevaNumero:destino.numero||'', responsableNuevo:dst.nombre,
+              estado:b.estado||'', ubicacion:b.ubicacion||'',
+              observaciones:'Reasignado por baja de '+org.nombre,
+              fecha:ts, fechaTxt:fechaTxt, capturadoPor:quien
+            });
+          });
+          return lote.commit();
+        });
+      },Promise.resolve()).then(function(){ return destino; });
+    }).then(function(){
+      toast('✓ '+plBien(bienes.length)+(bienes.length===1?' pasó a ':' pasaron a ')+dst.nombre);
+      cargarPersonal(function(){ editarPersonal(org.__id); });
+    }).catch(function(e){ console.error(e); toast('No se pudo reasignar (revise conexión)'); });
+  }
+
   window.editarPersonal=function(id){ var p=id?PERSONAL.find(function(x){return x.__id===id;}):{renglon:'011',cargo:'',noEmpleado:'',nombre:'',dpi:'',correo:'',activo:true,fechaIngreso:'',fechaBaja:''}; if(!p)return;
     perFotoActual=p.foto||'';
     var view=document.getElementById('view');
