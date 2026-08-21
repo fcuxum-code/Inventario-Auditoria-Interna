@@ -13,7 +13,7 @@
      modo sin conexión y encolar sus peticiones aquí solo estorbaría.
    El nombre del caché lleva versión: al cambiarla se borra el anterior. */
 
-var VERSION = "v53";
+var VERSION = "v54";
 var CACHE = "inventario-ai-" + VERSION;
 
 // Rutas relativas para que funcione sin importar la carpeta donde se publique.
@@ -26,6 +26,7 @@ var APP_SHELL = [
   "./css/styles.css",
   "./css/ui-redesign.css",
   "./css/tema.css",
+  "./css/personal.css",
   "./js/icons.js",
   "./js/app.js",
   "./js/personal-module.js",
