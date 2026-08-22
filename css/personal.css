@@ -226,3 +226,26 @@
 }
 .per-filtro-act b{ color:var(--amar); }
 .per-filtro-act .per-filtro-x{ margin-left:auto; color:var(--azul2); font-weight:700; cursor:pointer; white-space:nowrap; }
+
+/* Fila de acciones: Agregar + Importar */
+.per-acc{ display:flex; gap:8px; margin-bottom:12px; }
+.per-acc .per-add{ flex:1; margin-bottom:0; }
+.per-import{
+  flex:0 0 auto; padding:0 14px; border-radius:12px; cursor:pointer;
+  border:1px solid var(--linea); background:var(--card); color:var(--titulo);
+  font-weight:700; font-size:13.5px; display:inline-flex; align-items:center; gap:6px;
+  transition:background .16s ease, transform .13s ease;
+}
+.per-import:hover{ background:var(--hoverbg); }
+.per-import:active{ transform:scale(.98); }
+
+/* Botones de ubicación física del empleado */
+.per-ubicgrp{ display:flex; flex-wrap:wrap; gap:7px; margin-top:3px; }
+.per-ubicbtn{
+  flex:1 1 44%; padding:10px 8px; border-radius:10px; cursor:pointer;
+  border:1.6px solid var(--linea); background:var(--card); color:var(--ink,#333);
+  font-weight:700; font-size:12.5px; text-align:center;
+  transition:background .14s ease, border-color .14s ease, color .14s ease, transform .12s ease;
+}
+.per-ubicbtn:active{ transform:scale(.97); }
+.per-ubicbtn.sel{ background:var(--azul); border-color:var(--azul); color:#fff; }
