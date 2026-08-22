@@ -154,6 +154,11 @@
   .e-regular.sel{background:#B08900; border-color:#B08900; color:#fff;}
   .e-malo.sel{background:var(--naranja); border-color:var(--naranja); color:#fff;}
   .e-baja.sel{background:var(--rojo); border-color:var(--rojo); color:#fff;}
+  /* Botones de ubicación (Responsables y Nueva toma): 2 por fila, se marcan al tocar */
+  .bgrp.ubic{flex-wrap:wrap; gap:7px;}
+  .btn.ubicbtn{flex:1 1 44%; font-size:12.5px; padding:10px 8px;}
+  .btn.ubicbtn.sel{background:var(--azul); border-color:var(--azul); color:#fff;}
+  .ubicro{font-size:14px; color:var(--ink,#333); padding:4px 0; font-weight:600;}
   /* fila foto + extra */
   .tools{display:flex; gap:8px; align-items:center; margin-top:9px; flex-wrap:wrap;}
   .moretog{font-size:12.5px; color:var(--azul2); font-weight:600;}

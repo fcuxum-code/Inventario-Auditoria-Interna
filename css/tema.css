@@ -177,3 +177,22 @@
     color-scheme: light;
   }
 }
+
+/* ===== FIX: color de los botones SELECCIONADOS en modo oscuro =====
+   El override de arriba ".btn{background:var(--card)}" (para que los botones normales
+   se vean bien en oscuro) tenía la misma especificidad que las reglas ".sel" y, al
+   cargar después, las tapaba: en oscuro el estado elegido (SÍ/NO, Bueno/Regular/Malo/
+   Baja y la Ubicación) salía gris como si NADA estuviera seleccionado. Aquí se vuelve a
+   afirmar el color del seleccionado, con especificidad suficiente para ganar. */
+[data-theme="dark"] .btn.b-si.sel,   [data-theme="dark"] .btn.e-bueno.sel { background:var(--verde);   border-color:var(--verde);   color:#fff; }
+[data-theme="dark"] .btn.b-no.sel,   [data-theme="dark"] .btn.e-baja.sel  { background:var(--rojo);    border-color:var(--rojo);    color:#fff; }
+[data-theme="dark"] .btn.b-nu.sel,   [data-theme="dark"] .btn.e-malo.sel  { background:var(--naranja); border-color:var(--naranja); color:#fff; }
+[data-theme="dark"] .btn.e-regular.sel { background:#B08900; border-color:#B08900; color:#fff; }
+[data-theme="dark"] .btn.ubicbtn.sel   { background:var(--azul); border-color:var(--azul); color:#fff; }
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .btn.b-si.sel,   :root:not([data-theme="light"]) .btn.e-bueno.sel { background:var(--verde);   border-color:var(--verde);   color:#fff; }
+  :root:not([data-theme="light"]) .btn.b-no.sel,   :root:not([data-theme="light"]) .btn.e-baja.sel  { background:var(--rojo);    border-color:var(--rojo);    color:#fff; }
+  :root:not([data-theme="light"]) .btn.b-nu.sel,   :root:not([data-theme="light"]) .btn.e-malo.sel  { background:var(--naranja); border-color:var(--naranja); color:#fff; }
+  :root:not([data-theme="light"]) .btn.e-regular.sel { background:#B08900; border-color:#B08900; color:#fff; }
+  :root:not([data-theme="light"]) .btn.ubicbtn.sel   { background:var(--azul); border-color:var(--azul); color:#fff; }
+}
