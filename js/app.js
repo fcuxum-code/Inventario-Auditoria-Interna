@@ -760,7 +760,8 @@ function itemCard(b, showOwner, extraChip){
       +(!soloLectura && b.esNuevo?'<span class="moretog" style="color:var(--rojo)" onclick="borrarBien(\''+id+'\')">'+icon('trash',13)+' Borrar</span>':'')
     +'</div>'
     +'<div class="extra'+(_extraAbiertos.has(id)?" open":"")+'" id="ex_'+id+'">'
-      +'<label>Ubicación física real</label><input type="text" value="'+esc(b.ubicacion||"")+'" '+(soloLectura?'readonly':'onchange="markCampo(\''+id+'\',\'ubicacion\',this.value)"')+' placeholder="Ej. Oficina 3">'
+      +'<label>Ubicación física</label>'
+      +(soloLectura ? '<div class="ubicro">'+esc(b.ubicacion||"—")+'</div>' : ubicBotones(b.ubicacion,'markUbic',id))
       +'<label>Observaciones</label><input type="text" value="'+esc(b.observaciones||"")+'" '+(soloLectura?'readonly':'onchange="markCampo(\''+id+'\',\'observaciones\',this.value)"')+' placeholder="Ej. sin serie visible">'
     +'</div>'
     +(b.fechaVerificacion?'<div class="stamp">✓ '+esc(b.fechaVerificacion)+(b.verificadoPor?" · "+esc(b.verificadoPor):"")+'</div>':'')
@@ -843,6 +844,28 @@ function markCampo(id,campo,val){
   if(!requiereEdicion()) return;
   const patch={actualizado: firebase.firestore.FieldValue.serverTimestamp()}; patch[campo]=val;
   db.collection("bienes").doc(id).update(patch).catch(function(){ toast("No se pudo guardar"); });
+}
+/* Botones para elegir la ubicación de la lista estándar (LOCS). Se usan igual en la
+   verificación de un bien (Responsables) y en Nueva toma, para que la ubicación se
+   escoja siempre de las mismas opciones y quede marcada al tocar (no como texto libre,
+   que en móvil no daba sensación de "seleccionado"). Si un bien trae una ubicación
+   antigua que ya no está en la lista, se conserva como botón para no perderla. */
+function ubicBotones(actual, handler, arg){
+  const a = (actual||"").trim();
+  const vals = LOCS.slice();
+  if(a && vals.indexOf(a) < 0) vals.unshift(a);
+  return '<div class="bgrp ubic">' + vals.map(function(L){
+    const jl = String(L).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+    return '<button type="button" class="btn ubicbtn '+(a===L?"sel":"")+'" onclick="'+handler+'(\''+arg+'\',\''+jl+'\')">'+esc(L)+'</button>';
+  }).join("") + '</div>';
+}
+function markUbic(id,val){
+  if(!requiereEdicion()) return;
+  const b = BIENES[id]; if(!b) return;
+  const nuevo = b.ubicacion===val ? "" : val;   // tocar la ya elegida la quita
+  db.collection("bienes").doc(id).update({ubicacion:nuevo, actualizado: firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){ toast("No se pudo guardar"); });
+  b.ubicacion = nuevo;
+  if(repintarBienEnLista(id)) _pintadosLocal.add(id); else renderPronto();
 }
 function logMovimiento(b, extra){
   const rec = Object.assign({
@@ -1437,7 +1460,7 @@ function sesItemDeBien(b){
   return { iid: "i"+Date.now()+Math.random().toString(36).slice(2,7), codigo: b.codigo,
     desc: b.descripcion||"", valor: b.valor||0, esNuevo:false, estabaPendiente:false,
     origenTarjetaId: b.tarjetaId||null, origenTarjetaNumero: b.tarjetaNumero||"", origenResponsable: b.responsable||"",
-    tipoOrig: b.tipo||"INDIVIDUAL", estado: b.estado||"", obs: b.observaciones||"",
+    tipoOrig: b.tipo||"INDIVIDUAL", estado: b.estado||"", obs: b.observaciones||"", ubic: b.ubicacion||"",
     preexistente:true, tiene:true, foto:0, fotoUrl: b.fotoUrl||undefined };
 }
 function pickTarjeta(id){
@@ -1540,6 +1563,7 @@ function addInv(){
     tipoOrig: existing? existing.tipo : "INDIVIDUAL",
     estado: existing? (existing.estado||"") : "",
     obs: existing? (existing.observaciones||"") : "",
+    ubic: existing? (existing.ubicacion||"") : "",
     foto:0 };
   curSes.items.unshift(item);
   el.value=""; renderSesItems(); el.focus();
@@ -1598,7 +1622,10 @@ function sesItemCard(it){
        +(it.fotoUrl?'<a class="drivefoto" href="'+it.fotoUrl+'" target="_blank" rel="noopener"><img class="dthumb" src="'+driveThumbUrl(it.fotoUrl)+'" loading="lazy" alt="foto">🖼️ Ver foto</a>':'')
       +(it.preexistente?'':'<span class="moretog" style="color:var(--rojo)" onclick="delSesItem(\''+it.iid+'\')">'+icon('trash',13)+' Quitar</span>')
     +'</div>'
-    +'<div class="extra open" style="margin-top:8px"><input type="text" value="'+esc(it.obs||"")+'" oninput="sesItemObs(\''+it.iid+'\',this.value)" placeholder="Observación (opcional)"></div>';
+    +'<div class="extra open" style="margin-top:8px">'
+      +'<label>Ubicación física</label>'+ubicBotones(it.ubic,'sesItemUbic',it.iid)
+      +'<label>Observación</label><input type="text" value="'+esc(it.obs||"")+'" oninput="sesItemObs(\''+it.iid+'\',this.value)" placeholder="Observación (opcional)">'
+    +'</div>';
   }
   return '<div class="item'+(yaNo?' yano':'')+'" style="border-left-color:'+(it.esNuevo?"#B5651D":(yaNo?"#B23B3B":"#1F3864"))+'">'
     +'<div class="itop"><span class="inv">'+esc(it.codigo)+'</span></div>'
@@ -1613,6 +1640,7 @@ function sesItemCard(it){
 function sesItemTiene(iid,val){ const it=curSes.items.find(function(x){return x.iid===iid;}); if(!it) return; it.tiene = (val!==false); renderSesItems(); }
 function sesItemEstado(iid,val){ const it=curSes.items.find(function(x){return x.iid===iid;}); if(!it) return; it.estado = it.estado===val?"":val; renderSesItems(); }
 function sesItemObs(iid,val){ const it=curSes.items.find(function(x){return x.iid===iid;}); if(it) it.obs=val; }
+function sesItemUbic(iid,val){ const it=curSes.items.find(function(x){return x.iid===iid;}); if(!it) return; it.ubic = (it.ubic===val? "" : val); renderSesItems(); }
 function sesItemDesc(iid,val){ const it=curSes.items.find(function(x){return x.iid===iid;}); if(it) it.desc=val; }
 function delSesItem(iid){ curSes.items = curSes.items.filter(function(x){return x.iid!==iid;}); fotoDel("A"+iid); renderSesItems(); }
 function tarjetaDocId(numero){ return (numero && String(numero).trim()) ? bienDocId(numero) : null; }
@@ -1662,6 +1690,7 @@ function saveSession(){
   resolverTarjetaDestino(s).then(function(dest){
     const batch = db.batch();
     const nowTxt = today();
+    const subirPendientes = [];   // fotos que aún no tienen URL de Drive al momento de guardar
     if(s.firmaB64){
       batch.set(db.collection("tarjetas").doc(dest.id), {firmaRecibida:true, firmaFecha:nowTxt, firmaPersona:s.persona}, {merge:true});
     }
@@ -1704,15 +1733,17 @@ function saveSession(){
         responsableAnterior: huboTraslado? (it.origenResponsable||"") : "",
         actualizado: firebase.firestore.FieldValue.serverTimestamp()
       };
+      if(it.ubic) datosBien.ubicacion = it.ubic;   // ubicación elegida en la toma
       if(tieneFoto) datosBien.fotoBien = 1;
       if(it.fotoUrl) datosBien.fotoUrl = it.fotoUrl;
+      else if(tieneFoto) subirPendientes.push({cn:cn, name: it.fotoName||("BIEN_"+sanit(it.codigo)+".jpg"), it: it});
       batch.set(ref, datosBien, {merge:true});
       const movRef = db.collection("movimientos").doc();
       batch.set(movRef, {
         codigo: it.codigo, tipoMovimiento: it.esNuevo?"HALLAZGO_ASIGNADO":"REASIGNACION",
         tarjetaAnteriorNumero: it.origenTarjetaNumero||"", responsableAnterior: it.origenResponsable||"",
         tarjetaNuevaNumero: dest.numero||"", responsableNuevo: s.persona,
-        estado: it.estado||"", ubicacion: (BIENES[cn]&&BIENES[cn].ubicacion)||"", observaciones: it.obs||"",
+        estado: it.estado||"", ubicacion: it.ubic || (BIENES[cn]&&BIENES[cn].ubicacion)||"", observaciones: it.obs||"",
         fecha: firebase.firestore.FieldValue.serverTimestamp(), fechaTxt: nowTxt, capturadoPor: META.by||""
       });
       // Mover la foto de la toma (clave temporal) a la clave permanente del bien, para que no se pierda al ver el bien después
@@ -1725,7 +1756,19 @@ function saveSession(){
         }).catch(function(){});
       }
     });
-    return batch.commit().then(function(){ return dest; });
+    return batch.commit().then(function(){
+      // La cámara sube a Drive en segundo plano; si la toma se guardó antes de que
+      // terminara, el bien quedaría sin fotoUrl. Aquí se completa: se sube (o se reusa
+      // la URL ya lista) y se escribe el enlace de Drive en el bien.
+      subirPendientes.forEach(function(pf){
+        if(pf.it && pf.it.fotoUrl){ db.collection("bienes").doc(pf.cn).update({fotoUrl:pf.it.fotoUrl}).catch(function(){}); return; }
+        const enviar = function(b64){ if(!b64) return; subirFoto(pf.name,b64).then(function(url){
+          if(url){ if(pf.it) pf.it.fotoUrl=url; db.collection("bienes").doc(pf.cn).update({fotoUrl:url}).catch(function(){}); } }); };
+        if(pf.it && pf.it.fotoB64) enviar(pf.it.fotoB64);
+        else fotoGet("B"+pf.cn).then(function(r){ enviar(r&&r.b64); }).catch(function(){});
+      });
+      return dest;
+    });
   }).then(function(dest){
     if(s.firmaB64){
       const nombreFirma = "FIRMA_"+sanit(s.persona)+"_"+dest.id+".jpg";
@@ -1764,7 +1807,7 @@ function notificarPersona(s, numeroReal){
   const conFoto = fotoPromesas.length;
   return Promise.all(fotoPromesas).then(function(fotos){
     const payload = { type:"notificar", correo:s.correo, persona:s.persona, tarjeta:numeroReal||"(pendiente)",
-      ubicacion:s.loc, fecha: today(), capturadoPor: META.by||"", detalle: detalle, items: itemsMail,
+      ubicacion:(s.items.find(function(it){return it.ubic;})||{}).ubic||s.loc||"", fecha: today(), capturadoPor: META.by||"", detalle: detalle, items: itemsMail,
       fotos: fotos.filter(Boolean) };
     return fetch(META.gsUrl, {method:"POST", body: JSON.stringify(payload)});
   }).then(function(r){
