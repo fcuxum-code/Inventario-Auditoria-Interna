@@ -93,6 +93,127 @@
     });
   };
   window.perFotoQuitar=function(){ perFotoActual=''; pintarPreviewFoto(); };
+  // ---- Ubicación física de la persona (dónde se encuentra) ----
+  // Se reusan las mismas opciones que el resto de la app (LOCS de app.js) para que
+  // coincidan con la ubicación de los bienes; con respaldo por si aún no cargó app.js.
+  var LOCS_PER = (typeof LOCS!=='undefined' && LOCS && LOCS.length) ? LOCS : ["Oficinas Centrales","Anexo C.C. z.4","Anexo Torre Café","Archivo General"];
+  var perUbicActual='';
+  function ubicBotonesPer(actual){
+    var a=(actual||'').trim();
+    var vals=LOCS_PER.slice();
+    if(a && vals.indexOf(a)<0) vals.unshift(a);   // conserva un valor no estándar
+    return vals.map(function(L){
+      var jl=String(L).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      return '<button type="button" class="per-ubicbtn'+(a===L?' sel':'')+'" onclick="perSetUbic(\''+jl+'\')">'+esc(L)+'</button>';
+    }).join('');
+  }
+  window.perSetUbic=function(val){
+    perUbicActual = (perUbicActual===val ? '' : val);   // volver a tocar la misma la quita
+    var wrap=document.getElementById('pf_ubicWrap'); if(wrap) wrap.innerHTML=ubicBotonesPer(perUbicActual);
+  };
+  /* ===== IMPORTAR PERSONAL DESDE EXCEL =====
+     Reconoce las columnas No. Empleado / Nombre / Renglón / Cargo / DPI / Ubicación (en
+     cualquier orden) y crea o actualiza los empleados. Se usa MERGE para no borrar datos
+     ya cargados (foto, fecha de ingreso, situación laboral); solo refresca los campos del
+     archivo. No da de baja a nadie. */
+  function normHdr(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
+  function hallarCol(hdr, incluye){
+    for(var i=0;i<hdr.length;i++){ var h=normHdr(hdr[i]); for(var j=0;j<incluye.length;j++){ if(h.indexOf(incluye[j])>=0) return i; } }
+    return -1;
+  }
+  window.perImportarExcel=function(){
+    if(typeof requiereEdicion==='function' && !requiereEdicion())return;
+    var inp=document.createElement('input'); inp.type='file'; inp.accept='.xlsx,.xls,.csv'; inp.style.display='none';
+    document.body.appendChild(inp);
+    inp.onchange=function(){
+      var f=inp.files&&inp.files[0]; if(!f){ document.body.removeChild(inp); return; }
+      var listo = (typeof cargarLectorExcel==='function') ? cargarLectorExcel() : Promise.resolve(typeof XLSX!=='undefined');
+      listo.then(function(){
+        if(typeof XLSX==='undefined'){ toast('No se pudo cargar el lector de Excel (revise conexión)'); return; }
+        var rd=new FileReader();
+        rd.onload=function(e){
+          try{
+            var wb=XLSX.read(e.target.result,{type:'array'});
+            var ws=wb.Sheets[wb.SheetNames[0]];
+            var filas=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+            perProcesarFilas(filas);
+          }catch(err){ console.error(err); toast('No se pudo leer el archivo: '+(err.message||err)); }
+          finally{ if(inp.parentNode) document.body.removeChild(inp); }
+        };
+        rd.onerror=function(){ toast('No se pudo leer el archivo'); if(inp.parentNode) document.body.removeChild(inp); };
+        rd.readAsArrayBuffer(f);
+      });
+    };
+    inp.click();
+  };
+  function perProcesarFilas(filas){
+    if(!filas || !filas.length){ toast('El archivo no tiene filas'); return; }
+    // Buscar la fila de encabezados (la que tiene Nombre y No. de empleado)
+    var hi=-1, hdr=null;
+    for(var i=0;i<Math.min(filas.length,15);i++){
+      var fila=filas[i]||[];
+      var tieneNom=fila.some(function(c){return normHdr(c).indexOf('nombre')>=0;});
+      var tieneEmp=fila.some(function(c){return normHdr(c).indexOf('emplead')>=0;});
+      if(tieneNom&&tieneEmp){ hi=i; hdr=fila; break; }
+    }
+    if(hi<0){ toast('No encontré columnas de Nombre y No. de empleado en el archivo'); return; }
+    var cEmp=hallarCol(hdr,['emplead']), cNom=hallarCol(hdr,['nombre']),
+        cRen=hallarCol(hdr,['rengl']), cCar=hallarCol(hdr,['cargo']),
+        cDpi=hallarCol(hdr,['dpi']), cUbi=hallarCol(hdr,['ubicac']);
+    var val=function(fila,idx){ return idx>=0 ? String(fila[idx]==null?'':fila[idx]).trim() : ''; };
+    var existentesId={}; PERSONAL.forEach(function(x){ existentesId[x.__id]=1; if(x.noEmpleado) existentesId[String(x.noEmpleado).replace(/[^\w-]/g,'_')]=1; });
+    var upserts=[], nuevos=0, actualizados=0, omitidos=0, vistos={}, porUbic={};
+    for(var r=hi+1;r<filas.length;r++){
+      var fila=filas[r]||[];
+      var noEmp=val(fila,cEmp), nom=val(fila,cNom);
+      if(!noEmp && !nom){ continue; }               // fila vacía
+      if(!noEmp){ omitidos++; continue; }           // sin No. no se puede identificar
+      var docId=noEmp.replace(/[^\w-]/g,'_');
+      if(vistos[docId]){ continue; } vistos[docId]=1;
+      var esNuevo=!existentesId[docId];
+      if(esNuevo) nuevos++; else actualizados++;
+      var ubic=val(fila,cUbi);
+      if(ubic) porUbic[ubic]=(porUbic[ubic]||0)+1;
+      upserts.push({docId:docId, esNuevo:esNuevo,
+        data:{ nombre:nom, noEmpleado:noEmp, renglon:val(fila,cRen), cargo:val(fila,cCar), dpi:val(fila,cDpi), ubicacion:ubic }});
+    }
+    if(!upserts.length){ toast('No hay empleados válidos en el archivo'); return; }
+    window.__perImport=upserts;
+    var ubicTxt=Object.keys(porUbic).sort().map(function(u){ return esc(u)+': '+porUbic[u]; }).join(' · ');
+    var sheet=document.getElementById('sheet');
+    if(!sheet){ perImportConfirmar(); return; }   // sin hoja de UI, importa directo
+    sheet.innerHTML='<div class="grip"></div><h3>Confirmar importación de personal</h3>'
+      +'<div class="note">Se procesarán <b>'+upserts.length+'</b> empleado(s): <b>'+nuevos+'</b> nuevo(s) y <b>'+actualizados+'</b> que se actualizan.'
+      +(omitidos?' ('+omitidos+' fila(s) sin No. de empleado se omiten.)':'')+'</div>'
+      +(ubicTxt?'<div class="note">Por ubicación — '+ubicTxt+'</div>':'')
+      +'<div class="note">No se borra ninguna foto, fecha de ingreso ni situación laboral ya registradas; solo se refrescan nombre, cargo, renglón, DPI y ubicación.</div>'
+      +'<button class="per-guardar" style="margin-top:12px" onclick="perImportConfirmar()">Importar '+upserts.length+' empleado(s)</button>'
+      +'<button class="per-toggle" style="color:var(--gris)" onclick="if(typeof closeMenu===\'function\')closeMenu()">Cancelar</button>';
+    if(typeof showSheet==='function') showSheet();
+  }
+  window.perImportConfirmar=function(){
+    if(typeof requiereEdicion==='function' && !requiereEdicion())return;
+    var lista=window.__perImport||[]; if(!lista.length) return;
+    if(typeof closeMenu==='function') closeMenu();
+    toast('Importando '+lista.length+' empleado(s)...');
+    var ahora=new Date().toISOString();
+    var grupos=[]; for(var i=0;i<lista.length;i+=400) grupos.push(lista.slice(i,i+400));
+    grupos.reduce(function(cad,grupo){
+      return cad.then(function(){
+        var lote=db().batch();
+        grupo.forEach(function(u){
+          var d=Object.assign({},u.data,{actualizado:ahora});
+          if(u.esNuevo){ d.activo=true; d.creado=ahora; }   // los nuevos entran activos; a los existentes no se les toca la situación
+          lote.set(db().collection('personal').doc(u.docId), d, {merge:true});
+        });
+        return lote.commit();
+      });
+    },Promise.resolve()).then(function(){
+      window.__perImport=null;
+      toast('✓ Importados '+lista.length+' empleado(s)');
+      cargarPersonal(openPersonal);
+    }).catch(function(e){ console.error(e); toast('Error al importar: '+(e.message||e)); });
+  };
   function esActivo(nombre){ if(!PACTIVOS)return true; var ns=tset(nombre),ka=Object.keys(ns); if(!ka.length)return true;
     return PACTIVOS.some(function(p){ var i=0,kb=Object.keys(p); ka.forEach(function(t){if(p[t])i++;}); return (i/Math.min(ka.length,kb.length))>=0.6; }); }
   function cargarPersonal(cb){ db().collection('personal').orderBy('nombre').get().then(function(s){
@@ -130,7 +251,7 @@
         +'<div class="perTab" data-f="activos" onclick="perSetFiltro(\'activos\')">Activos <span class="per-tabn" id="perN_activos"></span></div>'
         +'<div class="perTab" data-f="inactivos" onclick="perSetFiltro(\'inactivos\')">Baja <span class="per-tabn" id="perN_inactivos"></span></div>'
       +'</div>'
-      +((typeof puedeEditar!=='function'||puedeEditar())?'<button class="per-add" onclick="editarPersonal(null)">&#65291; Agregar empleado</button>':'')
+      +((typeof puedeEditar!=='function'||puedeEditar())?'<div class="per-acc">'+'<button class="per-add" onclick="editarPersonal(null)">&#65291; Agregar empleado</button>'+'<button class="per-import" onclick="perImportarExcel()" title="Importar desde Excel">&#128228; Importar Excel</button>'+'</div>':'')
       +'<div id="perList"></div></div>';
     if(Date.now()-lastLoad>4000||!PERSONAL.length){ cargarPersonal(pintarPersonal); } else { pintarPersonal(); } };
   window.perSetFiltro=function(f){ perFiltro=f;
@@ -211,6 +332,7 @@
       var chips='';
       if(p.noEmpleado) chips+='<span class="per-chip azul">No. '+esc(p.noEmpleado)+'</span>';
       if(p.renglon)    chips+='<span class="per-chip">Renglón '+esc(p.renglon)+'</span>';
+      if(p.ubicacion)  chips+='<span class="per-chip azul" title="Ubicación física">&#128205; '+esc(p.ubicacion)+'</span>';
       if(ant)          chips+='<span class="per-chip'+(ina?'':' verde')+'" title="Antigüedad en el departamento">&#128197; '+esc(ant)+'</span>';
       if(ina)          chips+='<span class="per-chip roja">&#9679; Baja'+(fb?' '+esc(fb):'')+'</span>';
       return '<div class="per-card'+(ina?' baja':'')+'" onclick="editarPersonal(\''+esc(p.__id)+'\')">'
@@ -386,6 +508,7 @@
 
   window.editarPersonal=function(id){ var p=id?PERSONAL.find(function(x){return x.__id===id;}):{renglon:'011',cargo:'',noEmpleado:'',nombre:'',dpi:'',correo:'',activo:true,fechaIngreso:'',fechaBaja:''}; if(!p)return;
     perFotoActual=p.foto||'';
+    perUbicActual=p.ubicacion||'';
     var view=document.getElementById('view');
     function f(l,k,val,tipo,hint){
       return '<label class="per-fld"><span class="per-lbl">'+l+'</span>'
@@ -420,6 +543,8 @@
         +f('No. de empleado','noEmpleado',p.noEmpleado)
         +f('Renglón','renglon',p.renglon)
         +f('Cargo nominal','cargo',p.cargo)
+        +'<div class="per-fld"><span class="per-lbl">Ubicación física (dónde se encuentra)</span>'
+          +'<div id="pf_ubicWrap" class="per-ubicgrp">'+ubicBotonesPer(perUbicActual)+'</div></div>'
         +f('Fecha de ingreso al departamento','fechaIngreso',p.fechaIngreso,'date',hintIngreso)
       +'</div>'
       +'<div class="per-sec"><h3>&#128203; Situación laboral</h3>'
@@ -445,7 +570,7 @@
     // La baja no puede ser anterior al ingreso: dejaría una antigüedad negativa.
     if(fIng && fBaja && parseISO(fIng) && parseISO(fBaja) && parseISO(fBaja)<parseISO(fIng)){
       toast('La fecha de baja no puede ser anterior al ingreso'); return; }
-    var data={nombre:nom,noEmpleado:noEmp,renglon:g('renglon'),cargo:g('cargo'),dpi:g('dpi'),correo:g('correo'),foto:perFotoActual||'',fechaIngreso:fIng,activo:act,fechaBaja:fBaja,actualizado:new Date().toISOString()};
+    var data={nombre:nom,noEmpleado:noEmp,renglon:g('renglon'),cargo:g('cargo'),dpi:g('dpi'),correo:g('correo'),ubicacion:perUbicActual||'',foto:perFotoActual||'',fechaIngreso:fIng,activo:act,fechaBaja:fBaja,actualizado:new Date().toISOString()};
     var docId=id||noEmp.replace(/[^\w-]/g,'_'); if(!id)data.creado=new Date().toISOString();
     db().collection('personal').doc(docId).set(data,{merge:true}).then(function(){toast('Empleado guardado');cargarPersonal(openPersonal);}).catch(function(e){toast('Error al guardar');console.error(e);}); };
   function aplicarBaja(id,activo,fechaBaja){
