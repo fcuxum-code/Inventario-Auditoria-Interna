@@ -2006,11 +2006,15 @@ function cargarLectorExcel(){
   if(window.__xlsxPromesa) return window.__xlsxPromesa;
   toast("Preparando el lector de Excel…");
   window.__xlsxPromesa = new Promise(function(res){
-    const s = document.createElement("script");
-    s.src = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
-    s.onload = function(){ res(true); };
-    s.onerror = function(){ window.__xlsxPromesa = null; res(false); };
-    document.head.appendChild(s);
+    // Primero la copia local (ya está en el caché de la app, funciona sin internet);
+    // si por algún motivo falta, se recurre al CDN.
+    function cargar(src, respaldo){
+      const s = document.createElement("script"); s.src = src;
+      s.onload = function(){ res(true); };
+      s.onerror = function(){ if(respaldo){ cargar(respaldo, null); } else { window.__xlsxPromesa = null; res(false); } };
+      document.head.appendChild(s);
+    }
+    cargar("js/vendor/xlsx-js-style.min.js", "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js");
   });
   return window.__xlsxPromesa;
 }
@@ -2174,6 +2178,7 @@ function openMenu(){
     + sec("Revisar")
     +'<div class="mitem" onclick="abrirAvanceUbicacion()"><span class="ic">'+icon('mapPin',20)+'</span><div><b>Avance por ubicación</b><small>Cuánto falta por verificar en cada lugar</small></div></div>'
     /* Discrepancias no se repite aquí: se abre desde su tarjeta en el panel de inicio. */
+    +'<div class="mitem" onclick="cotejoUbicacion()"><span class="ic">'+icon('mapPin',20)+'</span><div><b>Cotejo de ubicación</b><small>Bienes en distinto lugar que su responsable</small></div></div>'
     +'<div class="mitem" onclick="abrirActividadReciente()"><span class="ic">'+icon('clock',20)+'</span><div><b>Actividad reciente</b><small>Últimos movimientos de todos los bienes</small></div></div>'
     +'<div class="mitem" onclick="abrirAsistente()"><span class="ic">'+icon('chat',20)+'</span><div><b>Asistente del inventario</b><small>Pregunte cantidades, valores o listados en lenguaje natural</small></div></div>'
 
