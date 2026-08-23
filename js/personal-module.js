@@ -39,7 +39,7 @@
     return Math.floor((Date.now()-d.getTime())/86400000); }
   function tset(s){ var o={}; String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).forEach(function(w){ if(w&&!STOP[w])o[w]=1; }); return o; }
   // ---- Foto de empleado: se guarda como dataURL JPEG comprimido en el campo "foto" ----
-  var perFotoActual='';
+  var perFotoActual='', perFotoThumb='';
   function comprimirImagen(file,cb){
     var reader=new FileReader();
     reader.onload=function(e){
@@ -60,6 +60,21 @@
     reader.onerror=function(){ cb(null); };
     reader.readAsDataURL(file);
   }
+  // Miniatura muy liviana (~72px) para las tarjetas del listado; la foto completa se
+  // guarda aparte y solo se carga en la ficha, para que abrir Personal no baje todas
+  // las fotos en cada refresco.
+  function hacerThumb(dataUrl,cb){
+    if(!dataUrl){ cb(''); return; }
+    var img=new Image();
+    img.onload=function(){
+      var max=72,w=img.width,h=img.height;
+      if(w>h){ if(w>max){ h=Math.round(h*max/w); w=max; } } else { if(h>max){ w=Math.round(w*max/h); h=max; } }
+      try{ var c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); cb(c.toDataURL('image/jpeg',0.62)); }
+      catch(e){ cb(''); }
+    };
+    img.onerror=function(){ cb(''); };
+    img.src=dataUrl;
+  }
   function plBien(n){ return n+(n===1?' bien':' bienes'); }
   function inicialNombre(n){
     // Iniciales del nombre y del primer apellido: "JUAN PEREZ" -> "JP"
@@ -73,8 +88,9 @@
     size=size||46;
     var dot = (estado===true||estado===false)
       ? '<span class="per-dot'+(estado?'':' off')+'" title="'+(estado?'Activo':'De baja')+'"></span>' : '';
-    var inner = (p&&p.foto)
-      ? '<img class="per-av-img" src="'+esc(p.foto)+'" alt="" style="width:'+size+'px;height:'+size+'px">'
+    var _f = p && (p.fotoThumb || p.foto);
+    var inner = _f
+      ? '<img class="per-av-img" src="'+esc(_f)+'" alt="" style="width:'+size+'px;height:'+size+'px">'
       : '<div class="per-av-ini" style="width:'+size+'px;height:'+size+'px;font-size:'+Math.round(size*0.36)+'px">'+esc(inicialNombre(p&&p.nombre))+'</div>';
     return '<div class="per-avatar" style="width:'+size+'px;height:'+size+'px">'+inner+dot+'</div>';
   }
@@ -89,10 +105,10 @@
     comprimirImagen(f,function(dataUrl){
       input.value='';
       if(!dataUrl){ if(window.toast)toast('No se pudo procesar la imagen'); return; }
-      perFotoActual=dataUrl; pintarPreviewFoto();
+      perFotoActual=dataUrl; hacerThumb(dataUrl,function(t){ perFotoThumb=t||dataUrl; }); pintarPreviewFoto();
     });
   };
-  window.perFotoQuitar=function(){ perFotoActual=''; pintarPreviewFoto(); };
+  window.perFotoQuitar=function(){ perFotoActual=''; perFotoThumb=''; pintarPreviewFoto(); };
   // ---- Ubicación física de la persona (dónde se encuentra) ----
   // Se reusan las mismas opciones que el resto de la app (LOCS de app.js) para que
   // coincidan con la ubicación de los bienes; con respaldo por si aún no cargó app.js.
@@ -506,8 +522,71 @@
     }).catch(function(e){ console.error(e); toast('No se pudo reasignar (revise conexión)'); });
   }
 
+  /* ===== COTEJO DE UBICACIÓN: persona vs. sus bienes =====
+     Marca los bienes cuya ubicación física NO coincide con la de su responsable actual.
+     Sirve para detectar cuando la persona se movió de lugar pero sus bienes siguen
+     registrados en el sitio anterior (o al revés). Es de solo lectura. */
+  function normU(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim().toUpperCase(); }
+  window.cotejoUbicacion=function(){
+    if(typeof closeMenu==='function') closeMenu();
+    if(typeof mostrarBuscador==='function') mostrarBuscador(false);
+    (window.asegurarPersonal||function(cb){cb&&cb();})(function(){ pintarCotejo(); });
+  };
+  function pintarCotejo(){
+    var view=document.getElementById('view'); if(!view) return;
+    var grupos=[], totalDes=0, sinUbicPersona=0, revisados=0;
+    PERSONAL.filter(function(p){return p.activo!==false;}).forEach(function(p){
+      var tarjs=(typeof tarjetasDePersonal==='function')?tarjetasDePersonal(p):[];
+      if(!tarjs.length) return;
+      var ids={}; tarjs.forEach(function(t){ ids[t.id]=1; });
+      var bienes=(typeof BIENES==='object'?Object.values(BIENES):[]).filter(function(b){return ids[b.tarjetaId];});
+      if(!bienes.length) return;
+      revisados++;
+      if(!p.ubicacion){ sinUbicPersona++; return; }   // no hay referencia para comparar
+      var pu=normU(p.ubicacion);
+      var desaj=bienes.filter(function(b){ var bu=normU(b.ubicacion); return bu && bu!==pu; });
+      if(desaj.length){ totalDes+=desaj.length; grupos.push({p:p, desaj:desaj}); }
+    });
+    grupos.sort(function(a,b){ return b.desaj.length-a.desaj.length; });
+
+    var html='<div class="per-form"><button class="backbtn" onclick="goHome()">&lsaquo; Inicio</button>'
+      +'<div class="per-head"><h2>&#128205; Cotejo de ubicación</h2></div>'
+      +'<div class="per-count" style="margin:0 2px 12px">Bienes cuya ubicación física no coincide con la de su responsable.</div>';
+
+    if(!grupos.length){
+      html+='<div class="per-vacio"><div class="per-vacio-ic">&#9989;</div>'
+        +'<div class="per-vacio-t">Todo coincide</div>'
+        +'<div class="per-vacio-s">Ningún bien con ubicación quedó en un lugar distinto al de su responsable.'
+        +(sinUbicPersona?' ('+sinUbicPersona+' responsable(s) con bienes aún no tienen ubicación registrada.)':'')+'</div></div>';
+    } else {
+      html+='<div class="per-aviso roja" style="margin-top:0"><b>&#9888;&#65039; '+totalDes+' bien(es) en distinta ubicación</b>'
+        +'<div class="per-aviso-s">'+grupos.length+' responsable(s) afectado(s)'
+        +(sinUbicPersona?' &middot; '+sinUbicPersona+' sin ubicación registrada':'')+'</div></div>';
+      html+=grupos.map(function(g){
+        var filas=g.desaj.sort(function(a,b){return (a.codigo||'').localeCompare(b.codigo||'');}).map(function(b){
+          return '<div class="per-bien" style="cursor:pointer" onclick="openPerson(\''+esc(b.tarjetaId)+'\')">'
+            +'<div class="per-bien-h"><span class="per-bien-cod">'+esc(b.codigo)+'</span>'
+            +'<span class="per-vf">Ver ficha &rsaquo;</span></div>'
+            +(b.descripcion?'<div class="per-bien-desc">'+esc(b.descripcion)+'</div>':'')
+            +'<div class="per-cotejo-l"><span class="per-chip roja">Bien: '+esc(b.ubicacion)+'</span>'
+            +'<span class="per-cotejo-flecha">&rarr;</span>'
+            +'<span class="per-chip verde">Responsable: '+esc(g.p.ubicacion)+'</span></div>'
+          +'</div>';
+        }).join('');
+        return '<div class="per-sec" style="border-top:none;padding-top:0;margin-top:16px">'
+          +'<div class="per-tarj-h" onclick="editarPersonal(\''+esc(g.p.__id)+'\')" style="cursor:pointer">'
+            +'<b>'+esc(g.p.nombre)+' &middot; '+g.desaj.length+' bien(es)</b>'
+            +'<span class="per-vf">'+esc(g.p.ubicacion)+' &rsaquo;</span></div>'
+          +filas+'</div>';
+      }).join('');
+    }
+    html+='</div>';
+    view.innerHTML=html; window.scrollTo(0,0);
+  }
+
   window.editarPersonal=function(id){ var p=id?PERSONAL.find(function(x){return x.__id===id;}):{renglon:'011',cargo:'',noEmpleado:'',nombre:'',dpi:'',correo:'',activo:true,fechaIngreso:'',fechaBaja:''}; if(!p)return;
     perFotoActual=p.foto||'';
+    perFotoThumb=p.fotoThumb||'';
     perUbicActual=p.ubicacion||'';
     var view=document.getElementById('view');
     function f(l,k,val,tipo,hint){
@@ -557,7 +636,21 @@
       +(id?'<button class="per-toggle" onclick="togglePersonal(\''+id+'\','+act+')">'+(act?'Marcar INACTIVO (ya no labora)':'Reactivar empleado')+'</button>':'')
       +(id?avisoBajaPendiente(p):'')
       +(id?'<div class="per-sec"><h3>&#128230; Bienes asignados</h3>'+bienesAsignadosHtml(p)+'</div>':'')
-      +'</div>'; };
+      +'</div>';
+    // Foto completa: si el empleado ya existe y su foto vive aparte, se trae para la
+    // vista previa; y si viene de un registro viejo (foto embebida sin miniatura), se
+    // genera la miniatura para migrarlo al guardar.
+    if(id){
+      if(!perFotoActual && (p.tieneFoto || p.fotoThumb)){
+        db().collection('personalFoto').doc(id).get().then(function(snap){
+          var full=snap&&snap.exists?(snap.data().foto||''):'';
+          if(full){ perFotoActual=full; if(!perFotoThumb){ hacerThumb(full,function(t){perFotoThumb=t||'';}); } pintarPreviewFoto(); }
+        }).catch(function(){});
+      } else if(perFotoActual && !perFotoThumb){
+        hacerThumb(perFotoActual,function(t){ perFotoThumb=t||''; });
+      }
+    }
+  };
   window.guardarPersonal=function(id){ if(typeof requiereEdicion==='function' && !requiereEdicion())return;
     var g=function(k){var el=document.getElementById('pf_'+k);return el?el.value.trim():'';};
     var noEmp=g('noEmpleado'),nom=g('nombre'); if(!nom){toast('El nombre es obligatorio');return;} if(!noEmp){toast('El No. de empleado es obligatorio');return;}
@@ -570,9 +663,14 @@
     // La baja no puede ser anterior al ingreso: dejaría una antigüedad negativa.
     if(fIng && fBaja && parseISO(fIng) && parseISO(fBaja) && parseISO(fBaja)<parseISO(fIng)){
       toast('La fecha de baja no puede ser anterior al ingreso'); return; }
-    var data={nombre:nom,noEmpleado:noEmp,renglon:g('renglon'),cargo:g('cargo'),dpi:g('dpi'),correo:g('correo'),ubicacion:perUbicActual||'',foto:perFotoActual||'',fechaIngreso:fIng,activo:act,fechaBaja:fBaja,actualizado:new Date().toISOString()};
+    var data={nombre:nom,noEmpleado:noEmp,renglon:g('renglon'),cargo:g('cargo'),dpi:g('dpi'),correo:g('correo'),ubicacion:perUbicActual||'',
+      fotoThumb:perFotoThumb||'', tieneFoto:!!perFotoActual, foto:'',   // la foto completa va en 'personalFoto'; 'foto' se limpia por peso
+      fechaIngreso:fIng,activo:act,fechaBaja:fBaja,actualizado:new Date().toISOString()};
     var docId=id||noEmp.replace(/[^\w-]/g,'_'); if(!id)data.creado=new Date().toISOString();
-    db().collection('personal').doc(docId).set(data,{merge:true}).then(function(){toast('Empleado guardado');cargarPersonal(openPersonal);}).catch(function(e){toast('Error al guardar');console.error(e);}); };
+    db().collection('personal').doc(docId).set(data,{merge:true}).then(function(){
+      db().collection('personalFoto').doc(docId).set({foto:perFotoActual||''},{merge:true}).catch(function(){});
+      toast('Empleado guardado'); cargarPersonal(openPersonal);
+    }).catch(function(e){toast('Error al guardar');console.error(e);}); };
   function aplicarBaja(id,activo,fechaBaja){
     return db().collection('personal').doc(id).set({activo:activo,fechaBaja:fechaBaja,actualizado:new Date().toISOString()},{merge:true})
       .then(function(){ toast(activo?'Reactivado':('Marcado de baja'+(fechaBaja?' el '+fmtFechaISO(fechaBaja):'')));cargarPersonal(openPersonal); })

@@ -349,8 +349,10 @@
       { h:"Nombre", w:34, get:function(p){ return p.nombre||""; } },
       { h:"Renglón", w:10, get:function(p){ return p.renglon||""; } },
       { h:"Cargo nominal", w:28, get:function(p){ return p.cargo||""; } },
+      { h:"Ubicación", w:20, get:function(p){ return p.ubicacion||""; } },
       { h:"DPI", w:16, get:function(p){ return p.dpi||""; } },
       { h:"Correo", w:28, get:function(p){ return p.correo||""; } },
+      { h:"Fecha de ingreso", w:15, tipo:"fecha", get:function(p){ return aFechaISO(p.fechaIngreso) || ""; } },
       { h:"Situación", w:12, get:function(p){ return p.activo===false ? "Baja" : "Activo"; } },
       { h:"Fecha de baja", w:14, tipo:"fecha", get:function(p){ return aFechaISO(p.fechaBaja) || ""; } }
     ];
