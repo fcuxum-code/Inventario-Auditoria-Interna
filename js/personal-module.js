@@ -522,68 +522,6 @@
     }).catch(function(e){ console.error(e); toast('No se pudo reasignar (revise conexión)'); });
   }
 
-  /* ===== COTEJO DE UBICACIÓN: persona vs. sus bienes =====
-     Marca los bienes cuya ubicación física NO coincide con la de su responsable actual.
-     Sirve para detectar cuando la persona se movió de lugar pero sus bienes siguen
-     registrados en el sitio anterior (o al revés). Es de solo lectura. */
-  function normU(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim().toUpperCase(); }
-  window.cotejoUbicacion=function(){
-    if(typeof closeMenu==='function') closeMenu();
-    if(typeof mostrarBuscador==='function') mostrarBuscador(false);
-    (window.asegurarPersonal||function(cb){cb&&cb();})(function(){ pintarCotejo(); });
-  };
-  function pintarCotejo(){
-    var view=document.getElementById('view'); if(!view) return;
-    var grupos=[], totalDes=0, sinUbicPersona=0, revisados=0;
-    PERSONAL.filter(function(p){return p.activo!==false;}).forEach(function(p){
-      var tarjs=(typeof tarjetasDePersonal==='function')?tarjetasDePersonal(p):[];
-      if(!tarjs.length) return;
-      var ids={}; tarjs.forEach(function(t){ ids[t.id]=1; });
-      var bienes=(typeof BIENES==='object'?Object.values(BIENES):[]).filter(function(b){return ids[b.tarjetaId];});
-      if(!bienes.length) return;
-      revisados++;
-      if(!p.ubicacion){ sinUbicPersona++; return; }   // no hay referencia para comparar
-      var pu=normU(p.ubicacion);
-      var desaj=bienes.filter(function(b){ var bu=normU(b.ubicacion); return bu && bu!==pu; });
-      if(desaj.length){ totalDes+=desaj.length; grupos.push({p:p, desaj:desaj}); }
-    });
-    grupos.sort(function(a,b){ return b.desaj.length-a.desaj.length; });
-
-    var html='<div class="per-form"><button class="backbtn" onclick="goHome()">&lsaquo; Inicio</button>'
-      +'<div class="per-head"><h2>&#128205; Cotejo de ubicación</h2></div>'
-      +'<div class="per-count" style="margin:0 2px 12px">Bienes cuya ubicación física no coincide con la de su responsable.</div>';
-
-    if(!grupos.length){
-      html+='<div class="per-vacio"><div class="per-vacio-ic">&#9989;</div>'
-        +'<div class="per-vacio-t">Todo coincide</div>'
-        +'<div class="per-vacio-s">Ningún bien con ubicación quedó en un lugar distinto al de su responsable.'
-        +(sinUbicPersona?' ('+sinUbicPersona+' responsable(s) con bienes aún no tienen ubicación registrada.)':'')+'</div></div>';
-    } else {
-      html+='<div class="per-aviso roja" style="margin-top:0"><b>&#9888;&#65039; '+totalDes+' bien(es) en distinta ubicación</b>'
-        +'<div class="per-aviso-s">'+grupos.length+' responsable(s) afectado(s)'
-        +(sinUbicPersona?' &middot; '+sinUbicPersona+' sin ubicación registrada':'')+'</div></div>';
-      html+=grupos.map(function(g){
-        var filas=g.desaj.sort(function(a,b){return (a.codigo||'').localeCompare(b.codigo||'');}).map(function(b){
-          return '<div class="per-bien" style="cursor:pointer" onclick="openPerson(\''+esc(b.tarjetaId)+'\')">'
-            +'<div class="per-bien-h"><span class="per-bien-cod">'+esc(b.codigo)+'</span>'
-            +'<span class="per-vf">Ver ficha &rsaquo;</span></div>'
-            +(b.descripcion?'<div class="per-bien-desc">'+esc(b.descripcion)+'</div>':'')
-            +'<div class="per-cotejo-l"><span class="per-chip roja">Bien: '+esc(b.ubicacion)+'</span>'
-            +'<span class="per-cotejo-flecha">&rarr;</span>'
-            +'<span class="per-chip verde">Responsable: '+esc(g.p.ubicacion)+'</span></div>'
-          +'</div>';
-        }).join('');
-        return '<div class="per-sec" style="border-top:none;padding-top:0;margin-top:16px">'
-          +'<div class="per-tarj-h" onclick="editarPersonal(\''+esc(g.p.__id)+'\')" style="cursor:pointer">'
-            +'<b>'+esc(g.p.nombre)+' &middot; '+g.desaj.length+' bien(es)</b>'
-            +'<span class="per-vf">'+esc(g.p.ubicacion)+' &rsaquo;</span></div>'
-          +filas+'</div>';
-      }).join('');
-    }
-    html+='</div>';
-    view.innerHTML=html; window.scrollTo(0,0);
-  }
-
   window.editarPersonal=function(id){ var p=id?PERSONAL.find(function(x){return x.__id===id;}):{renglon:'011',cargo:'',noEmpleado:'',nombre:'',dpi:'',correo:'',activo:true,fechaIngreso:'',fechaBaja:''}; if(!p)return;
     perFotoActual=p.foto||'';
     perFotoThumb=p.fotoThumb||'';

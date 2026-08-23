@@ -250,6 +250,3 @@
 .per-ubicbtn:active{ transform:scale(.97); }
 .per-ubicbtn.sel{ background:var(--azul); border-color:var(--azul); color:#fff; }
 
-/* Cotejo de ubicación: línea "Bien X → Responsable Y" */
-.per-cotejo-l{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-top:7px; }
-.per-cotejo-flecha{ color:var(--gris2); font-weight:700; }
