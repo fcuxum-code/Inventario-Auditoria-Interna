@@ -754,7 +754,7 @@ function itemCard(b, showOwner, extraChip){
       +(soloLectura?'':'<button class="fotobtn" id="fb_B'+id+'" onclick="takePhoto(\'B'+id+'\')">'+icon('camera',15)+' Foto</button>')
       +'<img class="thumb" id="th_B'+id+'" style="display:none" onclick="viewPhoto(\'B'+id+'\')">'
        +(b.fotoUrl?'<a class="drivefoto" href="'+b.fotoUrl+'" target="_blank" rel="noopener"><img class="dthumb" src="'+driveThumbUrl(b.fotoUrl)+'" loading="lazy" alt="foto">🖼️ Ver foto</a>':'')
-      +'<span class="moretog" onclick="toggleExtra(\''+id+'\')">＋ Ubicación / observación</span>'
+      +'<span class="moretog" onclick="toggleExtra(\''+id+'\')">＋ Ficha (marca, serie…) / ubicación</span>'
       +'<span class="moretog" onclick="verHistorial(\''+id+'\')">'+icon('clock',13)+' Historial</span>'
       +(!soloLectura && b.existe==="NO" && b.tarjetaId?'<span class="moretog" style="color:var(--naranja)" onclick="descargarBien(\''+id+'\')">'+icon('logOut',13)+' Quitar de la tarjeta</span>':'')
       +(!soloLectura && b.esNuevo?'<span class="moretog" style="color:var(--rojo)" onclick="borrarBien(\''+id+'\')">'+icon('trash',13)+' Borrar</span>':'')
@@ -762,6 +762,14 @@ function itemCard(b, showOwner, extraChip){
     +'<div class="extra'+(_extraAbiertos.has(id)?" open":"")+'" id="ex_'+id+'">'
       +'<label>Ubicación física</label>'
       +(soloLectura ? '<div class="ubicro">'+esc(b.ubicacion||"—")+'</div>' : ubicBotones(b.ubicacion,'markUbic',id))
+      +'<div class="ficha2">'
+        +'<div><label>Marca</label><input type="text" value="'+esc(b.marca||"")+'" '+(soloLectura?'readonly':'onchange="markCampo(\''+id+'\',\'marca\',this.value)"')+' placeholder="Marca"></div>'
+        +'<div><label>Modelo</label><input type="text" value="'+esc(b.modelo||"")+'" '+(soloLectura?'readonly':'onchange="markCampo(\''+id+'\',\'modelo\',this.value)"')+' placeholder="Modelo"></div>'
+      +'</div>'
+      +'<div class="ficha2">'
+        +'<div><label>No. de serie</label><input type="text" value="'+esc(b.serie||"")+'" '+(soloLectura?'readonly':'onchange="markCampo(\''+id+'\',\'serie\',this.value)"')+' placeholder="No. de serie"></div>'
+        +'<div><label>Fecha de compra</label><input type="text" value="'+esc(b.fechaCompra||"")+'" '+(soloLectura?'readonly':'onchange="markCampo(\''+id+'\',\'fechaCompra\',this.value)"')+' placeholder="DD/MM/AAAA"></div>'
+      +'</div>'
       +'<label>Observaciones</label><input type="text" value="'+esc(b.observaciones||"")+'" '+(soloLectura?'readonly':'onchange="markCampo(\''+id+'\',\'observaciones\',this.value)"')+' placeholder="Ej. sin serie visible">'
     +'</div>'
     +(b.fechaVerificacion?'<div class="stamp">✓ '+esc(b.fechaVerificacion)+(b.verificadoPor?" · "+esc(b.verificadoPor):"")+'</div>':'')
@@ -1999,6 +2007,105 @@ function confirmarImportacion(){
   }
   next();
 }
+/* ===== COMPLETAR DATOS DE BIENES DESDE EXCEL =====
+   Toma un Excel con No. de inventario + Marca / Modelo / No. de serie / Fecha de compra
+   y RELLENA esos campos en los bienes que YA existen (los busca por No. de inventario).
+   No crea bienes nuevos ni pisa un dato con una celda vacía. */
+function completarBienesExcel(){
+  if(!requiereEdicion()) return;
+  cargarLectorExcel().then(function(ok){
+    if(!ok || typeof XLSX==="undefined"){ toast("No se pudo cargar el lector de Excel"); return; }
+    const inp=document.createElement("input"); inp.type="file"; inp.accept=".xlsx,.xls,.csv"; inp.style.display="none";
+    document.body.appendChild(inp);
+    inp.onchange=function(){
+      const f=inp.files&&inp.files[0]; if(!f){ document.body.removeChild(inp); return; }
+      toast("Leyendo archivo…");
+      const rd=new FileReader();
+      rd.onload=function(e){
+        try{
+          const wb=XLSX.read(e.target.result,{type:"array",cellDates:true});
+          let mejor=null;
+          wb.SheetNames.forEach(function(nom){
+            const rows=XLSX.utils.sheet_to_json(wb.Sheets[nom],{defval:""});
+            if(!rows.length) return;
+            const c=hallarColumna(rows[0],["NO_BIEN","INVENTARIO","CÓDIGO","CODIGO","NO."]);
+            if(c && (!mejor||rows.length>mejor.rows.length)) mejor={nombre:nom,rows:rows};
+          });
+          if(!mejor){ toast("No encontré una hoja con No. de inventario"); return; }
+          procesarCompletarBienes(mejor.rows, mejor.nombre, wb.SheetNames.length);
+        }catch(err){ toast("No se pudo leer el archivo: "+(err.message||err)); }
+        finally{ if(inp.parentNode) document.body.removeChild(inp); }
+      };
+      rd.onerror=function(){ toast("No se pudo leer el archivo"); if(inp.parentNode) document.body.removeChild(inp); };
+      rd.readAsArrayBuffer(f);
+    };
+    inp.click();
+  });
+}
+function _fechaCompraTxt(v){
+  if(v instanceof Date && !isNaN(v)){ return String(v.getDate()).padStart(2,"0")+"/"+String(v.getMonth()+1).padStart(2,"0")+"/"+v.getFullYear(); }
+  return String(v==null?"":v).trim();
+}
+function procesarCompletarBienes(rows, nombreHoja, totalHojas){
+  if(!rows.length){ toast("El archivo no tiene filas"); return; }
+  const h0=rows[0];
+  const colCod=hallarColumna(h0,["NO_BIEN","INVENTARIO","CÓDIGO","CODIGO","NO."]);
+  if(!colCod){ toast("No encontré la columna de No. de inventario"); return; }
+  const colMarca=hallarColumna(h0,["MARCA"]);
+  const colModelo=hallarColumna(h0,["MODELO"]);
+  const colSerie=hallarColumna(h0,["SERIE"]);
+  const colFecha=hallarColumna(h0,["FECHA DE COMPRA","FECHA COMPRA","ADQUISICION","ADQUISICIÓN","COMPRA"]);
+  if(!colMarca && !colModelo && !colSerie && !colFecha){ toast("No encontré columnas de Marca, Modelo, Serie ni Fecha de compra"); return; }
+  const updates=[]; let noExisten=0, sinDatos=0, vistos={};
+  rows.forEach(function(r){
+    const cod=String(r[colCod]==null?"":r[colCod]).trim(); if(!cod) return;
+    const id=bienDocId(cod); if(vistos[id]) return; vistos[id]=1;
+    if(!BIENES[id]){ noExisten++; return; }               // no está cargado: se omite (no se crea)
+    const patch={};
+    if(colMarca){ const v=String(r[colMarca]==null?"":r[colMarca]).trim(); if(v) patch.marca=v; }
+    if(colModelo){ const v=String(r[colModelo]==null?"":r[colModelo]).trim(); if(v) patch.modelo=v; }
+    if(colSerie){ const v=String(r[colSerie]==null?"":r[colSerie]).trim(); if(v) patch.serie=v; }
+    if(colFecha){ const v=_fechaCompraTxt(r[colFecha]); if(v) patch.fechaCompra=v; }
+    if(!Object.keys(patch).length){ sinDatos++; return; }
+    updates.push({id:id, codigo:cod, patch:patch});
+  });
+  if(!updates.length){ toast("Ningún No. de inventario del archivo coincide con bienes cargados"); return; }
+  const campos=[colMarca?"Marca":null,colModelo?"Modelo":null,colSerie?"No. de serie":null,colFecha?"Fecha de compra":null].filter(Boolean).join(", ");
+  document.getElementById("sheet").innerHTML='<div class="grip"></div><h3>Completar datos de bienes</h3>'
+    +(totalHojas>1?'<div class="note">Se leyó la hoja "<b>'+esc(nombreHoja)+'</b>".</div>':'')
+    +'<div class="note">Campos detectados: <b>'+esc(campos)+'</b>.</div>'
+    +'<div class="note">Se actualizarán <b>'+updates.length+'</b> bien(es) ya cargados.'
+    +(noExisten?('<br>'+noExisten+' No. de inventario del archivo no están en el sistema y se omiten (no se crean).'):'')
+    +(sinDatos?('<br>'+sinDatos+' fila(s) sin datos que aportar, se omiten.'):'')
+    +'<br>No se sobrescribe ningún dato con una casilla vacía.</div>'
+    +'<div style="max-height:200px;overflow:auto;border:1px solid #E2E6EC;border-radius:9px;margin-top:8px">'
+    + updates.slice(0,25).map(function(u){ var d=u.patch; return '<div style="padding:8px 10px;border-bottom:1px solid #F0F2F6;font-size:12.5px"><b>'+esc(u.codigo)+'</b> — '+esc([d.marca,d.modelo,d.serie,d.fechaCompra].filter(Boolean).join(" · "))+'</div>'; }).join("")
+    + (updates.length>25?('<div style="padding:8px 10px;font-size:12px;color:var(--gris2)">…y '+(updates.length-25)+' más</div>'):'')
+    +'</div>'
+    +'<button class="act g" onclick="confirmarCompletarBienes()">✓ Actualizar '+updates.length+' bien(es)</button>'
+    +'<button class="act o" onclick="closeMenu()">Cancelar</button>';
+  window.__completarPend=updates;
+  showSheet();
+}
+function confirmarCompletarBienes(){
+  if(!requiereEdicion()) return;
+  const ups=window.__completarPend||[]; if(!ups.length) return;
+  closeMenu();
+  toast("Actualizando "+ups.length+" bien(es)…");
+  function chunk(a,n){ const o=[]; for(let i=0;i<a.length;i+=n) o.push(a.slice(i,i+n)); return o; }
+  const chunks=chunk(ups,400); let i=0;
+  function next(){
+    if(i>=chunks.length){ toast("✓ "+ups.length+" bien(es) actualizados"); window.__completarPend=null; goHome(); return; }
+    const batch=db.batch();
+    chunks[i].forEach(function(u){
+      const patch=Object.assign({}, u.patch, {actualizado: firebase.firestore.FieldValue.serverTimestamp()});
+      batch.set(db.collection("bienes").doc(u.id), patch, {merge:true});
+    });
+    i++;
+    batch.commit().then(next).catch(function(e){ toast("Error: "+(e.message||e)); });
+  }
+  next();
+}
 /* El lector de Excel (SheetJS, ~500 KB) solo hace falta al importar, que es algo ocasional.
    Antes se bajaba en cada arranque de la app; ahora se pide en el momento. */
 function cargarLectorExcel(){
@@ -2188,6 +2295,7 @@ function openMenu(){
     +'<div class="mitem" onclick="imprimirReporteEjecutivo()"><span class="ic">'+icon('clipboardCheck',20)+'</span><div><b>Reporte ejecutivo (PDF)</b><small>Resumen de una página: avance, diferencias y carga al AS-400</small></div></div>'
     +'<div class="mitem" onclick="generarExcel()"><span class="ic">'+icon('barChart',20)+'</span><div><b>Generar reporte en Excel</b><small>Resumen, bienes, discrepancias, tarjetas, personal, movimientos y hallazgos</small></div></div>'
     +'<div class="mitem" onclick="importarExcel()"><span class="ic">'+icon('upload',20)+'</span><div><b>Importar bienes nuevos desde Excel</b><small>Los crea como pendientes de asignar</small></div></div>'
+    +'<div class="mitem" onclick="completarBienesExcel()"><span class="ic">'+icon('upload',20)+'</span><div><b>Completar datos de bienes desde Excel</b><small>Rellena marca, modelo, serie y fecha de compra por No. de inventario</small></div></div>'
 
     + sec("Configuración")
     +'<div class="fld"><label>'+icon('mail',14)+' URL de Apps Script (correos y fotos a Drive)</label>'
