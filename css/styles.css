@@ -171,6 +171,8 @@
   .thumb{width:44px; height:44px; border-radius:8px; object-fit:cover; border:1.5px solid var(--linea);}
   .extra{display:none; margin-top:9px;}
   .extra.open{display:block;}
+  .ficha2{display:flex; gap:8px;}
+  .ficha2>div{flex:1; min-width:0;}
   .extra label,.fform label{font-size:11px; color:var(--gris); font-weight:600; display:block; margin:8px 0 3px;}
   .extra input,.fform input,.fform select{width:100%; padding:10px 11px; border:1.4px solid var(--linea);
     border-radius:9px; font-size:15px; outline:none; background:#fff;}
