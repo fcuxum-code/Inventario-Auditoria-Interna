@@ -343,11 +343,16 @@ function statsGlobales(){
 }
 function renderPanelMetricas(){
   const s = statsGlobales();
+  function kpi(cls, ic, num, lbl, sub, click){
+    return '<div class="kpicard '+cls+'"'+(click?(' onclick="'+click+'"'):'')+'>'
+      +'<div class="kpitop"><span class="kpiic">'+icon(ic,15)+'</span><span class="kpilbl">'+lbl+'</span>'+(click?'<span class="kpichev">›</span>':'')+'</div>'
+      +'<div class="kpinum">'+num+'</div><div class="kpisub">'+sub+'</div></div>';
+  }
   return '<div class="kpigrid">'
-    + '<div class="kpicard static"><div class="kpinum">'+s.pct+'%</div><div class="kpilbl">Avance de verificación</div><div class="kpisub">'+s.done+' / '+s.total+' bienes</div></div>'
-    + '<div class="kpicard kpi-disc" onclick="abrirDiscrepancias()"><div class="kpinum">'+s.disc+'</div><div class="kpilbl">Discrepancias</div><div class="kpisub">Bienes marcados NO</div></div>'
-    + '<div class="kpicard kpi-pend" onclick="openPendientes()"><div class="kpinum">'+s.pendCount+'</div><div class="kpilbl">Pendientes de asignar</div><div class="kpisub">'+(s.pendViejos?s.pendViejos+' con '+UMBRAL_DIAS_PENDIENTE+'+ días':'Sin atrasos')+'</div></div>'
-    + '<div class="kpicard kpi-valor static"><div class="kpinum">'+money(s.valorTotal)+'</div><div class="kpilbl">Valor total</div><div class="kpisub">'+s.tarjetas+' responsable(s)</div></div>'
+    + kpi('static kpi-avance','clipboardCheck', s.pct+'%', 'Avance', s.done+' / '+s.total+' bienes','')
+    + kpi('kpi-disc','alertTriangle', s.disc, 'Discrepancias', 'Bienes marcados NO','abrirDiscrepancias()')
+    + kpi('kpi-pend','logOut', s.pendCount, 'Pendientes', (s.pendViejos?s.pendViejos+' con '+UMBRAL_DIAS_PENDIENTE+'+ días':'Sin atrasos'),'openPendientes()')
+    + kpi('static kpi-valor','barChart', money(s.valorTotal), 'Valor total', s.tarjetas+' responsable(s)','')
     + '</div>'
     + (s.tarjetas ? ('<div class="as400bar" onclick="abrirPendientesAS400()">'
         + '<div class="as400bartop"><b>Carga al AS-400</b><span>'+s.as400Ok+' de '+s.tarjetas+' tarjetas · '+s.as400Pct+'%</span></div>'
@@ -2007,105 +2012,6 @@ function confirmarImportacion(){
   }
   next();
 }
-/* ===== COMPLETAR DATOS DE BIENES DESDE EXCEL =====
-   Toma un Excel con No. de inventario + Marca / Modelo / No. de serie / Fecha de compra
-   y RELLENA esos campos en los bienes que YA existen (los busca por No. de inventario).
-   No crea bienes nuevos ni pisa un dato con una celda vacía. */
-function completarBienesExcel(){
-  if(!requiereEdicion()) return;
-  cargarLectorExcel().then(function(ok){
-    if(!ok || typeof XLSX==="undefined"){ toast("No se pudo cargar el lector de Excel"); return; }
-    const inp=document.createElement("input"); inp.type="file"; inp.accept=".xlsx,.xls,.csv"; inp.style.display="none";
-    document.body.appendChild(inp);
-    inp.onchange=function(){
-      const f=inp.files&&inp.files[0]; if(!f){ document.body.removeChild(inp); return; }
-      toast("Leyendo archivo…");
-      const rd=new FileReader();
-      rd.onload=function(e){
-        try{
-          const wb=XLSX.read(e.target.result,{type:"array",cellDates:true});
-          let mejor=null;
-          wb.SheetNames.forEach(function(nom){
-            const rows=XLSX.utils.sheet_to_json(wb.Sheets[nom],{defval:""});
-            if(!rows.length) return;
-            const c=hallarColumna(rows[0],["NO_BIEN","INVENTARIO","CÓDIGO","CODIGO","NO."]);
-            if(c && (!mejor||rows.length>mejor.rows.length)) mejor={nombre:nom,rows:rows};
-          });
-          if(!mejor){ toast("No encontré una hoja con No. de inventario"); return; }
-          procesarCompletarBienes(mejor.rows, mejor.nombre, wb.SheetNames.length);
-        }catch(err){ toast("No se pudo leer el archivo: "+(err.message||err)); }
-        finally{ if(inp.parentNode) document.body.removeChild(inp); }
-      };
-      rd.onerror=function(){ toast("No se pudo leer el archivo"); if(inp.parentNode) document.body.removeChild(inp); };
-      rd.readAsArrayBuffer(f);
-    };
-    inp.click();
-  });
-}
-function _fechaCompraTxt(v){
-  if(v instanceof Date && !isNaN(v)){ return String(v.getDate()).padStart(2,"0")+"/"+String(v.getMonth()+1).padStart(2,"0")+"/"+v.getFullYear(); }
-  return String(v==null?"":v).trim();
-}
-function procesarCompletarBienes(rows, nombreHoja, totalHojas){
-  if(!rows.length){ toast("El archivo no tiene filas"); return; }
-  const h0=rows[0];
-  const colCod=hallarColumna(h0,["NO_BIEN","INVENTARIO","CÓDIGO","CODIGO","NO."]);
-  if(!colCod){ toast("No encontré la columna de No. de inventario"); return; }
-  const colMarca=hallarColumna(h0,["MARCA"]);
-  const colModelo=hallarColumna(h0,["MODELO"]);
-  const colSerie=hallarColumna(h0,["SERIE"]);
-  const colFecha=hallarColumna(h0,["FECHA DE COMPRA","FECHA COMPRA","ADQUISICION","ADQUISICIÓN","COMPRA"]);
-  if(!colMarca && !colModelo && !colSerie && !colFecha){ toast("No encontré columnas de Marca, Modelo, Serie ni Fecha de compra"); return; }
-  const updates=[]; let noExisten=0, sinDatos=0, vistos={};
-  rows.forEach(function(r){
-    const cod=String(r[colCod]==null?"":r[colCod]).trim(); if(!cod) return;
-    const id=bienDocId(cod); if(vistos[id]) return; vistos[id]=1;
-    if(!BIENES[id]){ noExisten++; return; }               // no está cargado: se omite (no se crea)
-    const patch={};
-    if(colMarca){ const v=String(r[colMarca]==null?"":r[colMarca]).trim(); if(v) patch.marca=v; }
-    if(colModelo){ const v=String(r[colModelo]==null?"":r[colModelo]).trim(); if(v) patch.modelo=v; }
-    if(colSerie){ const v=String(r[colSerie]==null?"":r[colSerie]).trim(); if(v) patch.serie=v; }
-    if(colFecha){ const v=_fechaCompraTxt(r[colFecha]); if(v) patch.fechaCompra=v; }
-    if(!Object.keys(patch).length){ sinDatos++; return; }
-    updates.push({id:id, codigo:cod, patch:patch});
-  });
-  if(!updates.length){ toast("Ningún No. de inventario del archivo coincide con bienes cargados"); return; }
-  const campos=[colMarca?"Marca":null,colModelo?"Modelo":null,colSerie?"No. de serie":null,colFecha?"Fecha de compra":null].filter(Boolean).join(", ");
-  document.getElementById("sheet").innerHTML='<div class="grip"></div><h3>Completar datos de bienes</h3>'
-    +(totalHojas>1?'<div class="note">Se leyó la hoja "<b>'+esc(nombreHoja)+'</b>".</div>':'')
-    +'<div class="note">Campos detectados: <b>'+esc(campos)+'</b>.</div>'
-    +'<div class="note">Se actualizarán <b>'+updates.length+'</b> bien(es) ya cargados.'
-    +(noExisten?('<br>'+noExisten+' No. de inventario del archivo no están en el sistema y se omiten (no se crean).'):'')
-    +(sinDatos?('<br>'+sinDatos+' fila(s) sin datos que aportar, se omiten.'):'')
-    +'<br>No se sobrescribe ningún dato con una casilla vacía.</div>'
-    +'<div style="max-height:200px;overflow:auto;border:1px solid #E2E6EC;border-radius:9px;margin-top:8px">'
-    + updates.slice(0,25).map(function(u){ var d=u.patch; return '<div style="padding:8px 10px;border-bottom:1px solid #F0F2F6;font-size:12.5px"><b>'+esc(u.codigo)+'</b> — '+esc([d.marca,d.modelo,d.serie,d.fechaCompra].filter(Boolean).join(" · "))+'</div>'; }).join("")
-    + (updates.length>25?('<div style="padding:8px 10px;font-size:12px;color:var(--gris2)">…y '+(updates.length-25)+' más</div>'):'')
-    +'</div>'
-    +'<button class="act g" onclick="confirmarCompletarBienes()">✓ Actualizar '+updates.length+' bien(es)</button>'
-    +'<button class="act o" onclick="closeMenu()">Cancelar</button>';
-  window.__completarPend=updates;
-  showSheet();
-}
-function confirmarCompletarBienes(){
-  if(!requiereEdicion()) return;
-  const ups=window.__completarPend||[]; if(!ups.length) return;
-  closeMenu();
-  toast("Actualizando "+ups.length+" bien(es)…");
-  function chunk(a,n){ const o=[]; for(let i=0;i<a.length;i+=n) o.push(a.slice(i,i+n)); return o; }
-  const chunks=chunk(ups,400); let i=0;
-  function next(){
-    if(i>=chunks.length){ toast("✓ "+ups.length+" bien(es) actualizados"); window.__completarPend=null; goHome(); return; }
-    const batch=db.batch();
-    chunks[i].forEach(function(u){
-      const patch=Object.assign({}, u.patch, {actualizado: firebase.firestore.FieldValue.serverTimestamp()});
-      batch.set(db.collection("bienes").doc(u.id), patch, {merge:true});
-    });
-    i++;
-    batch.commit().then(next).catch(function(e){ toast("Error: "+(e.message||e)); });
-  }
-  next();
-}
 /* El lector de Excel (SheetJS, ~500 KB) solo hace falta al importar, que es algo ocasional.
    Antes se bajaba en cada arranque de la app; ahora se pide en el momento. */
 function cargarLectorExcel(){
@@ -2295,7 +2201,6 @@ function openMenu(){
     +'<div class="mitem" onclick="imprimirReporteEjecutivo()"><span class="ic">'+icon('clipboardCheck',20)+'</span><div><b>Reporte ejecutivo (PDF)</b><small>Resumen de una página: avance, diferencias y carga al AS-400</small></div></div>'
     +'<div class="mitem" onclick="generarExcel()"><span class="ic">'+icon('barChart',20)+'</span><div><b>Generar reporte en Excel</b><small>Resumen, bienes, discrepancias, tarjetas, personal, movimientos y hallazgos</small></div></div>'
     +'<div class="mitem" onclick="importarExcel()"><span class="ic">'+icon('upload',20)+'</span><div><b>Importar bienes nuevos desde Excel</b><small>Los crea como pendientes de asignar</small></div></div>'
-    +'<div class="mitem" onclick="completarBienesExcel()"><span class="ic">'+icon('upload',20)+'</span><div><b>Completar datos de bienes desde Excel</b><small>Rellena marca, modelo, serie y fecha de compra por No. de inventario</small></div></div>'
 
     + sec("Configuración")
     +'<div class="fld"><label>'+icon('mail',14)+' URL de Apps Script (correos y fotos a Drive)</label>'
