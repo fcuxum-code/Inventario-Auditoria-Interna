@@ -662,3 +662,22 @@ body.imprimiendo-guias{overflow:visible !important;}
   #tipsPrint, #tipsPrint *{visibility:visible;}
   #tipsPrint{display:block; position:absolute; left:0; top:0; width:100%; padding:20px; background:#fff;}
 }
+
+  /* ===== ETIQUETAS CON QR (impresión) =====
+     Medida pensada para etiqueta adhesiva de 50 x 25 mm, que es la más común en
+     impresoras de rollo. En hoja normal se acomodan varias por página. */
+  .etq-hoja{display:flex; flex-wrap:wrap; gap:2mm;}
+  .etq{width:50mm; height:25mm; box-sizing:border-box; display:flex; align-items:center; gap:1.5mm;
+    padding:1.5mm 2mm; border:0.2mm solid #bbb; border-radius:1mm; overflow:hidden;
+    background:#fff; color:#000; page-break-inside:avoid; break-inside:avoid;}
+  .etq-txt{flex:1; min-width:0;}
+  .etq-desc{font-size:7.2pt; font-weight:700; line-height:1.12; max-height:2.6em; overflow:hidden;}
+  .etq-cod{font-size:8.6pt; font-weight:800; letter-spacing:.2px; margin-top:0.6mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .etq-pie{font-size:6pt; margin-top:0.5mm; color:#333; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .etq-qr{flex:none; width:19mm; height:19mm; display:flex; align-items:center; justify-content:center;}
+  .etq-qr svg{width:100%; height:100%; display:block;}
+  @media print{
+    @page{ margin:4mm; }
+    .etq-hoja{gap:1mm;}
+    .etq{border:0.2mm solid #999;}
+  }

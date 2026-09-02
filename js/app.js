@@ -608,6 +608,7 @@ function renderPerson(v){
     +'<span class="moretog" onclick="editCorreoTarjeta(\''+t.id+'\')">✉️ '+(t.correo?esc(t.correo):"agregar correo")+'</span>'
     +' <span class="moretog" onclick="compartirConstancia(\''+t.id+'\')">'+icon('share',13)+' Compartir constancia (PDF)</span>'
     +' <span class="moretog" onclick="descargarConstancia(\''+t.id+'\')">'+icon('download',13)+' Descargar</span>'
+    +' <span class="moretog" onclick="etiquetasDeTarjeta(\''+t.id+'\')">'+icon('tag',13)+' Etiquetas QR</span>'
     +(t.firmaRecibida?(' <span class="moretog" onclick="verFirma(\''+t.id+'\')">'+icon('check',13)+' Firmado'+(t.firmaFecha?(' ('+esc(t.firmaFecha)+')'):'')+'</span>'):'')
     +'</div></div>'
     + as400Control(t);
@@ -821,6 +822,7 @@ function itemCard(b, showOwner, extraChip){
        +(b.fotoUrl?'<a class="drivefoto" href="'+b.fotoUrl+'" target="_blank" rel="noopener"><img class="dthumb" src="'+driveThumbUrl(b.fotoUrl)+'" loading="lazy" alt="foto">🖼️ Ver foto</a>':'')
       +'<span class="moretog" onclick="toggleExtra(\''+id+'\')">＋ Ficha (marca, serie…) / ubicación</span>'
       +'<span class="moretog" onclick="verHistorial(\''+id+'\')">'+icon('clock',13)+' Historial</span>'
+      +'<span class="moretog" onclick="etiquetaBien(\''+id+'\')">'+icon('tag',13)+' Etiqueta QR</span>'
       +(!soloLectura && b.existe==="NO" && b.tarjetaId?'<span class="moretog" style="color:var(--naranja)" onclick="descargarBien(\''+id+'\')">'+icon('logOut',13)+' Quitar de la tarjeta</span>':'')
       +(!soloLectura && b.esNuevo?'<span class="moretog" style="color:var(--rojo)" onclick="borrarBien(\''+id+'\')">'+icon('trash',13)+' Borrar</span>':'')
     +'</div>'
