@@ -77,13 +77,15 @@ header .htitle small{ opacity:.85 !important; font-weight:500 !important; }
 
 /* Bottom nav */
 #fabbar{
-  background:rgba(255,255,255,.86) !important;
-  backdrop-filter:saturate(140%) blur(10px);
-  -webkit-backdrop-filter:saturate(140%) blur(10px);
+  /* Superficie translúcida que sigue el tema: antes iba fijo en blanco y en modo
+     oscuro la barra quedaba clara. Además respeta el área segura del teléfono. */
+  background:color-mix(in srgb, var(--card) 88%, transparent) !important;
+  backdrop-filter:saturate(140%) blur(12px);
+  -webkit-backdrop-filter:saturate(140%) blur(12px);
   border-top:1px solid var(--linea) !important;
-  box-shadow:0 -6px 22px rgba(20,30,60,.08) !important;
-  padding:8px 10px !important;
-  gap:8px !important;
+  box-shadow:0 -6px 22px rgba(10,20,45,.10) !important;
+  padding:7px 10px calc(7px + env(safe-area-inset-bottom)) !important;
+  gap:7px !important;
 }
 #fabbar button{
   border-radius:14px !important;
@@ -107,3 +109,100 @@ button{ font-family:inherit !important; }
 @media print{
   html, body{ background:#fff !important; background-image:none !important; }
 }
+
+/* ===================== PULIDO DE INTERFAZ (v61) =====================
+   Toques para que se sienta app nativa: respeta el notch, tipografía más
+   nítida, tarjetas con jerarquía y una barra inferior tipo pestañas.
+   Todo con los tokens del tema, así que sirve en claro y oscuro. */
+html{ -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+body{ overscroll-behavior-y:contain; }
+
+/* ---- Encabezado: área segura del notch + degradado sutil ---- */
+header{
+  background:linear-gradient(160deg, var(--azul2), var(--azul)) !important;
+  padding-top:calc(10px + env(safe-area-inset-top)) !important;
+  padding-left:calc(12px + env(safe-area-inset-left)) !important;
+  padding-right:calc(12px + env(safe-area-inset-right)) !important;
+  box-shadow:0 1px 0 rgba(255,255,255,.06) inset, 0 4px 16px rgba(10,20,45,.22) !important;
+}
+.htitle{ font-size:16px; letter-spacing:-.2px; }
+.htitle small{ font-size:11px; opacity:.85; margin-top:2px; }
+.hbtn{ background:rgba(255,255,255,.14); backdrop-filter:blur(6px); border-radius:11px;
+  transition:background .16s ease, transform .12s ease; }
+.hbtn:active{ transform:scale(.94); background:rgba(255,255,255,.24); }
+/* Barra de avance más esbelta y legible */
+.pbarwrap{ height:16px; border-radius:20px; background:rgba(255,255,255,.16); margin-top:9px; }
+.pbar{ background:linear-gradient(90deg,#46b352,#63d46c); box-shadow:0 0 10px rgba(80,200,110,.45); }
+.pbartxt{ font-size:11px; letter-spacing:.2px; }
+
+/* ---- Buscador ---- */
+.searchbar input{ border-radius:13px; font-size:15px; padding-top:11px; padding-bottom:11px;
+  box-shadow:0 1px 2px rgba(20,30,60,.05); transition:border-color .18s ease, box-shadow .18s ease; }
+.searchbar input:focus{ box-shadow:0 0 0 3px color-mix(in srgb, var(--azul2) 16%, transparent); }
+.filterbtn{ border-radius:13px; background:var(--card); color:var(--gris);
+  transition:transform .12s ease, background .16s ease; }
+.filterbtn:active{ transform:scale(.94); }
+
+/* ---- Tarjetas de métricas (inicio) ---- */
+.kpigrid{ gap:10px; margin:4px 0 14px; }
+.kpicard{
+  border-radius:16px; padding:12px 13px 13px; position:relative; overflow:hidden;
+  box-shadow:0 1px 2px rgba(20,30,60,.05), 0 6px 18px rgba(20,30,60,.05);
+  transition:transform .13s ease, box-shadow .2s ease;
+}
+.kpicard::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--azul2); opacity:.85; }
+.kpicard.kpi-disc::before{ background:var(--rojo); }
+.kpicard.kpi-pend::before{ background:var(--naranja); }
+.kpicard.kpi-valor::before{ background:var(--teal); }
+.kpitop{ display:flex; align-items:center; gap:6px; }
+.kpiic{ display:flex; color:var(--azul2); flex:none; }
+.kpi-disc .kpiic{ color:var(--rojo); } .kpi-pend .kpiic{ color:var(--naranja); } .kpi-valor .kpiic{ color:var(--teal); }
+.kpilbl{ font-size:11.5px; font-weight:700; color:var(--gris); margin:0; letter-spacing:.1px;
+  text-transform:uppercase; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.kpichev{ color:var(--chev); font-size:17px; line-height:1; flex:none; }
+.kpinum{ font-size:26px; font-weight:800; letter-spacing:-.6px; margin-top:6px; color:var(--titulo); }
+.kpi-valor .kpinum{ font-size:19px; letter-spacing:-.3px; }
+.kpisub{ font-size:11px; color:var(--gris2); margin-top:2px; }
+
+/* ---- Fila de responsable ---- */
+.prow{ border-radius:14px; padding:11px 12px; margin-bottom:8px;
+  box-shadow:0 1px 2px rgba(20,30,60,.05), 0 5px 14px rgba(20,30,60,.04); }
+.pname{ font-size:14.5px; letter-spacing:-.2px; color:var(--titulo); }
+.pmeta{ font-size:11.5px; margin-top:3px; }
+.ring::before{ background:var(--card); }
+.ringtxt{ font-size:11px; }
+
+/* ---- Tarjeta de bien ---- */
+.item{ border-radius:14px; box-shadow:0 1px 2px rgba(20,30,60,.05), 0 5px 14px rgba(20,30,60,.04); }
+
+/* ---- Barra inferior tipo pestañas ---- */
+.fabbar button{ gap:3px; letter-spacing:.1px;
+  transition:background .16s ease, color .16s ease, transform .12s ease; }
+.fabbar button:active{ transform:scale(.95); }
+/* Cada acción con su color propio; se usa ".fabbar button.x" para ganarle a ".fabbar button" */
+.fabbar button.fb-home{ background:color-mix(in srgb, var(--azul2) 11%, transparent); color:var(--azul2); }
+.fabbar button.fb-exp{ background:color-mix(in srgb, var(--naranja) 13%, transparent); color:var(--naranja); }
+.fabbar button.fb-hz{ background:var(--azul); color:#fff; box-shadow:0 3px 10px rgba(31,56,100,.30); }
+.fabbar button svg{ opacity:.95; }
+
+/* ---- Fila de hallazgos ---- */
+.hzrow{ border-radius:14px; box-shadow:0 1px 2px rgba(20,30,60,.05); }
+
+/* ---- Hoja inferior (menú) más de app ---- */
+.sheet{ border-radius:20px 20px 0 0 !important; padding-bottom:calc(14px + env(safe-area-inset-bottom)) !important; }
+.mitem{ border-radius:12px; padding:11px 10px; transition:background .15s ease; }
+
+@media (prefers-reduced-motion:reduce){
+  .kpicard, .hbtn, .fabbar button, .filterbtn{ transition:none !important; }
+}
+
+/* ---- Pistas de progreso que seguían fijas en claro (se veían blancas en oscuro) ---- */
+.locbarwrap{ background:color-mix(in srgb, var(--linea) 70%, transparent) !important; }
+.ring{ background:conic-gradient(var(--verde) calc(var(--p)*1%), color-mix(in srgb, var(--linea) 80%, transparent) 0) !important; }
+
+/* ---- Superficies que seguían fijas en claro y se veían blancas en oscuro ---- */
+.act.o{ background:var(--card); border-color:var(--rojob); }
+.act.q{ background:color-mix(in srgb, var(--azul2) 12%, transparent); color:var(--azul2); }
+.fotobtn{ background:color-mix(in srgb, var(--azul2) 9%, transparent); border-color:color-mix(in srgb, var(--azul2) 28%, transparent); }
+.chip.c-comp{ background:color-mix(in srgb, var(--azul2) 14%, transparent); color:var(--azul2); }
+.chip.c-ind{ background:color-mix(in srgb, var(--gris) 15%, transparent); color:var(--gris); }
