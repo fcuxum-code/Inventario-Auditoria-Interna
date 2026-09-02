@@ -36,8 +36,9 @@
   function entrar(tipo, cerrar){
     if(!listo) return;
     var top = nivelActual();
-    if(top && top.tipo === tipo && tipo === "sheet"){
-      // Abrir un panel encima de otro reutiliza el mismo nivel: atrás cierra una sola vez.
+    if(top && top.tipo === tipo && (tipo === "sheet" || tipo === "vista")){
+      // Abrir un panel/pantalla encima de otro igual reutiliza el nivel: atrás cierra una vez.
+      // Sin esto, volver de una ficha al listado apilaba un nivel extra cada vez.
       top.cerrar = cerrar;
       return;
     }
@@ -193,6 +194,36 @@
       var top = nivelActual();
       if(top && top.tipo === "abtipo") salir("abtipo");
       else if(top && top.tipo === "abcaso") salir("abcaso");
+    });
+
+    /* Búsqueda y filtros: al escribir o filtrar, la pantalla cambia por completo (incluido
+       el desglose de pendientes por tipo de bien). Antes esto no dejaba paso en el historial
+       y el botón atrás salía de la app en vez de regresar al inicio. */
+    function enBusqueda(){
+      try{ return !!(mode.q || filtrosActivos() || mostrarFiltros); }catch(e){ return false; }
+    }
+    function cerrarBusqueda(){
+      var c = document.getElementById("search"); if(c) c.value = "";
+      try{ mode.q = ""; }catch(e){}
+      if(typeof resetFiltrosBusqueda === "function") resetFiltrosBusqueda();
+      if(typeof render === "function") render();
+    }
+    function sincronizarBusqueda(){
+      var top = nivelActual();
+      if(enBusqueda()){
+        if(!top || top.tipo !== "busqueda") entrar("busqueda", cerrarBusqueda);
+      } else if(top && top.tipo === "busqueda"){
+        salir("busqueda");
+      }
+    }
+    /* Se engancha a render() y no a cada acción: la búsqueda escrita se aplica con un
+       retardo (debounce), así que justo después de onSearch todavía no hay nada buscado.
+       render() es por donde pasa todo cambio de pantalla, así que ahí el estado ya es real. */
+    envolver("render", null, sincronizarBusqueda);
+
+    // Ficha de un empleado: atrás regresa al listado de Personal, no al inicio.
+    envolver("editarPersonal", null, function(){
+      entrar("perficha", function(){ if(typeof openPersonal === "function") openPersonal(); });
     });
 
     // Tips y recomendaciones: una sola pantalla, atrás la cierra.
