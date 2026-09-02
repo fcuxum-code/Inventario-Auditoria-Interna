@@ -363,14 +363,16 @@ function renderPanelMetricas(){
       +'</div>') : '');
 }
 /* ================= FILTROS DE BÚSQUEDA ================= */
-let searchFiltros = { ubic:"", estado:"", categoria:"", as400:"" };
+let searchFiltros = { ubic:"", estado:"", categoria:"", as400:"", pend:"" };
 let mostrarFiltros = false;
-function filtrosActivos(){ return !!(searchFiltros.ubic || searchFiltros.estado || searchFiltros.categoria || searchFiltros.as400); }
-function resetFiltrosBusqueda(){ searchFiltros={ubic:"",estado:"",categoria:"",as400:""}; mostrarFiltros=false; }
+function filtrosActivos(){ return !!(searchFiltros.ubic || searchFiltros.estado || searchFiltros.categoria || searchFiltros.as400 || searchFiltros.pend); }
+function resetFiltrosBusqueda(){ searchFiltros={ubic:"",estado:"",categoria:"",as400:"",pend:""}; mostrarFiltros=false; }
 function toggleFiltrosBusqueda(){ mostrarFiltros=!mostrarFiltros; render(); }
 function setFiltroBusqueda(campo,val){ searchFiltros[campo]=val; render(); }
 function limpiarFiltrosBusqueda(){ resetFiltrosBusqueda(); render(); }
 function bienCoincideFiltros(b){
+  if(searchFiltros.pend==="SI" && b.existe) return false;   // solo lo que falta verificar
+  if(searchFiltros.pend==="NO" && !b.existe) return false;  // solo lo ya verificado
   if(searchFiltros.ubic && b.ubicacion!==searchFiltros.ubic) return false;
   if(searchFiltros.estado && b.estado!==searchFiltros.estado) return false;
   if(searchFiltros.categoria && categoriaBien(b).cod!==searchFiltros.categoria) return false;
@@ -422,22 +424,80 @@ function render(){
   // Las tarjetas que se quedaron sin bienes (todo reasignado, p. ej. al pasar a una provisional
   // o al cambiar de tarjeta) desaparecen de la lista: ya no hay nada que revisar en ellas.
   const tarjs = tarjetasActivas().filter(function(t){ return bienesDe(t.id).length > 0; });
+  /* Con muchas tarjetas ya terminadas, verlas todas juntas estorba. Se separan en dos
+     apartados: lo que falta y lo ya completo. Es solo una forma de mostrar: no cambia
+     ni borra ningún dato. */
+  const pendientesT = [], completasT = [];
+  tarjs.forEach(function(t){
+    const l = bienesDe(t.id);
+    (doneCount(l) < l.length ? pendientesT : completasT).push(t);
+  });
+  pendientesT.sort(function(a,b){
+    const la=bienesDe(a.id), lb=bienesDe(b.id);
+    return (lb.length-doneCount(lb)) - (la.length-doneCount(la));   // más pendientes primero
+  });
+  const bienesPorVerificar = Object.values(BIENES).filter(function(b){ return b.tarjetaId && !b.existe; });
+
   let h = renderPanelMetricas();
   h+='<div class="hzrow" onclick="openHall()"><span class="ic">'+icon('camera',22)+'</span>'
     +'<div style="flex:1"><b>Hallazgos: bienes encontrados sin tarjeta</b><small>Toque Hallazgo para anotar uno</small></div>'
     +'<div style="color:#C99B62;font-size:20px">›</div></div>';
-  h+='<div class="hint">Toque un responsable para verificar sus bienes. '+tarjs.length+' tarjetas · '+Object.keys(BIENES).length+' bienes.</div>';
-  tarjs.forEach(function(t){
+
+  h+='<div class="filters homefilters">'
+    +'<div class="fp '+(homeTab==="pend"?"on":"")+'" onclick="setHomeTab(\'pend\')">Pendientes ('+pendientesT.length+')</div>'
+    +'<div class="fp '+(homeTab==="ok"?"on":"")+'" onclick="setHomeTab(\'ok\')">Completas ('+completasT.length+')</div>'
+    +'</div>';
+
+  function filaTarjeta(t){
     const list = bienesDe(t.id); const d=doneCount(list); const n=list.length; const p=n?Math.round(d/n*100):0;
-    h+='<div class="prow" onclick="openPerson(\''+t.id+'\')">'
+    const faltan = n-d;
+    return '<div class="prow" onclick="openPerson(\''+t.id+'\')">'
       +'<div class="ring" style="--p:'+p+'"><span class="ringtxt">'+d+'/'+n+'</span></div>'
       +'<div class="pinfo"><div class="pname">'+esc(t.responsable||"(sin nombre)")+'</div>'
       +'<div class="pmeta">Tarjeta '+(t.numero?esc(t.numero):(t.provisional?"provisional":"(pendiente)"))+' '+chipTipo(t.tipo)
       +(t.correo?' <span class="pill-mail">✉️</span>':'')
-      +(t.as400Actualizado?' <span class="chip c-as400">'+icon('check',10,'margin-right:2px')+'AS-400</span>':'')+'</div></div>'
+      +(t.as400Actualizado?' <span class="chip c-as400">'+icon('check',10,'margin-right:2px')+'AS-400</span>':'')
+      +(faltan?' <span class="chip c-falta">faltan '+faltan+'</span>':'')+'</div></div>'
       +'<div style="color:var(--chev);font-size:20px">›</div></div>';
-  });
+  }
+
+  if(homeTab==="pend"){
+    if(!pendientesT.length){
+      h+=emptyState("¡Todo verificado!","No queda ningún bien pendiente en las tarjetas activas.");
+    } else {
+      h+='<div class="hint"><b>'+bienesPorVerificar.length+' bien'+(bienesPorVerificar.length===1?'':'es')+'</b> por verificar en '
+        +pendientesT.length+' responsable'+(pendientesT.length===1?'':'s')+'.</div>';
+      // Desglose por tipo de bien: al tocar uno se abren esos pendientes listos para verificar.
+      const porCat={};
+      bienesPorVerificar.forEach(function(b){ const c=categoriaBien(b); porCat[c.cod]=porCat[c.cod]||{n:0,nombre:c.nombre}; porCat[c.cod].n++; });
+      const cats=Object.keys(porCat).sort(function(a,b){ return porCat[b].n-porCat[a].n; });
+      if(cats.length>1){
+        h+='<div class="catgrid">'+cats.map(function(cod){
+          return '<div class="catchip" onclick="verPendientesCategoria(\''+cod+'\')">'
+            +'<b>'+porCat[cod].n+'</b><span>'+esc(porCat[cod].nombre)+'</span></div>';
+        }).join("")+'</div>';
+      }
+      h+=pendientesT.map(filaTarjeta).join("");
+    }
+  } else {
+    if(!completasT.length){
+      h+=emptyState("Aún no hay tarjetas completas","Aparecerán aquí cuando verifique todos los bienes de un responsable.");
+    } else {
+      h+='<div class="hint">'+completasT.length+' responsable'+(completasT.length===1?'':'s')+' con todos sus bienes verificados.</div>';
+      h+=completasT.map(filaTarjeta).join("");
+    }
+  }
   v.innerHTML=h;
+}
+/* Apartado activo del inicio: "pend" (lo que falta) u "ok" (ya completas). */
+let homeTab = "pend";
+function setHomeTab(t){ homeTab=t; render(); window.scrollTo(0,0); }
+/* Abre los bienes pendientes de una categoría, listos para verificar en la misma lista. */
+function verPendientesCategoria(cod){
+  resetFiltrosBusqueda();
+  searchFiltros.categoria = cod;
+  searchFiltros.pend = "SI";
+  render(); window.scrollTo(0,0);
 }
 function bienesPendientes(){ return Object.values(BIENES).filter(function(b){ return !b.tarjetaId; }); }
 const UMBRAL_DIAS_PENDIENTE = 7;
@@ -1174,6 +1234,10 @@ function renderBarraFiltros(){
   h += '<select onchange="setFiltroBusqueda(\'categoria\',this.value)"><option value="">Categoría (todas)</option>'
      + CATEGORIAS_BIEN.map(function(c){ return '<option value="'+c.cod+'" '+(searchFiltros.categoria===c.cod?"selected":"")+'>'+esc(c.nombre)+'</option>'; }).join("")
      + '<option value="OTROS" '+(searchFiltros.categoria==="OTROS"?"selected":"")+'>Otros / sin clasificar</option>'
+     + '</select>';
+  h += '<select onchange="setFiltroBusqueda(\'pend\',this.value)"><option value="">Verificación (todas)</option>'
+     + '<option value="SI" '+(searchFiltros.pend==="SI"?"selected":"")+'>Pendientes de verificar</option>'
+     + '<option value="NO" '+(searchFiltros.pend==="NO"?"selected":"")+'>Ya verificados</option>'
      + '</select>';
   h += '<select onchange="setFiltroBusqueda(\'as400\',this.value)"><option value="">AS-400 (todas)</option>'
      + '<option value="NO" '+(searchFiltros.as400==="NO"?"selected":"")+'>Pendientes de cargar</option>'
