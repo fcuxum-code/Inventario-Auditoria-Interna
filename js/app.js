@@ -720,6 +720,7 @@ function imprimirReporteEjecutivo(){
       +'<div class="pdfirma"><div class="pdline"></div>Revisó</div>'
     +'</div>'
     +'<div class="pdnota">Revise el texto de este reporte antes de usarlo como documento oficial — el formato es un punto de partida, no un modelo institucional certificado.</div>';
+  document.getElementById("printArea").removeAttribute("data-modo");
   document.getElementById("printArea").innerHTML = html;
   setTimeout(function(){ window.print(); }, 80);
 }
@@ -754,7 +755,8 @@ function imprimirConstancia(tarjetaId){
         +'<div class="pdfirma"><div class="pdline"></div>Firma de Auditoría Interna</div>'
       +'</div>'
       +'<div class="pdnota">Revise el texto de esta constancia antes de usarla como documento oficial — el formato es un punto de partida, no un modelo institucional certificado.</div>';
-    document.getElementById("printArea").innerHTML = html;
+    document.getElementById("printArea").removeAttribute("data-modo");
+  document.getElementById("printArea").innerHTML = html;
     setTimeout(function(){ window.print(); }, 80);
   });
 }
