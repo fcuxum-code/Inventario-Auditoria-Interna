@@ -1266,7 +1266,7 @@ function renderSearch(v){
     const b=BIENES[id];
     if(!bienCoincideFiltros(b)) return false;
     if(!q) return true;
-    return coincide([b.codigo, b.descripcion, b.responsable, b.tarjetaNumero, b.codigoSiges, b.colaborador]);
+    return coincide([b.codigo, b.descripcion, b.responsable, b.tarjetaNumero, b.codigoSiges, b.colaborador, b.modelo, b.serie]);
   });
   const hz = q ? Object.values(HALLAZGOS).filter(function(z){
     return coincide([z.inv, z.desc]);
