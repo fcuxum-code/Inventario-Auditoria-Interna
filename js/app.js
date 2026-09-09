@@ -1969,7 +1969,7 @@ document.getElementById("excelin").addEventListener("change", function(){
   const rd = new FileReader();
   rd.onload = function(e){
     try{
-      const wb = XLSX.read(e.target.result, {type:"array"});
+      const wb = XLSX.read(e.target.result, {type:"array", cellDates:true});
       const elegida = elegirMejorHoja(wb);
       if(!elegida){ toast("No encontré una hoja con una columna de No. de Inventario reconocible."); return; }
       procesarFilasImportadas(elegida.rows, elegida.nombre, wb.SheetNames.length);
@@ -2010,6 +2010,12 @@ function hallarColumna(row, claves){
   }
   return null;
 }
+/* Fecha de compra desde Excel: si la celda es una fecha real la vuelve DD/MM/AAAA;
+   si es texto la deja como está. */
+function _fechaCompraImport(v){
+  if(v instanceof Date && !isNaN(v)){ return String(v.getDate()).padStart(2,"0")+"/"+String(v.getMonth()+1).padStart(2,"0")+"/"+v.getFullYear(); }
+  return String(v==null?"":v).trim();
+}
 function leerColumnas(rows){
   const first = rows[0];
   const colCod = hallarColumna(first, ["NO_BIEN","INVENTARIO","CÓDIGO","CODIGO","NO."]);
@@ -2018,11 +2024,15 @@ function leerColumnas(rows){
   const colNombre = hallarColumna(first, ["NOMBRE"]);
   const colTarjeta = hallarColumna(first, ["TARJETA"]);
   const colSiges = hallarColumna(first, ["BIESIC","SIGES"]);
-  return {colCod, colDesc, colVal, colNombre, colTarjeta, colSiges};
+  const colMarca = hallarColumna(first, ["MARCA"]);
+  const colModelo = hallarColumna(first, ["MODELO"]);
+  const colSerie = hallarColumna(first, ["SERIE"]);
+  const colFecha = hallarColumna(first, ["FECHA DE COMPRA","FECHA COMPRA","ADQUISICION","ADQUISICIÓN","COMPRA"]);
+  return {colCod, colDesc, colVal, colNombre, colTarjeta, colSiges, colMarca, colModelo, colSerie, colFecha};
 }
 function procesarFilasImportadas(rows, nombreHoja, totalHojas){
   if(!rows.length){ toast("El archivo no tiene filas de datos"); return; }
-  const {colCod, colDesc, colVal, colSiges} = leerColumnas(rows);
+  const {colCod, colDesc, colVal, colSiges, colMarca, colModelo, colSerie, colFecha} = leerColumnas(rows);
   if(!colCod){ toast("No encontré una columna de No. de Inventario en el archivo"); return; }
   const nuevos = []; let vacios=0, existentes=0, invalidos=0;
   const vistos = {};
@@ -2036,7 +2046,11 @@ function procesarFilasImportadas(rows, nombreHoja, totalHojas){
     nuevos.push({ id:id, codigo:cod,
       codigoSiges: colSiges? String(r[colSiges]==null?"":r[colSiges]).trim() : "",
       descripcion: colDesc? String(r[colDesc]==null?"":r[colDesc]).trim() : "",
-      valor: colVal? (Number(r[colVal])||0) : 0 });
+      valor: colVal? (Number(r[colVal])||0) : 0,
+      marca: colMarca? String(r[colMarca]==null?"":r[colMarca]).trim() : "",
+      modelo: colModelo? String(r[colModelo]==null?"":r[colModelo]).trim() : "",
+      serie: colSerie? String(r[colSerie]==null?"":r[colSerie]).trim() : "",
+      fechaCompra: colFecha? _fechaCompraImport(r[colFecha]) : "" });
   });
   if(nuevos.length===0){ toast("No hay bienes nuevos para importar (¿ya estaban todos en el sistema?)"); return; }
   document.getElementById("sheet").innerHTML = '<div class="grip"></div><h3>Confirmar importación</h3>'
@@ -2067,13 +2081,19 @@ function confirmarImportacion(){
     if(i>=chunks.length){ toast("✓ Importación completa ("+nuevos.length+" bienes)"); window.__importPend=null; goHome(); return; }
     const batch = db.batch();
     chunks[i].forEach(function(n){
-      batch.set(db.collection("bienes").doc(n.id), {
+      const datos = {
         codigo:n.codigo, codigoSiges:n.codigoSiges||"", descripcion:n.descripcion||n.codigo, valor:n.valor||0,
         tarjetaId:null, tarjetaNumero:"", responsable:"",
         tipo:"INDIVIDUAL", ubicacion:"", estado:"", existe:"", fechaVerificacion:"", verificadoPor:"",
         esNuevo:true, observaciones:"", notaDuplicado:"", fotoBien:0,
         actualizado: firebase.firestore.FieldValue.serverTimestamp()
-      }, {merge:true});
+      };
+      // Solo se escriben si venían en el archivo, para no dejar campos vacíos de más.
+      if(n.marca) datos.marca = n.marca;
+      if(n.modelo) datos.modelo = n.modelo;
+      if(n.serie) datos.serie = n.serie;
+      if(n.fechaCompra) datos.fechaCompra = n.fechaCompra;
+      batch.set(db.collection("bienes").doc(n.id), datos, {merge:true});
     });
     i++;
     batch.commit().then(next).catch(function(e){ toast("Error al importar: "+(e.message||e)); });
@@ -2110,10 +2130,33 @@ function importarExcel(){
 function mostrarImportarExcel(){
   window.__excelMode = "importar";
   document.getElementById("sheet").innerHTML = '<div class="grip"></div><h3>📥 Importar bienes desde Excel</h3>'
-    +'<div class="note">El archivo debe tener columnas con <b>No. de Inventario</b>, <b>Descripción</b> y opcionalmente <b>Valor</b>. No importa el nombre exacto de la columna ni el orden, la app las reconoce sola. Los bienes se crean <b>sin responsable</b> — después los asigna con 🧍 Nueva toma. Esta opción solo AGREGA, nunca elimina nada.</div>'
-    +'<button class="act p" onclick="document.getElementById(\'excelin\').click()">📎 Elegir archivo Excel</button>'
+    +'<div class="note"><b>¿No sabe qué columnas llevar?</b> Descargue la plantilla, llénela con sus bienes y súbala. Ya trae las columnas correctas: <b>No. de Inventario</b>, <b>No. SIGES</b>, <b>Descripción</b>, <b>Marca</b>, <b>Modelo</b>, <b>No. de Serie</b>, <b>Fecha de compra</b> y <b>Valor</b>.</div>'
+    +'<div class="note">Solo el <b>No. de Inventario</b> es obligatorio; lo demás es opcional. No importa el orden ni el nombre exacto de la columna, la app las reconoce sola. Los bienes se crean <b>sin responsable</b> (después los asigna con 🧍 Nueva toma). Esta opción solo AGREGA, nunca elimina nada.</div>'
+    +'<button class="act g" onclick="descargarPlantillaBienes()">⬇️ Descargar plantilla Excel</button>'
+    +'<button class="act p" onclick="document.getElementById(\'excelin\').click()">📎 Elegir archivo y subir</button>'
     +'<button class="act o" onclick="closeMenu()">Cancelar</button>';
   showSheet();
+}
+/* Genera y descarga una plantilla Excel con las columnas que la app reconoce y dos
+   filas de ejemplo, para que no haya que adivinar el formato. */
+function descargarPlantillaBienes(){
+  if(!requiereEdicion()) return;
+  cargarLectorExcel().then(function(ok){
+    if(!ok || typeof XLSX==="undefined"){ toast("No se pudo preparar la plantilla (revise su conexión)"); return; }
+    try{
+      const headers = ["No. de Inventario","No. SIGES","Descripción","Marca","Modelo","No. de Serie","Fecha de compra","Valor"];
+      const ejemplos = [
+        ["255483","","LOCKER METAL 3 COMPARTIMIENTOS COLOR BEIGE","Argueta","S/M","S/S","22/01/1997",320],
+        ["INV-1001","BS-77012","Computadora portátil","HP","ProBook 450 G8","5CD1234ABC","10/05/2022",6400]
+      ];
+      const ws = XLSX.utils.aoa_to_sheet([headers].concat(ejemplos));
+      ws["!cols"] = [{wch:18},{wch:14},{wch:42},{wch:16},{wch:18},{wch:18},{wch:15},{wch:12}];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Bienes");
+      XLSX.writeFile(wb, "Plantilla_Bienes_Inventario.xlsx");
+      toast("Plantilla descargada ✓ — llénela y súbala aquí mismo");
+    }catch(e){ console.error(e); toast("No se pudo descargar la plantilla"); }
+  });
 }
 function compressImage(file,cb){
   const rd=new FileReader();
