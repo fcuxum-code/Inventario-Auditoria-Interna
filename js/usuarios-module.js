@@ -144,6 +144,15 @@
 '      allow read: if autenticado();\n'+
 '      allow write: if esEditor();\n'+
 '    }\n'+
+'    match /personalFoto/{id} {\n'+
+'      allow read: if autenticado();\n'+
+'      allow write: if esEditor();\n'+
+'    }\n'+
+'    // Presencia: cada quien escribe SOLO su propia señal; todos los autenticados la leen.\n'+
+'    match /presencia/{uid} {\n'+
+'      allow read: if autenticado();\n'+
+'      allow write: if autenticado() && request.auth.uid == uid;\n'+
+'    }\n'+
 '  }\n'+
 '}\n';
 
