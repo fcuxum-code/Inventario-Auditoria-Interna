@@ -254,3 +254,11 @@ header{
   #view > *, .sheet.show{ animation:none !important; }
   .prow:active, .item:active{ transform:none !important; }
 }
+
+/* Indicador "en línea" en el encabezado */
+.htitle small .enlinea{
+  display:inline-block; margin-left:8px; padding:1px 8px; border-radius:20px;
+  background:rgba(255,255,255,.16); color:#fff; font-weight:700; font-size:10.5px;
+  cursor:pointer; white-space:nowrap; vertical-align:middle;
+}
+.htitle small .enlinea:active{ background:rgba(255,255,255,.28); }
