@@ -382,9 +382,12 @@
       var items=(typeof BIENES==='object'?Object.values(BIENES):[]).filter(function(b){return b.tarjetaId===t.id;})
         .sort(function(a,b){return (a.codigo||'').localeCompare(b.codigo||'');});
       totalBienes+=items.length;
-      items.forEach(function(b){ totalQ+=Number(b.valor||0); });
+      var subQ=0; items.forEach(function(b){ var v=Number(b.valor||0); totalQ+=v; subQ+=v; });
+      // Monto individual de ESTA tarjeta (además del total general de abajo).
+      var subTxt = subQ ? 'Q'+subQ.toLocaleString('es-GT',{minimumFractionDigits:2}) : '';
       var head='<div class="per-tarj-h">'
-        +'<b>Tarjeta '+esc(t.numero||'(pendiente)')+' &middot; '+plBien(items.length)+'</b>'
+        +'<b>Tarjeta '+esc(t.numero||'(pendiente)')+' &middot; '+plBien(items.length)
+        +(subTxt?' <span class="per-tarj-monto">'+subTxt+'</span>':'')+'</b>'
         +'<span class="per-vf" onclick="openPerson(\''+t.id+'\')">Ver ficha &rsaquo;</span></div>';
       var rows=items.length?items.map(function(b){
         return '<div class="per-bien">'
