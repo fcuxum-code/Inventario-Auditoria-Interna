@@ -250,3 +250,6 @@
 .per-ubicbtn:active{ transform:scale(.97); }
 .per-ubicbtn.sel{ background:var(--azul); border-color:var(--azul); color:#fff; }
 
+
+/* Monto individual de cada tarjeta en su encabezado */
+.per-tarj-monto{ color:var(--teal); font-weight:800; }
