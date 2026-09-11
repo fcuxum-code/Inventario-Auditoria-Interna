@@ -840,17 +840,27 @@ function quitarFirma(tarjetaId){
 }
 
 /* ================= TARJETA DE BIEN ================= */
-/* Texto resumen del bien para copiar a la tarjeta (AS-400/SICOIN). Solo incluye
-   los datos que existan: si un bien no tiene marca o serie, esos no aparecen. */
+/* ¿El campo trae un dato real? Muchos registros traen marcadores de "sin dato"
+   (S/M = sin marca, S/S = sin serie, S/N, N/A, guiones, etc.). Esos NO se copian. */
+function _tieneDato(v){
+  if(v==null) return false;
+  const t = String(v).trim().toUpperCase().replace(/\s+/g," ");
+  if(!t) return false;
+  const vacios = ["S/M","S/S","S/N","N/A","NA","N/D","ND","SIN","SIN MARCA","SIN MODELO",
+    "SIN SERIE","SIN DATO","SIN DATOS","NINGUNO","NINGUNA","-","--","---",".",".."];
+  return vacios.indexOf(t) < 0;
+}
+/* Texto resumen del bien para copiar a la tarjeta. Solo incluye los datos que
+   REALMENTE existan: si un bien no tiene marca, modelo o serie (o traen un
+   marcador de "sin dato"), esos campos no aparecen. */
 function resumenBien(b){
   if(!b) return "";
   const partes = [];
-  if(b.marca) partes.push("MARCA: "+b.marca);
-  if(b.modelo) partes.push("MODELO: "+b.modelo);
-  if(b.serie) partes.push("No. de serie: "+b.serie);
-  if(b.fechaCompra) partes.push("Fecha de compra: "+b.fechaCompra);
+  if(_tieneDato(b.marca))  partes.push("MARCA: "+String(b.marca).trim());
+  if(_tieneDato(b.modelo)) partes.push("MODELO: "+String(b.modelo).trim());
+  if(_tieneDato(b.serie))  partes.push("No. de serie: "+String(b.serie).trim());
   let cab = "No. BIEN "+(b.codigo||"");
-  if(b.descripcion) cab += ": "+b.descripcion;
+  if(_tieneDato(b.descripcion)) cab += ": "+String(b.descripcion).trim();
   return cab + (partes.length ? "; "+partes.join("; ") : "");
 }
 function copiarResumenBien(id){
