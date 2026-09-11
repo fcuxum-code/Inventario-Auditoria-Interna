@@ -621,6 +621,9 @@ function renderPerson(v){
   } else if(puedeEditar() && (n-d)>0){
     h+='<button class="act p" style="margin-bottom:12px" onclick="abrirModoRapido(\''+t.id+'\')">'+icon('zap',16,'margin-right:7px')+'Modo rápido — verificar '+(n-d)+' pendiente'+((n-d)===1?'':'s')+'</button>';
   }
+  if(puedeEditar() && n>0){
+    h+='<button class="act o" style="margin-bottom:12px;color:var(--naranja)" onclick="desasignarTodosDeTarjeta(\''+t.id+'\')">'+icon('refreshCw',15,'margin-right:6px')+'Desasignar los '+n+' bien'+(n===1?'':'es')+' (liberar para nueva provisión)</button>';
+  }
   if(show.length===0){ h+=emptyState('No hay bienes en este filtro'); v.innerHTML=h; loadThumbs(); return; }
   if(mode.filter!=="list" && (n-d)>1){
     h+='<button class="act o" style="margin-bottom:12px" onclick="marcarPendientesNo(\''+t.id+'\')">'+icon('x',15,'margin-right:6px')+'Ninguno de los pendientes está aquí (marcar todos NO)</button>';
@@ -652,6 +655,58 @@ function borrarTarjetaDefinitiva(id){
   db.collection("tarjetas").doc(id).delete()
     .then(function(){ toast("Responsable eliminado ✓"); goHome(); })
     .catch(function(){ toast("Error al eliminar"); });
+}
+/* Desasigna de golpe TODOS los bienes de una tarjeta: pasan a "pendientes de asignar"
+   (tarjetaId:null) conservando de dónde salieron (tarjetaAnteriorNumero/responsableAnterior)
+   y dejando un movimiento por bien. Pensado para preparar una nueva provisión: las tarjetas
+   provisionales dejan de servir cuando la gente se mueve, así se liberan rápido los bienes
+   sin borrar ningún dato. No elimina nada de la colección de bienes; solo los libera. */
+function desasignarTodosDeTarjeta(id){
+  if(!requiereEdicion()) return;
+  const t = TARJETAS[id]; if(!t) return;
+  const items = bienesDe(id);
+  if(!items.length){ toast("Esta tarjeta no tiene bienes asignados"); return; }
+  const quien = t.responsable || "esta persona";
+  if(!confirm('¿Desasignar los '+items.length+' bien'+(items.length===1?'':'es')+' de '+quien+'?\n\n'
+    +'Pasarán a "Bienes pendientes de asignar" para una nueva provisión. Queda registro de dónde salió cada uno. NO se borra ningún dato.')) return;
+  const tarjetaAnteriorNumero = t.numero||"", responsableAnterior = t.responsable||"";
+  // Lotes de 200 bienes (cada bien son 2 operaciones: actualizar + movimiento) para no pasar el límite de 500.
+  const lotes = [];
+  for(let i=0;i<items.length;i+=200) lotes.push(items.slice(i,i+200));
+  const sello = firebase.firestore.FieldValue.serverTimestamp();
+  Promise.all(lotes.map(function(grupo){
+    const batch = db.batch();
+    grupo.forEach(function(b){
+      batch.update(db.collection("bienes").doc(b.id), {
+        tarjetaId: null, tarjetaNumero: "", responsable: "", existe: "",
+        tarjetaAnteriorNumero: b.tarjetaNumero||tarjetaAnteriorNumero,
+        responsableAnterior: b.responsable||responsableAnterior,
+        actualizado: sello
+      });
+      const movRef = db.collection("movimientos").doc();
+      batch.set(movRef, {
+        codigo: b.codigo, tipoMovimiento: "DESASIGNADO",
+        tarjetaAnteriorNumero: b.tarjetaNumero||tarjetaAnteriorNumero,
+        responsableAnterior: b.responsable||responsableAnterior,
+        tarjetaNuevaNumero: "", responsableNuevo: "",
+        estado: b.estado||"", ubicacion: b.ubicacion||"",
+        observaciones: "Liberado en lote para nueva provisión",
+        fecha: sello, fechaTxt: today(), capturadoPor: META.by||""
+      });
+    });
+    return batch.commit();
+  })).then(function(){
+    toast(items.length+' bien'+(items.length===1?'':'es')+' liberado'+(items.length===1?'':'s')+' ✓ — en pendientes de asignar');
+    // Tarjeta ya vacía: si es provisional, ofrecer borrarla para dejar limpia la lista.
+    const esProvisional = t.provisional || !t.numero;
+    if(esProvisional && confirm('Los bienes quedaron libres. ¿Borrar también la tarjeta provisional vacía de '+quien+'?')){
+      db.collection("tarjetas").doc(id).delete()
+        .then(function(){ toast("Tarjeta provisional eliminada ✓"); goHome(); })
+        .catch(function(){ render(); });
+    } else {
+      render();
+    }
+  }).catch(function(){ toast("No se pudo completar (revise conexión)"); });
 }
 function setFilter(f){ mode.filter=f; render(); }
 
