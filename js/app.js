@@ -840,6 +840,27 @@ function quitarFirma(tarjetaId){
 }
 
 /* ================= TARJETA DE BIEN ================= */
+/* Texto resumen del bien para copiar a la tarjeta (AS-400/SICOIN). Solo incluye
+   los datos que existan: si un bien no tiene marca o serie, esos no aparecen. */
+function resumenBien(b){
+  if(!b) return "";
+  const partes = [];
+  if(b.marca) partes.push("MARCA: "+b.marca);
+  if(b.modelo) partes.push("MODELO: "+b.modelo);
+  if(b.serie) partes.push("No. de serie: "+b.serie);
+  if(b.fechaCompra) partes.push("Fecha de compra: "+b.fechaCompra);
+  let cab = "No. BIEN "+(b.codigo||"");
+  if(b.descripcion) cab += ": "+b.descripcion;
+  return cab + (partes.length ? "; "+partes.join("; ") : "");
+}
+function copiarResumenBien(id){
+  const b = BIENES[id]; if(!b) return;
+  const txt = resumenBien(b);
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(function(){ toast("Resumen copiado ✓ — péguelo en la tarjeta"); })
+      .catch(function(){ toast("Selecciónelo y copie manual"); });
+  } else toast("Selecciónelo y copie manual");
+}
 function itemCard(b, showOwner, extraChip){
   const cls = b.existe==="SÍ"?"done-si":b.existe==="NO"?"done-no":b.existe==="NO UBICADO"?"done-nu":"";
   const dup = b.notaDuplicado?'<span class="chip c-dup">⚠ REVISAR</span>':'';
@@ -895,6 +916,11 @@ function itemCard(b, showOwner, extraChip){
         +'<div><label>Fecha de compra</label><input type="text" value="'+esc(b.fechaCompra||"")+'" '+(soloLectura?'readonly':'onchange="markCampo(\''+id+'\',\'fechaCompra\',this.value)"')+' placeholder="DD/MM/AAAA"></div>'
       +'</div>'
       +'<label>Observaciones</label><input type="text" value="'+esc(b.observaciones||"")+'" '+(soloLectura?'readonly':'onchange="markCampo(\''+id+'\',\'observaciones\',this.value)"')+' placeholder="Ej. sin serie visible">'
+      +'<div class="resumenbox">'
+        +'<div class="resumenlbl">'+icon('clipboardCheck',13,'margin-right:5px')+'Resumen para copiar a la tarjeta</div>'
+        +'<div class="resumentxt" id="res_'+id+'">'+esc(resumenBien(b))+'</div>'
+        +'<button class="resumencopy" type="button" onclick="copiarResumenBien(\''+id+'\')">'+icon('clipboardCheck',14,'margin-right:6px')+'Copiar</button>'
+      +'</div>'
     +'</div>'
     +(b.fechaVerificacion?'<div class="stamp">✓ '+esc(b.fechaVerificacion)+(b.verificadoPor?" · "+esc(b.verificadoPor):"")+'</div>':'')
   +'</div>';
