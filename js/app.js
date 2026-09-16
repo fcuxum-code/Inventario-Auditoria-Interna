@@ -911,6 +911,7 @@ function itemCard(b, showOwner, extraChip){
       +'<span class="moretog" onclick="toggleExtra(\''+id+'\')">＋ Ficha (marca, serie…) / ubicación</span>'
       +'<span class="moretog" onclick="verHistorial(\''+id+'\')">'+icon('clock',13)+' Historial</span>'
       +'<span class="moretog" onclick="etiquetaBien(\''+id+'\')">'+icon('tag',13)+' Etiqueta QR</span>'
+      +(soloLectura?'':'<span class="moretog" onclick="cambiarNumeroBien(\''+id+'\')">✎ Corregir número</span>')
       +(!soloLectura && b.existe==="NO" && b.tarjetaId?'<span class="moretog" style="color:var(--naranja)" onclick="descargarBien(\''+id+'\')">'+icon('logOut',13)+' Quitar de la tarjeta</span>':'')
       +(!soloLectura && b.esNuevo?'<span class="moretog" style="color:var(--rojo)" onclick="borrarBien(\''+id+'\')">'+icon('trash',13)+' Borrar</span>':'')
     +'</div>'
@@ -1012,6 +1013,73 @@ function markCampo(id,campo,val){
   if(!requiereEdicion()) return;
   const patch={actualizado: firebase.firestore.FieldValue.serverTimestamp()}; patch[campo]=val;
   db.collection("bienes").doc(id).update(patch).catch(function(){ toast("No se pudo guardar"); });
+}
+/* Corregir el NÚMERO DE BIEN cuando quedó mal escrito. El número es también la llave
+   del registro (con él se busca al escanear), así que no se puede solo editar el texto:
+   se vuelve a crear el registro con el número correcto conservando TODOS sus datos
+   (descripción, marca, serie, tarjeta, foto, etc.), se borra el anterior y se reetiqueta
+   su historial de movimientos. No se pierde nada. */
+function cambiarNumeroBien(id){
+  if(!requiereEdicion()) return;
+  const b = BIENES[id]; if(!b) return;
+  const viejo = b.codigo||"";
+  pedirTexto("Corregir número de bien",
+    "Escriba el número de bien correcto. Se conserva todo (descripción, marca, serie, tarjeta, foto e historial).",
+    viejo, "text", function(val){
+    const nuevo = (val||"").trim();
+    if(!nuevo) return;
+    if(nuevo === viejo){ toast("Es el mismo número"); return; }
+    const nuevoId = bienDocId(nuevo);
+    if(nuevoId !== id && BIENES[nuevoId]){
+      alert('Ya existe otro bien con el número "'+nuevo+'". Revise ese registro o use otro número.');
+      return;
+    }
+    if(!confirm('¿Cambiar el número de bien de "'+viejo+'" a "'+nuevo+'"?\n\nSe conserva toda la información y el historial. No se borra ningún dato.')) return;
+    const sello = firebase.firestore.FieldValue.serverTimestamp();
+    db.collection("movimientos").where("codigo","==",viejo).get().then(function(snap){
+      const ops = [];
+      if(nuevoId === id){
+        ops.push({t:"update", ref: db.collection("bienes").doc(id), data:{codigo:nuevo, actualizado:sello}});
+      } else {
+        const data = Object.assign({}, b); delete data.id; data.codigo = nuevo; data.actualizado = sello;
+        ops.push({t:"set", ref: db.collection("bienes").doc(nuevoId), data:data});
+        ops.push({t:"delete", ref: db.collection("bienes").doc(id)});
+      }
+      snap.docs.forEach(function(d){ ops.push({t:"update", ref:d.ref, data:{codigo:nuevo}}); });
+      ops.push({t:"set", ref: db.collection("movimientos").doc(), data:{
+        codigo: nuevo, tipoMovimiento:"CORRECCION_NUMERO",
+        tarjetaAnteriorNumero:"", responsableAnterior:"",
+        tarjetaNuevaNumero: b.tarjetaNumero||"", responsableNuevo: b.responsable||"",
+        estado: b.estado||"", ubicacion: b.ubicacion||"",
+        observaciones: 'Número corregido de '+viejo+' a '+nuevo,
+        fecha: sello, fechaTxt: today(), capturadoPor: META.by||""
+      }});
+      // Lotes de 400 operaciones para no pasar el límite de 500.
+      let p = Promise.resolve();
+      for(let i=0;i<ops.length;i+=400){
+        const grupo = ops.slice(i,i+400);
+        p = p.then(function(){
+          const batch = db.batch();
+          grupo.forEach(function(o){
+            if(o.t==="set") batch.set(o.ref, o.data);
+            else if(o.t==="update") batch.update(o.ref, o.data);
+            else if(o.t==="delete") batch.delete(o.ref);
+          });
+          return batch.commit();
+        });
+      }
+      return p;
+    }).then(function(){
+      // Si cambió la llave, llevar también la foto guardada en el teléfono al nuevo número.
+      if(nuevoId !== id){
+        fotoGet("B"+id).then(function(rec){
+          if(rec){ fotoPut(Object.assign({}, rec, {k:"B"+nuevoId})).then(function(){ fotoDel("B"+id); }).catch(function(){}); }
+        }).catch(function(){});
+      }
+      toast('Número corregido a '+nuevo+' ✓');
+      if(typeof render==="function") render();
+    }).catch(function(){ toast("No se pudo corregir (revise conexión)"); });
+  });
 }
 /* Botones para elegir la ubicación de la lista estándar (LOCS). Se usan igual en la
    verificación de un bien (Responsables) y en Nueva toma, para que la ubicación se
