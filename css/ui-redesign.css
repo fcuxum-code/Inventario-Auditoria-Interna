@@ -320,3 +320,5 @@ header{
   width:100%; box-sizing:border-box; padding:11px 12px; font-size:15px;
   border:1.5px solid var(--linea); border-radius:10px; background:var(--card); color:var(--ink);
 }
+textarea.offld{ font-family:inherit; resize:vertical; min-height:54px; line-height:1.4; }
+select.offld{ appearance:auto; }

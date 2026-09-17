@@ -1468,70 +1468,115 @@ function oficioToggle(id, checked){
   const c = document.getElementById("ofcount");
   if(c) c.textContent = oficioSel.size+" seleccionado(s)";
 }
+const _MESES_ES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const _DIAS_ES  = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+function fechaLarga(dt){ dt=dt||new Date(); return dt.getDate()+" de "+_MESES_ES[dt.getMonth()]+" de "+dt.getFullYear(); }
+function fechaLargaDia(dt){ dt=dt||new Date(); return _DIAS_ES[dt.getDay()]+" "+fechaLarga(dt); }
 function oficioGenerar(){
   if(oficioSel.size===0){ toast("Marque al menos un bien para el oficio"); return; }
   const P = window.OFICIO_PLANTILLA || {};
   const campos = P.campos || [];
   const filas = campos.map(function(cp){
-    const def = cp.def==="__HOY__" ? today() : (cp.def||"");
-    return '<label class="oflbl">'+esc(cp.label)+(cp.req?' *':'')+'</label>'
-      + '<input class="offld" id="off_'+cp.id+'" type="'+(cp.tipo||"text")+'" value="'+esc(def)+'" '+(cp.req?'data-req="1"':'')+'>';
+    let def = cp.def;
+    if(def==="__FECHA_LARGA__") def = fechaLarga(new Date());
+    else if(def==="__FECHA_LARGA_DIA__") def = fechaLargaDia(new Date());
+    else def = def || "";
+    const lbl = '<label class="oflbl">'+esc(cp.label)+(cp.req?' *':'')+'</label>';
+    if(cp.tipo==="select"){
+      const ops = (cp.opciones==="__UBIC__") ? (P.ubicaciones||[]) : (cp.opciones||[]);
+      return lbl + '<select class="offld" id="off_'+cp.id+'">'
+        + ops.map(function(o){ return '<option value="'+esc(o.val)+'">'+esc(o.txt)+'</option>'; }).join("") + '</select>';
+    }
+    if(cp.tipo==="textarea"){
+      return lbl + '<textarea class="offld" id="off_'+cp.id+'" rows="2" placeholder="'+esc(cp.ph||"")+'"></textarea>';
+    }
+    return lbl + '<input class="offld" id="off_'+cp.id+'" type="text" value="'+esc(def)+'" placeholder="'+esc(cp.ph||"")+'">';
   }).join("");
   document.getElementById("sheet").innerHTML =
-    '<div class="grip"></div><h3>'+icon('clipboardCheck',18,'margin-right:6px;vertical-align:-3px')+'Oficio de salida — '+oficioSel.size+' bien(es)</h3>'
-    + '<div class="hint" style="margin-top:-8px">Complete los datos del oficio. Se genera un PDF para imprimir o compartir; no cambia nada en el inventario.</div>'
+    '<div class="grip"></div><h3>'+icon('clipboardCheck',18,'margin-right:6px;vertical-align:-3px')+'Oficio de egreso — '+oficioSel.size+' bien(es)</h3>'
+    + '<div class="hint" style="margin-top:-8px">Complete los datos. Se genera el oficio en Word (editable) o PDF; no cambia nada en el inventario.</div>'
     + '<div class="ofform">'+filas+'</div>'
     + '<button class="act g" onclick="oficioWord()">'+icon('download',16,'margin-right:6px')+'Descargar Word (editable)</button>'
     + '<button class="act o" onclick="oficioImprimir()">'+icon('download',15,'margin-right:6px')+'Imprimir / PDF</button>'
     + '<button class="act o" onclick="closeMenu()">Cancelar</button>';
   showSheet();
 }
-/* Reúne los datos del formulario y los bienes marcados. Devuelve null si falta la plantilla. */
+/* Reúne datos del formulario, bienes marcados y fungibles escritos a mano. */
 function _oficioDatos(){
   const P = window.OFICIO_PLANTILLA; if(!P) return null;
   const d = {};
   (P.campos||[]).forEach(function(cp){ const el=document.getElementById("off_"+cp.id); d[cp.id]=el?el.value.trim():""; });
   const bienes = Array.from(oficioSel).map(function(id){ return BIENES[id]; }).filter(Boolean)
     .sort(function(a,b){ return (a.codigo||"").localeCompare(b.codigo||""); });
+  // Fungibles: una línea por bien; empieza con la cantidad y luego la descripción.
+  const fungibles = (d.fungibles||"").split(/\n+/).map(function(l){ return l.trim(); }).filter(Boolean).map(function(l){
+    const m = l.match(/^(\d+)\s*[-;,\.\)]?\s+(.+)$/);
+    return m ? { cantidad:m[1], descripcion:m[2].trim() } : { cantidad:"1", descripcion:l };
+  });
   d.cantidad = bienes.length;
-  return { P:P, d:d, bienes:bienes, cols: P.columnas || [
-    {th:"No. de bien",get:function(b){return b.codigo||"";}},
-    {th:"Descripción",get:function(b){return b.descripcion||"";}} ] };
+  return { P:P, d:d, bienes:bienes, fungibles:fungibles };
 }
-function _oficioTabla(cols, bienes, inline){
-  const thStyle = inline ? ' style="border:1px solid #999;padding:5px 7px;background:#EAEEF4;text-align:left"' : '';
-  const tdBase  = inline ? 'border:1px solid #999;padding:5px 7px;' : '';
-  const thead = '<tr>'+cols.map(function(c){ return '<th'+(inline?' style="border:1px solid #999;padding:5px 7px;background:#EAEEF4;text-align:'+(c.num?'right':'left')+'"':(c.num?' class="pdnum"':''))+'>'+esc(c.th)+'</th>'; }).join("")+'</tr>';
-  const tbody = bienes.map(function(b){
-    return '<tr>'+cols.map(function(c){ let v; try{ v=c.get(b); }catch(e){ v=""; }
-      return '<td'+(inline?' style="'+tdBase+'text-align:'+(c.num?'right':'left')+'"':(c.num?' class="pdnum"':''))+'>'+esc(v==null?"":v)+'</td>'; }).join("")+'</tr>';
+/* Arma el HTML del oficio tal como el modelo. Estilos en línea (una sola versión que
+   sirve para el PDF del navegador y para Word, que no entiende flexbox ni variables). */
+function _oficioDoc(info){
+  const P=info.P, d=info.d, bienes=info.bienes, fung=info.fungibles;
+  const bordeTd = 'border:1px solid #333;padding:4px 6px;font-size:11pt;';
+  const th = function(txt, w){ return '<th style="'+bordeTd+'background:#e9e9e9;text-align:center'+(w?';width:'+w:'')+'">'+esc(txt)+'</th>'; };
+  // Tabla de activo fijo: No. | No. BIEN | DESCRIPCIÓN
+  const filasAF = bienes.map(function(b,i){
+    return '<tr><td style="'+bordeTd+'text-align:center">'+(i+1)+'</td>'
+      + '<td style="'+bordeTd+'text-align:center">'+esc(b.codigo||"")+'</td>'
+      + '<td style="'+bordeTd+'">'+esc(P.descBien?P.descBien(b):(b.descripcion||""))+'</td></tr>';
   }).join("");
-  if(inline) return '<table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-top:6px"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table>';
-  return '<table class="pdtabla oftabla"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table>';
+  const tablaAF = '<table style="width:100%;border-collapse:collapse;margin:10px 0"><thead><tr>'
+    + th("No.","40px") + th("No. BIEN","120px") + th("DESCRIPCIÓN") + '</tr></thead><tbody>'+filasAF+'</tbody></table>';
+  // Bloque de fungibles (solo si se escribieron)
+  let bloqueFung = "";
+  if(fung && fung.length){
+    const filasF = fung.map(function(f){
+      return '<tr><td style="'+bordeTd+'text-align:center;width:90px">'+esc(f.cantidad)+'</td>'
+        + '<td style="'+bordeTd+'">'+esc(f.descripcion)+'</td></tr>';
+    }).join("");
+    bloqueFung = '<p style="text-indent:1.2cm;margin:12px 0 0">'+esc(P.fungibleIntro||"")+'</p>'
+      + '<table style="width:100%;border-collapse:collapse;margin:10px 0"><thead><tr>'
+      + th("CANTIDAD") + th("DESCRIPCIÓN") + '</tr></thead><tbody>'+filasF+'</tbody></table>';
+  }
+  // Firmas (fijas), en tabla de 2 columnas con divisor
+  const firmas = P.firmas||[];
+  const celdaFirma = function(f, borde){
+    f = f||{};
+    return '<td style="width:50%;vertical-align:top;text-align:center;padding:0 14px;font-size:10.5pt'+(borde?';border-left:1px solid #333':'')+'">'
+      + '<div style="margin-bottom:2px">'+esc(f.nombre||"")+'</div>'
+      + (f.cargo||[]).map(function(c){ return '<div style="font-weight:bold">'+esc(c)+'</div>'; }).join("") + '</td>';
+  };
+  const tablaFirmas = '<table style="width:100%;border-collapse:collapse;margin-top:70px"><tr>'
+    + celdaFirma(firmas[0], false) + celdaFirma(firmas[1], true) + '</tr></table>';
+  const pStyle = 'text-indent:1.2cm;margin:9px 0;text-align:justify;line-height:1.5';
+  return '<div style="font-family:\'Times New Roman\',serif;font-size:12pt;color:#000">'
+    + (P.membreteHTML||"")
+    + '<div style="text-align:right;margin:4px 0 12px">Guatemala, '+esc(d.fechaOficio||"")+'</div>'
+    + (P.destinatario||"")
+    + '<div style="margin:12px 0 2px">'+esc(P.saludo||"")+'</div>'
+    + '<p style="'+pStyle+'">'+esc(P.intro||"")+'</p>'
+    + tablaAF + bloqueFung
+    + '<p style="'+pStyle+'">'+(typeof P.parrafoFinal==="function"?P.parrafoFinal(d):"")+'</p>'
+    + '<p style="text-indent:1.2cm;margin:16px 0 0">'+esc(P.despedida||"")+'</p>'
+    + tablaFirmas
+    + '<div style="margin-top:12px;font-size:10pt">'+esc(P.referencia||"")+'</div>'
+    + (P.footerHTML||"")
+    + '</div>';
 }
 function oficioWord(){
   if(oficioSel.size===0){ toast("Marque al menos un bien"); return; }
   const info = _oficioDatos(); if(!info){ toast("Falta la plantilla del oficio"); return; }
-  const P=info.P, d=info.d;
-  const membrete = '<div style="text-align:center;margin-bottom:16px">'+(P.membreteHTML||"")+'</div>';
-  const cuerpo = (typeof P.cuerpo==="function") ? P.cuerpo(d) : "";
-  const cierre = (typeof P.cierre==="function") ? P.cierre(d) : "";
-  const contenido = membrete + cuerpo + _oficioTabla(info.cols, info.bienes, true) + cierre
-    + '<p style="margin-top:26px;font-size:9.5px;color:#888;text-align:center">Revise el texto de este oficio antes de usarlo como documento oficial.</p>';
-  // Documento HTML que Word abre y deja editar. Estilos en línea + un bloque simple
-  // (sin flexbox ni variables CSS, que Word no entiende).
   const doc = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
-    + '<head><meta charset="utf-8"><title>Oficio de salida de bienes</title>'
+    + '<head><meta charset="utf-8"><title>Oficio de egreso de bienes</title>'
     + '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->'
-    + '<style>'
-      + '@page{ size:21.6cm 27.9cm; margin:2.5cm 2.5cm; }'
-      + 'body{ font-family:"Times New Roman",serif; font-size:12pt; color:#000; }'
-      + 'p{ margin:8pt 0; } table{ border-collapse:collapse; }'
-      + '.oftxt{ font-size:12pt; line-height:1.5; }'
-    + '</style></head><body>'+contenido+'</body></html>';
+    + '<style>@page{ size:21.6cm 27.9cm; margin:2.2cm 2.5cm; } body{ font-family:"Times New Roman",serif; font-size:12pt; color:#000; }</style>'
+    + '</head><body>'+_oficioDoc(info)+'</body></html>';
   const blob = new Blob(['﻿'+doc], {type:"application/msword"});
-  descargarBlob(blob, "Oficio_salida_bienes_"+today().replace(/\//g,"-")+".doc");
-  toast("Oficio Word descargado ✓ — ábralo para editar/firmar");
+  descargarBlob(blob, "Oficio_egreso_bienes_"+today().replace(/\//g,"-")+".doc");
+  toast("Oficio Word descargado ✓ — ábralo para revisar/firmar");
   closeMenu();
 }
 function descargarBlob(blob, nombre){
@@ -1546,15 +1591,9 @@ function descargarBlob(blob, nombre){
 function oficioImprimir(){
   if(oficioSel.size===0){ toast("Marque al menos un bien"); return; }
   const info = _oficioDatos(); if(!info){ toast("Falta la plantilla del oficio"); return; }
-  const P=info.P, d=info.d;
-  const membrete = '<div class="ofmembrete">'+(P.membreteHTML||"")+'</div>';
-  const cuerpo = (typeof P.cuerpo==="function") ? P.cuerpo(d) : "";
-  const cierre = (typeof P.cierre==="function") ? P.cierre(d) : "";
-  const html = membrete + cuerpo + _oficioTabla(info.cols, info.bienes, false) + cierre
-    + '<div class="pdnota">Revise el texto de este oficio antes de usarlo como documento oficial.</div>';
   const pa = document.getElementById("printArea");
   pa.setAttribute("data-modo","oficio");
-  pa.innerHTML = html;
+  pa.innerHTML = _oficioDoc(info);
   closeMenu();
   setTimeout(function(){ window.print(); }, 80);
 }
