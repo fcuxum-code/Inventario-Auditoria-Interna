@@ -60,12 +60,16 @@
     /* 4) CIERRE + FIRMAS (debajo de la tabla).
        d.entrega y d.recibe = nombre/puesto de quien entrega y quien recibe. */
     cierre: function(d){
+      // Firmas en tabla (se ve igual en el PDF del navegador y en Word; el flexbox no
+      // funciona en Word, por eso se usa tabla de 2 columnas).
       return ''
         + '<p class="oftxt" style="margin-top:18px">Sin otro particular, atentamente.</p>'
-        + '<div class="pdfirmas">'
-          + '<div class="pdfirma"><div class="pdline"></div>'+(d.entrega?e(d.entrega):'Entrega')+'</div>'
-          + '<div class="pdfirma"><div class="pdline"></div>'+(d.recibe?e(d.recibe):'Recibe')+'</div>'
-        + '</div>';
+        + '<table class="pdfirmas-t" style="width:100%;margin-top:48px;border-collapse:collapse"><tr>'
+          + '<td style="text-align:center;font-size:11.5px;padding:0 20px;vertical-align:top">'
+            + '<div style="border-top:1px solid #333;margin-bottom:6px;height:1px"></div>'+(d.entrega?e(d.entrega):'Entrega')+'</td>'
+          + '<td style="text-align:center;font-size:11.5px;padding:0 20px;vertical-align:top">'
+            + '<div style="border-top:1px solid #333;margin-bottom:6px;height:1px"></div>'+(d.recibe?e(d.recibe):'Recibe')+'</td>'
+        + '</tr></table>';
     },
 
     /* Campos que pide el formulario antes de generar. Puede quitar los que
