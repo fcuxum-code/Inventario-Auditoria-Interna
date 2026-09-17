@@ -419,7 +419,7 @@ function render(){
   const v=document.getElementById("view");
   const fbtn = document.getElementById("filterbtn"); if(fbtn) fbtn.classList.toggle("on", filtrosActivos()||mostrarFiltros);
   mostrarBuscador(mode.view!=="ses"); // en "Nueva toma" el buscador no aplica y solo estorba
-  if(mode.q || filtrosActivos() || mostrarFiltros) return renderSearch(v);
+  if(mode.q || filtrosActivos() || mostrarFiltros || oficioModo) return renderSearch(v);
   if(mode.view==="person") return renderPerson(v);
   if(mode.view==="hall") return renderHall(v);
   if(mode.view==="ses") return renderSession(v);
@@ -918,7 +918,6 @@ function itemCard(b, showOwner, extraChip, selUI){
       +'<span class="moretog" onclick="toggleExtra(\''+id+'\')">＋ Ficha (marca, serie…) / ubicación</span>'
       +'<span class="moretog" onclick="verHistorial(\''+id+'\')">'+icon('clock',13)+' Historial</span>'
       +'<span class="moretog" onclick="etiquetaBien(\''+id+'\')">'+icon('tag',13)+' Etiqueta QR</span>'
-      +(soloLectura?'':'<span class="moretog" onclick="cambiarNumeroBien(\''+id+'\')">✎ Corregir número</span>')
       +(!soloLectura && b.existe==="NO" && b.tarjetaId?'<span class="moretog" style="color:var(--naranja)" onclick="descargarBien(\''+id+'\')">'+icon('logOut',13)+' Quitar de la tarjeta</span>':'')
       +(!soloLectura && b.esNuevo?'<span class="moretog" style="color:var(--rojo)" onclick="borrarBien(\''+id+'\')">'+icon('trash',13)+' Borrar</span>':'')
     +'</div>'
@@ -1026,6 +1025,17 @@ function markCampo(id,campo,val){
    se vuelve a crear el registro con el número correcto conservando TODOS sus datos
    (descripción, marca, serie, tarjeta, foto, etc.), se borra el anterior y se reetiqueta
    su historial de movimientos. No se pierde nada. */
+/* Desde el menú: pide el número que está mal, ubica el bien y abre la corrección. */
+function abrirCorregirNumero(){
+  if(!requiereEdicion()) return;
+  closeMenu();
+  pedirTexto("Corregir número de bien", "Escriba el número de bien que está MAL (el actual) para ubicarlo.", "", "text", function(val){
+    const raw = (val||"").trim(); if(!raw) return;
+    const b = buscarBienPorCodigoOSiges(raw);
+    if(!b){ toast('No se encontró ningún bien con el número "'+raw+'"'); return; }
+    cambiarNumeroBien(b.id);   // pide el número correcto y hace el cambio
+  });
+}
 function cambiarNumeroBien(id){
   if(!requiereEdicion()) return;
   const b = BIENES[id]; if(!b) return;
@@ -1438,29 +1448,43 @@ function renderSearch(v){
     return coincide([z.inv, z.desc]);
   }) : [];
   let h = renderBarraFiltros();
-  // Botón para entrar/salir del modo "armar oficio de salida"
-  h += '<div class="ofmodo-row">'
-    + '<button class="ofmodo-btn'+(oficioModo?' on':'')+'" onclick="oficioToggleModo()">'
-      + icon('clipboardCheck',15,'margin-right:6px')
-      + (oficioModo?'Salir de selección de oficio':'Armar oficio de salida de bienes')+'</button>'
-    + '</div>';
-  if(oficioModo) h += '<div class="hint" style="margin-top:-4px">Marque los bienes que van en el oficio (uno o varios) y toque <b>Generar oficio</b> abajo. Esto no cambia nada en el inventario.</div>';
-  h += '<div class="hint">'+(ids.length+hz.length)+' resultado(s)'+(q?' para "'+esc(mode.q)+'"':(filtrosActivos()?' con estos filtros':''))+'.</div>';
-  if(hz.length) h += hz.map(hallCard).join("");
-  if(ids.length===0 && hz.length===0) h += emptyState('Sin coincidencias', q?'Si el bien no está en el listado, use Nueva toma o Hallazgo':'Pruebe con otros filtros');
-  else h += ids.slice(0,200).map(function(id){ return itemCard(BIENES[id], true, "", oficioModo); }).join("");
+  // El modo "oficio" se activa desde el menú (no aparece en la búsqueda normal).
+  if(oficioModo){
+    h += '<div class="ofmodo-row">'
+      + '<button class="ofmodo-btn on" onclick="oficioSalirModo()">'+icon('arrowLeft',15,'margin-right:6px')+'Salir del oficio</button></div>';
+    h += '<div class="hint" style="margin-top:-4px">Busque y <b>marque</b> los bienes que van en el oficio (uno o varios) y toque <b>Generar oficio</b> abajo. No cambia nada en el inventario.</div>';
+  }
+  const soloGuia = oficioModo && !q && !filtrosActivos();  // sin búsqueda todavía: no volcar todo
+  if(!soloGuia) h += '<div class="hint">'+(ids.length+hz.length)+' resultado(s)'+(q?' para "'+esc(mode.q)+'"':(filtrosActivos()?' con estos filtros':''))+'.</div>';
+  if(soloGuia){
+    h += emptyState('Escriba en el buscador', 'Encuentre los bienes por nombre, número, descripción, modelo o serie, y márquelos.');
+  } else {
+    if(hz.length) h += hz.map(hallCard).join("");
+    if(ids.length===0 && hz.length===0) h += emptyState('Sin coincidencias', q?'Si el bien no está en el listado, use Nueva toma o Hallazgo':'Pruebe con otros filtros');
+    else h += ids.slice(0,200).map(function(id){ return itemCard(BIENES[id], true, "", oficioModo); }).join("");
+  }
   if(oficioModo){
     h += '<div class="ofbar"><span class="ofbar-n" id="ofcount">'+oficioSel.size+' seleccionado(s)</span>'
        + '<button class="ofbar-go" onclick="oficioGenerar()">'+icon('download',15,'margin-right:6px')+'Generar oficio</button></div>';
   }
   v.innerHTML = h; loadThumbs();
 }
-/* ---- Oficio de salida de bienes: selección y generación del PDF ---- */
-function oficioToggleModo(){
-  oficioModo = !oficioModo;
-  oficioSel = new Set();     // siempre se empieza limpio
+/* ---- Oficio de egreso: se entra desde el menú ---- */
+function abrirOficioEgreso(){
+  closeMenu();
+  oficioModo = true; oficioSel = new Set();
+  mode.view = "home"; mode.q = "";
+  const sb = document.getElementById("search"); if(sb) sb.value = "";
+  render(); window.scrollTo(0,0);
+  setTimeout(function(){ const s=document.getElementById("search"); if(s) s.focus(); }, 120);
+}
+function oficioSalirModo(){
+  oficioModo = false; oficioSel = new Set();
   render();
 }
+// Helpers para el botón atrás (js/navegacion.js)
+window.__oficioEnModo = function(){ return oficioModo; };
+window.__oficioReset = function(){ oficioModo = false; oficioSel = new Set(); };
 function oficioToggle(id, checked){
   if(checked) oficioSel.add(id); else oficioSel.delete(id);
   const card = document.getElementById("it_"+id);
@@ -2643,6 +2667,10 @@ function openMenu(){
 
     /* Las opciones de esta sección las agrega js/herramientas-module.js. */
     + sec("Herramientas")
+
+    + sec("Oficios y correcciones")
+    +'<div class="mitem" onclick="abrirOficioEgreso()"><span class="ic">'+icon('clipboardCheck',20)+'</span><div><b>Oficio de egreso de bienes</b><small>Elija los bienes y genere el oficio en Word</small></div></div>'
+    +(puedeEditar()?'<div class="mitem" onclick="abrirCorregirNumero()"><span class="ic">'+icon('refreshCw',20)+'</span><div><b>Corregir número de un bien</b><small>Cuando un No. de bien quedó mal escrito</small></div></div>':'')
 
     + sec("Reportes")
     +'<div class="mitem" onclick="imprimirReporteEjecutivo()"><span class="ic">'+icon('clipboardCheck',20)+'</span><div><b>Reporte ejecutivo (PDF)</b><small>Resumen de una página: avance, diferencias y carga al AS-400</small></div></div>'

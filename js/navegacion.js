@@ -200,12 +200,13 @@
        el desglose de pendientes por tipo de bien). Antes esto no dejaba paso en el historial
        y el botón atrás salía de la app en vez de regresar al inicio. */
     function enBusqueda(){
-      try{ return !!(mode.q || filtrosActivos() || mostrarFiltros); }catch(e){ return false; }
+      try{ return !!(mode.q || filtrosActivos() || mostrarFiltros || (window.__oficioEnModo && window.__oficioEnModo())); }catch(e){ return false; }
     }
     function cerrarBusqueda(){
       var c = document.getElementById("search"); if(c) c.value = "";
       try{ mode.q = ""; }catch(e){}
       if(typeof resetFiltrosBusqueda === "function") resetFiltrosBusqueda();
+      if(window.__oficioReset) window.__oficioReset();   // el atrás también sale del modo oficio
       if(typeof render === "function") render();
     }
     function sincronizarBusqueda(){
