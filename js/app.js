@@ -365,6 +365,9 @@ function renderPanelMetricas(){
 /* ================= FILTROS DE BÚSQUEDA ================= */
 let searchFiltros = { ubic:"", estado:"", categoria:"", as400:"", pend:"" };
 let mostrarFiltros = false;
+/* Selección de bienes para armar un OFICIO de salida (no toca la base, solo genera el PDF). */
+let oficioModo = false;
+let oficioSel = new Set();
 function filtrosActivos(){ return !!(searchFiltros.ubic || searchFiltros.estado || searchFiltros.categoria || searchFiltros.as400 || searchFiltros.pend); }
 function resetFiltrosBusqueda(){ searchFiltros={ubic:"",estado:"",categoria:"",as400:"",pend:""}; mostrarFiltros=false; }
 function toggleFiltrosBusqueda(){ mostrarFiltros=!mostrarFiltros; render(); }
@@ -871,7 +874,7 @@ function copiarResumenBien(id){
       .catch(function(){ toast("Selecciónelo y copie manual"); });
   } else toast("Selecciónelo y copie manual");
 }
-function itemCard(b, showOwner, extraChip){
+function itemCard(b, showOwner, extraChip, selUI){
   const cls = b.existe==="SÍ"?"done-si":b.existe==="NO"?"done-no":b.existe==="NO UBICADO"?"done-nu":"";
   const dup = b.notaDuplicado?'<span class="chip c-dup">⚠ REVISAR</span>':'';
   const nuevo = b.esNuevo?'<span class="chip c-hz">NUEVO</span>':'';
@@ -894,7 +897,11 @@ function itemCard(b, showOwner, extraChip){
         +['BUENO','REGULAR','MALO','PARA BAJA'].map(function(e){ const cl=e==="PARA BAJA"?"baja":e.toLowerCase();
           return '<button class="btn est e-'+cl+' '+(b.estado===e?"sel":"")+'" onclick="markEstado(\''+id+'\',\''+e+'\')">'+(e==="PARA BAJA"?"Baja":e.charAt(0)+e.slice(1).toLowerCase())+'</button>'; }).join("")
       +'</div>';
-  return '<div class="item '+cls+'" id="it_'+id+'">'
+  const selBox = selUI
+    ? '<label class="ofcheck"><input type="checkbox" '+(oficioSel.has(id)?'checked':'')+' onclick="oficioToggle(\''+id+'\',this.checked)"><span>Incluir en el oficio</span></label>'
+    : '';
+  return '<div class="item '+cls+(selUI && oficioSel.has(id)?' ofsel':'')+'" id="it_'+id+'">'
+    +selBox
     +'<div class="itop"><span class="inv">'+esc(b.codigo)+(b.codigoSiges?' <small style="font-weight:600;color:var(--gris2)">· SIGES '+esc(b.codigoSiges)+'</small>':'')+'</span><span class="val">'+money(b.valor)+'</span></div>'
     +'<div class="ochips">'+chipCategoria(b)+chipTipo(b.tipo)+nuevo+pendChip+dup+(extraChip||"")+'</div>'
     +descField
@@ -1431,11 +1438,79 @@ function renderSearch(v){
     return coincide([z.inv, z.desc]);
   }) : [];
   let h = renderBarraFiltros();
+  // Botón para entrar/salir del modo "armar oficio de salida"
+  h += '<div class="ofmodo-row">'
+    + '<button class="ofmodo-btn'+(oficioModo?' on':'')+'" onclick="oficioToggleModo()">'
+      + icon('clipboardCheck',15,'margin-right:6px')
+      + (oficioModo?'Salir de selección de oficio':'Armar oficio de salida de bienes')+'</button>'
+    + '</div>';
+  if(oficioModo) h += '<div class="hint" style="margin-top:-4px">Marque los bienes que van en el oficio (uno o varios) y toque <b>Generar oficio</b> abajo. Esto no cambia nada en el inventario.</div>';
   h += '<div class="hint">'+(ids.length+hz.length)+' resultado(s)'+(q?' para "'+esc(mode.q)+'"':(filtrosActivos()?' con estos filtros':''))+'.</div>';
   if(hz.length) h += hz.map(hallCard).join("");
   if(ids.length===0 && hz.length===0) h += emptyState('Sin coincidencias', q?'Si el bien no está en el listado, use Nueva toma o Hallazgo':'Pruebe con otros filtros');
-  else h += ids.slice(0,200).map(function(id){ return itemCard(BIENES[id], true); }).join("");
+  else h += ids.slice(0,200).map(function(id){ return itemCard(BIENES[id], true, "", oficioModo); }).join("");
+  if(oficioModo){
+    h += '<div class="ofbar"><span class="ofbar-n" id="ofcount">'+oficioSel.size+' seleccionado(s)</span>'
+       + '<button class="ofbar-go" onclick="oficioGenerar()">'+icon('download',15,'margin-right:6px')+'Generar oficio</button></div>';
+  }
   v.innerHTML = h; loadThumbs();
+}
+/* ---- Oficio de salida de bienes: selección y generación del PDF ---- */
+function oficioToggleModo(){
+  oficioModo = !oficioModo;
+  oficioSel = new Set();     // siempre se empieza limpio
+  render();
+}
+function oficioToggle(id, checked){
+  if(checked) oficioSel.add(id); else oficioSel.delete(id);
+  const card = document.getElementById("it_"+id);
+  if(card) card.classList.toggle("ofsel", checked);
+  const c = document.getElementById("ofcount");
+  if(c) c.textContent = oficioSel.size+" seleccionado(s)";
+}
+function oficioGenerar(){
+  if(oficioSel.size===0){ toast("Marque al menos un bien para el oficio"); return; }
+  const P = window.OFICIO_PLANTILLA || {};
+  const campos = P.campos || [];
+  const filas = campos.map(function(cp){
+    const def = cp.def==="__HOY__" ? today() : (cp.def||"");
+    return '<label class="oflbl">'+esc(cp.label)+(cp.req?' *':'')+'</label>'
+      + '<input class="offld" id="off_'+cp.id+'" type="'+(cp.tipo||"text")+'" value="'+esc(def)+'" '+(cp.req?'data-req="1"':'')+'>';
+  }).join("");
+  document.getElementById("sheet").innerHTML =
+    '<div class="grip"></div><h3>'+icon('clipboardCheck',18,'margin-right:6px;vertical-align:-3px')+'Oficio de salida — '+oficioSel.size+' bien(es)</h3>'
+    + '<div class="hint" style="margin-top:-8px">Complete los datos del oficio. Se genera un PDF para imprimir o compartir; no cambia nada en el inventario.</div>'
+    + '<div class="ofform">'+filas+'</div>'
+    + '<button class="act g" onclick="oficioImprimir()">'+icon('download',16,'margin-right:6px')+'Generar PDF</button>'
+    + '<button class="act o" onclick="closeMenu()">Cancelar</button>';
+  showSheet();
+}
+function oficioImprimir(){
+  const P = window.OFICIO_PLANTILLA;
+  if(!P){ toast("Falta la plantilla del oficio"); return; }
+  const d = {};
+  (P.campos||[]).forEach(function(cp){ const el=document.getElementById("off_"+cp.id); d[cp.id]=el?el.value.trim():""; });
+  // Bienes seleccionados, en el orden en que aparecen (por código)
+  const bienes = Array.from(oficioSel).map(function(id){ return BIENES[id]; }).filter(Boolean)
+    .sort(function(a,b){ return (a.codigo||"").localeCompare(b.codigo||""); });
+  d.cantidad = bienes.length;
+  const cols = P.columnas || [{th:"No. de bien",get:function(b){return b.codigo||"";}},{th:"Descripción",get:function(b){return b.descripcion||"";}}];
+  const thead = '<tr>'+cols.map(function(c){ return '<th'+(c.num?' class="pdnum"':'')+'>'+esc(c.th)+'</th>'; }).join("")+'</tr>';
+  const tbody = bienes.map(function(b){
+    return '<tr>'+cols.map(function(c){ let val; try{ val=c.get(b); }catch(e){ val=""; } return '<td'+(c.num?' class="pdnum"':'')+'>'+esc(val==null?"":val)+'</td>'; }).join("")+'</tr>';
+  }).join("");
+  const membrete = '<div class="ofmembrete">'+(P.membreteHTML||"")+'</div>';
+  const cuerpo = (typeof P.cuerpo==="function") ? P.cuerpo(d) : "";
+  const cierre = (typeof P.cierre==="function") ? P.cierre(d) : "";
+  const html = membrete + cuerpo
+    + '<table class="pdtabla oftabla"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table>'
+    + cierre
+    + '<div class="pdnota">Revise el texto de este oficio antes de usarlo como documento oficial.</div>';
+  const pa = document.getElementById("printArea");
+  pa.setAttribute("data-modo","oficio");
+  pa.innerHTML = html;
+  closeMenu();
+  setTimeout(function(){ window.print(); }, 80);
 }
 
 /* ================= HALLAZGOS ================= */

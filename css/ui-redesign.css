@@ -286,3 +286,37 @@ header{
   box-shadow:var(--shadow-sm,0 1px 2px rgba(0,0,0,.08));
 }
 .resumencopy:active{ transform:scale(.97); }
+
+/* ===== Oficio de salida de bienes (selección en la búsqueda) ===== */
+.ofmodo-row{ margin:2px 0 8px; }
+.ofmodo-btn{
+  width:100%; display:flex; align-items:center; justify-content:center;
+  padding:11px 14px; border-radius:11px; cursor:pointer; font-size:14px; font-weight:700;
+  border:1.5px solid var(--azul2); background:var(--card); color:var(--azul2);
+}
+.ofmodo-btn.on{ background:var(--azul2); color:#fff; border-color:var(--azul2); }
+.ofmodo-btn:active{ transform:scale(.99); }
+.ofcheck{
+  display:flex; align-items:center; gap:9px; margin:-2px 0 8px;
+  font-size:13.5px; font-weight:700; color:var(--azul2); cursor:pointer; user-select:none;
+}
+.ofcheck input{ width:20px; height:20px; accent-color:var(--azul2); flex:none; }
+.item.ofsel{ box-shadow:0 0 0 2px var(--azul2) inset; }
+.ofbar{
+  position:sticky; bottom:10px; z-index:30; margin:14px 0 4px;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:10px 12px; border-radius:13px;
+  background:var(--card); border:1px solid var(--linea); box-shadow:var(--shadow-lg,0 8px 24px rgba(0,0,0,.16));
+}
+.ofbar-n{ font-size:13.5px; font-weight:700; color:var(--ink); }
+.ofbar-go{
+  display:inline-flex; align-items:center; padding:11px 18px; border:none; border-radius:10px;
+  background:var(--verde); color:#fff; font-size:14px; font-weight:800; cursor:pointer;
+}
+.ofbar-go:active{ transform:scale(.98); }
+.ofform{ margin:6px 0 12px; }
+.oflbl{ display:block; font-size:12px; font-weight:700; color:var(--gris2); margin:10px 0 3px; }
+.offld{
+  width:100%; box-sizing:border-box; padding:11px 12px; font-size:15px;
+  border:1.5px solid var(--linea); border-radius:10px; background:var(--card); color:var(--ink);
+}
