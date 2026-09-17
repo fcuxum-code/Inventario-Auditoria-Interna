@@ -13,7 +13,7 @@
      modo sin conexión y encolar sus peticiones aquí solo estorbaría.
    El nombre del caché lleva versión: al cambiarla se borra el anterior. */
 
-var VERSION = "v76";
+var VERSION = "v77";
 var CACHE = "inventario-ai-" + VERSION;
 
 // Rutas relativas para que funcione sin importar la carpeta donde se publique.
@@ -49,6 +49,9 @@ var APP_SHELL = [
   "./js/navegacion.js",
   "./js/etiquetas.js",
   "./js/oficio-plantilla.js",
+  "./js/oficio-docx.js",
+  "./plantillas/oficio_docx.json",
+  "./plantillas/oficio_egreso_base.docx",
   "./js/presencia.js",
   "./js/vendor/qrcode-generator.js",
   "./js/vendor/xlsx-js-style.min.js"

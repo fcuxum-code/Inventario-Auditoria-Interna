@@ -1569,15 +1569,32 @@ function _oficioDoc(info){
 function oficioWord(){
   if(oficioSel.size===0){ toast("Marque al menos un bien"); return; }
   const info = _oficioDatos(); if(!info){ toast("Falta la plantilla del oficio"); return; }
+  const nombre = "Oficio_egreso_bienes_"+today().replace(/\//g,"-");
+  closeMenu();
+  if(typeof window.oficioGenerarDocx === "function"){
+    toast("Generando oficio…");
+    window.oficioGenerarDocx(info).then(function(bytes){
+      descargarBlob(new Blob([bytes], {type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"}), nombre+".docx");
+      toast("Oficio Word (.docx) descargado ✓");
+    }).catch(function(){
+      // Respaldo: Word básico en HTML si no se pudo armar el .docx con la plantilla
+      oficioWordHTML(info, nombre);
+    });
+  } else {
+    oficioWordHTML(info, nombre);
+  }
+}
+/* Respaldo: genera un .doc (HTML que Word abre) con el membrete reconstruido.
+   Se usa solo si falla la generación del .docx oficial. */
+function oficioWordHTML(info, nombre){
   const doc = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
     + '<head><meta charset="utf-8"><title>Oficio de egreso de bienes</title>'
     + '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->'
     + '<style>@page{ size:21.6cm 27.9cm; margin:2.2cm 2.5cm; } body{ font-family:"Times New Roman",serif; font-size:12pt; color:#000; }</style>'
     + '</head><body>'+_oficioDoc(info)+'</body></html>';
   const blob = new Blob(['﻿'+doc], {type:"application/msword"});
-  descargarBlob(blob, "Oficio_egreso_bienes_"+today().replace(/\//g,"-")+".doc");
-  toast("Oficio Word descargado ✓ — ábralo para revisar/firmar");
-  closeMenu();
+  descargarBlob(blob, (nombre||"Oficio_egreso_bienes")+".doc");
+  toast("Oficio Word descargado ✓ (formato básico)");
 }
 function descargarBlob(blob, nombre){
   try{
