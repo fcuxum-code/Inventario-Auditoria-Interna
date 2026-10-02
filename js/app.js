@@ -129,6 +129,9 @@ function _pedirTextoCancelar(){
 /* ================= ESTADO EN VIVO ================= */
 let TARJETAS = {};
 let BIENES = {};
+/* Bienes con BAJA AUTORIZADA: siguen en la base (no se borra nada) pero se guardan aparte,
+   así quedan fuera de los totales, tarjetas, pendientes, búsqueda y reportes del inventario. */
+let BAJAS = {};
 let HALLAZGOS = {};
 let ready = {t:false, b:false};
 let mode = {view:"home", tarjetaId:null, filter:"todos", q:""};
@@ -174,7 +177,7 @@ firebase.auth().onAuthStateChanged(function(user){
   } else {
     detenerListeners();
     firstSyncDone = false; ready = {t:false,b:false};
-    TARJETAS={}; BIENES={}; HALLAZGOS={}; curSes=null; MI_ROL="editor";
+    TARJETAS={}; BIENES={}; BAJAS={}; HALLAZGOS={}; curSes=null; MI_ROL="editor";
     const mo=document.getElementById("migoverlay"); if(mo) mo.style.display="none";
     if(lo) lo.style.display="flex";
     setSync("off","Sin iniciar sesión");
@@ -269,8 +272,11 @@ function iniciarListeners(){
   _unsubs.push(db.collection("bienes").onSnapshot(function(snap){
     const cambios = snap.docChanges();
     cambios.forEach(function(ch){
-      if(ch.type==="removed"){ delete BIENES[ch.doc.id]; }
-      else { BIENES[ch.doc.id] = Object.assign({id:ch.doc.id}, ch.doc.data()); }
+      const did = ch.doc.id;
+      if(ch.type==="removed"){ delete BIENES[did]; delete BAJAS[did]; return; }
+      const reg = Object.assign({id:did}, ch.doc.data());
+      if(reg.bajaAutorizada){ BAJAS[did] = reg; delete BIENES[did]; }
+      else { BIENES[did] = reg; delete BAJAS[did]; }
     });
     ready.b = true; afterFirstSync();
     if(firstSyncDone){
@@ -368,6 +374,8 @@ let mostrarFiltros = false;
 /* Selección de bienes para armar un OFICIO de salida (no toca la base, solo genera el PDF). */
 let oficioModo = false;
 let oficioSel = new Set();
+/* Para qué se están seleccionando bienes en la búsqueda: "oficio" (egreso) o "baja" (baja autorizada). */
+let selProposito = "oficio";
 function filtrosActivos(){ return !!(searchFiltros.ubic || searchFiltros.estado || searchFiltros.categoria || searchFiltros.as400 || searchFiltros.pend); }
 function resetFiltrosBusqueda(){ searchFiltros={ubic:"",estado:"",categoria:"",as400:"",pend:""}; mostrarFiltros=false; }
 function toggleFiltrosBusqueda(){ mostrarFiltros=!mostrarFiltros; render(); }
@@ -898,7 +906,7 @@ function itemCard(b, showOwner, extraChip, selUI){
           return '<button class="btn est e-'+cl+' '+(b.estado===e?"sel":"")+'" onclick="markEstado(\''+id+'\',\''+e+'\')">'+(e==="PARA BAJA"?"Baja":e.charAt(0)+e.slice(1).toLowerCase())+'</button>'; }).join("")
       +'</div>';
   const selBox = selUI
-    ? '<label class="ofcheck"><input type="checkbox" '+(oficioSel.has(id)?'checked':'')+' onclick="oficioToggle(\''+id+'\',this.checked)"><span>Incluir en el oficio</span></label>'
+    ? '<label class="ofcheck"><input type="checkbox" '+(oficioSel.has(id)?'checked':'')+' onclick="oficioToggle(\''+id+'\',this.checked)"><span>'+(selProposito==="baja"?"Dar de baja":"Incluir en el oficio")+'</span></label>'
     : '';
   return '<div class="item '+cls+(selUI && oficioSel.has(id)?' ofsel':'')+'" id="it_'+id+'">'
     +selBox
@@ -1047,7 +1055,7 @@ function cambiarNumeroBien(id){
     if(!nuevo) return;
     if(nuevo === viejo){ toast("Es el mismo número"); return; }
     const nuevoId = bienDocId(nuevo);
-    if(nuevoId !== id && BIENES[nuevoId]){
+    if(nuevoId !== id && (BIENES[nuevoId] || BAJAS[nuevoId])){
       alert('Ya existe otro bien con el número "'+nuevo+'". Revise ese registro o use otro número.');
       return;
     }
@@ -1158,7 +1166,7 @@ function descargarBien(id){
   }).catch(function(){});
 }
 function verHistorial(id){
-  const b = BIENES[id];
+  const b = BIENES[id] || BAJAS[id];
   const codigo = b ? b.codigo : id;
   document.getElementById("sheet").innerHTML =
     '<div class="grip"></div><h3>Historial · '+esc(codigo)+'</h3>'
@@ -1451,8 +1459,14 @@ function renderSearch(v){
   // El modo "oficio" se activa desde el menú (no aparece en la búsqueda normal).
   if(oficioModo){
     h += '<div class="ofmodo-row">'
-      + '<button class="ofmodo-btn on" onclick="oficioSalirModo()">'+icon('arrowLeft',15,'margin-right:6px')+'Salir del oficio</button></div>';
-    h += '<div class="hint" style="margin-top:-4px">Busque y <b>marque</b> los bienes que van en el oficio (uno o varios) y toque <b>Generar oficio</b> abajo. No cambia nada en el inventario.</div>';
+      + '<button class="ofmodo-btn on" onclick="oficioSalirModo()">'+icon('arrowLeft',15,'margin-right:6px')+(selProposito==="baja"?'Cancelar la baja':'Salir del oficio')+'</button></div>';
+    h += selProposito==="baja"
+      ? '<div class="hint" style="margin-top:-4px">Busque y <b>marque</b> los bienes que tienen <b>baja autorizada</b> y toque <b>Registrar baja</b> abajo. Después se le pedirá el documento que la autoriza.</div>'
+      : '<div class="hint" style="margin-top:-4px">Busque y <b>marque</b> los bienes que van en el oficio (uno o varios) y toque <b>Generar oficio</b> abajo. No cambia nada en el inventario.</div>';
+  }
+  if(q){
+    const bajasQ = Object.values(BAJAS).filter(function(b){ return coincide([b.codigo, b.descripcion, b.codigoSiges, b.modelo, b.serie]); });
+    if(bajasQ.length) h += '<div class="hint bajahint" onclick="abrirBajas()">'+icon('alertTriangle',13,'margin-right:5px')+bajasQ.length+' bien(es) que coinciden están dados de <b>baja autorizada</b> — ver en Bajas autorizadas ›</div>';
   }
   const soloGuia = oficioModo && !q && !filtrosActivos();  // sin búsqueda todavía: no volcar todo
   if(!soloGuia) h += '<div class="hint">'+(ids.length+hz.length)+' resultado(s)'+(q?' para "'+esc(mode.q)+'"':(filtrosActivos()?' con estos filtros':''))+'.</div>';
@@ -1465,26 +1479,162 @@ function renderSearch(v){
   }
   if(oficioModo){
     h += '<div class="ofbar"><span class="ofbar-n" id="ofcount">'+oficioSel.size+' seleccionado(s)</span>'
-       + '<button class="ofbar-go" onclick="oficioGenerar()">'+icon('download',15,'margin-right:6px')+'Generar oficio</button></div>';
+       + (selProposito==="baja"
+          ? '<button class="ofbar-go baja" onclick="bajaFormulario()">'+icon('trash',15,'margin-right:6px')+'Registrar baja</button></div>'
+          : '<button class="ofbar-go" onclick="oficioGenerar()">'+icon('download',15,'margin-right:6px')+'Generar oficio</button></div>');
   }
   v.innerHTML = h; loadThumbs();
 }
 /* ---- Oficio de egreso: se entra desde el menú ---- */
 function abrirOficioEgreso(){
   closeMenu();
-  oficioModo = true; oficioSel = new Set();
+  oficioModo = true; oficioSel = new Set(); selProposito = "oficio";
   mode.view = "home"; mode.q = "";
   const sb = document.getElementById("search"); if(sb) sb.value = "";
   render(); window.scrollTo(0,0);
   setTimeout(function(){ const s=document.getElementById("search"); if(s) s.focus(); }, 120);
 }
 function oficioSalirModo(){
-  oficioModo = false; oficioSel = new Set();
+  oficioModo = false; oficioSel = new Set(); selProposito = "oficio";
   render();
+}
+/* ================= BAJAS AUTORIZADAS =================
+   Una baja definitiva NO borra el bien: se marca con el documento que la autoriza y la
+   fecha a partir de la cual rige. La app lo separa (mapa BAJAS) y deja de contarlo en
+   totales, tarjetas, pendientes y reportes. Se puede revertir si se registró por error. */
+function _isoAFecha(iso){ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||""); return m? (m[3]+"/"+m[2]+"/"+m[1]) : (iso||""); }
+function _hoyISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function abrirBajaSeleccion(){
+  if(!requiereEdicion()) return;
+  closeMenu();
+  oficioModo = true; oficioSel = new Set(); selProposito = "baja";
+  mode.view = "home"; mode.q = "";
+  const sb = document.getElementById("search"); if(sb) sb.value = "";
+  render(); window.scrollTo(0,0);
+  setTimeout(function(){ const s=document.getElementById("search"); if(s) s.focus(); }, 120);
+}
+function bajaFormulario(){
+  if(!requiereEdicion()) return;
+  const sel = Array.from(oficioSel).map(function(id){ return BIENES[id]; }).filter(Boolean);
+  if(!sel.length){ toast("Marque al menos un bien para dar de baja"); return; }
+  const total = sel.reduce(function(a,b){ return a+Number(b.valor||0); },0);
+  document.getElementById("sheet").innerHTML =
+    '<div class="grip"></div><h3>'+icon('trash',18,'margin-right:6px;vertical-align:-3px')+'Registrar baja autorizada</h3>'
+    + '<div class="note"><b>'+sel.length+'</b> bien(es) · <b>'+money(total)+'</b>. Saldrán del inventario y del monto total, pero <b>no se borran</b>: quedan en "Bajas autorizadas" con su documento.</div>'
+    + '<div style="max-height:150px;overflow:auto;border:1px solid var(--linea);border-radius:9px;margin:8px 0">'
+      + sel.map(function(b){ return '<div style="padding:7px 10px;border-bottom:1px solid var(--linea);font-size:13px"><b>'+esc(b.codigo)+'</b> — '+esc(b.descripcion||"")+' <span style="color:var(--gris2)">'+money(b.valor)+'</span></div>'; }).join("")
+    + '</div>'
+    + '<div class="ofform">'
+      + '<label class="oflbl" for="bj_doc">Documento que autoriza la baja *</label>'
+      + '<input class="offld" id="bj_doc" type="text" placeholder="Ej. Oficio No. 123-2026 / Resolución No. ...">'
+      + '<label class="oflbl" for="bj_desde">Baja a partir de *</label>'
+      + '<input class="offld" id="bj_desde" type="date" value="'+_hoyISO()+'">'
+      + '<label class="oflbl" for="bj_motivo">Motivo</label>'
+      + '<input class="offld" id="bj_motivo" type="text" value="Baja definitiva" placeholder="Ej. obsolescencia, daño irreparable">'
+      + '<label class="oflbl" for="bj_link">Enlace al documento escaneado (opcional)</label>'
+      + '<input class="offld" id="bj_link" type="url" placeholder="Pegue aquí el enlace de Drive del documento">'
+    + '</div>'
+    + '<button class="act g" onclick="bajaRegistrar()">'+icon('check',16,'margin-right:6px')+'Registrar baja de '+sel.length+' bien(es)</button>'
+    + '<button class="act o" onclick="closeMenu()">Cancelar</button>';
+  showSheet();
+  setTimeout(function(){ const d=document.getElementById("bj_doc"); if(d) d.focus(); }, 150);
+}
+function bajaRegistrar(){
+  if(!requiereEdicion()) return;
+  const sel = Array.from(oficioSel).map(function(id){ return BIENES[id]; }).filter(Boolean);
+  const doc = (document.getElementById("bj_doc")||{}).value.trim();
+  const desdeISO = (document.getElementById("bj_desde")||{}).value || "";
+  const motivo = ((document.getElementById("bj_motivo")||{}).value||"").trim();
+  const link = ((document.getElementById("bj_link")||{}).value||"").trim();
+  if(!sel.length){ toast("No hay bienes seleccionados"); return; }
+  if(!doc){ toast("Escriba el documento que autoriza la baja"); const d=document.getElementById("bj_doc"); if(d) d.focus(); return; }
+  if(!desdeISO){ toast("Indique la fecha a partir de la cual rige la baja"); return; }
+  const desde = _isoAFecha(desdeISO);
+  if(!confirm('¿Registrar la baja de '+sel.length+' bien(es) autorizada por "'+doc+'" a partir del '+desde+'?\n\nSaldrán de los totales del inventario. No se borra ningún dato y se puede revertir.')) return;
+  const sello = firebase.firestore.FieldValue.serverTimestamp();
+  const lotes=[]; for(let i=0;i<sel.length;i+=200) lotes.push(sel.slice(i,i+200));
+  Promise.all(lotes.map(function(grupo){
+    const batch = db.batch();
+    grupo.forEach(function(b){
+      batch.update(db.collection("bienes").doc(b.id), {
+        bajaAutorizada:true, bajaDocumento:doc, bajaDesde:desde, bajaDesdeISO:desdeISO,
+        bajaMotivo:motivo, bajaEnlace:link, bajaRegistro:today(), bajaPor:META.by||"",
+        bajaResponsable:b.responsable||"", bajaTarjetaNumero:b.tarjetaNumero||"",
+        actualizado:sello
+      });
+      batch.set(db.collection("movimientos").doc(), {
+        codigo:b.codigo, tipoMovimiento:"BAJA_AUTORIZADA",
+        tarjetaAnteriorNumero:b.tarjetaNumero||"", responsableAnterior:b.responsable||"",
+        tarjetaNuevaNumero:"", responsableNuevo:"",
+        estado:b.estado||"", ubicacion:b.ubicacion||"",
+        observaciones:"Baja autorizada por "+doc+" a partir del "+desde+(motivo?(" — "+motivo):""),
+        fecha:sello, fechaTxt:today(), capturadoPor:META.by||""
+      });
+    });
+    return batch.commit();
+  })).then(function(){
+    toast(sel.length+" bien(es) dados de baja ✓ — fuera del monto del inventario");
+    closeMenu();
+    oficioModo=false; oficioSel=new Set(); selProposito="oficio";
+    render();
+    setTimeout(abrirBajas, 350);
+  }).catch(function(){ toast("No se pudo registrar la baja (revise conexión)"); });
+}
+function abrirBajas(){
+  const lista = Object.values(BAJAS);
+  const total = lista.reduce(function(a,b){ return a+Number(b.valor||0); },0);
+  const grupos = {};
+  lista.forEach(function(b){
+    const k = (b.bajaDocumento||"(sin documento)")+"|"+(b.bajaDesdeISO||"");
+    (grupos[k]=grupos[k]||[]).push(b);
+  });
+  const claves = Object.keys(grupos).sort(function(a,b){ return (b.split("|")[1]||"").localeCompare(a.split("|")[1]||""); });
+  let h = '<div class="grip"></div><h3>'+icon('trash',18,'margin-right:6px;vertical-align:-3px')+'Bajas autorizadas</h3>'
+    + '<div class="note">'+(lista.length
+        ? ('<b>'+lista.length+'</b> bien(es) dados de baja por <b>'+money(total)+'</b>. Ya <b>no se cuentan</b> en el inventario ni en el monto total; sus datos se conservan.')
+        : 'Aún no hay bajas registradas. Los bienes dados de baja salen del inventario y del monto total, pero sus datos se conservan aquí con el documento que las autorizó.')+'</div>';
+  if(puedeEditar()) h += '<button class="act p" onclick="abrirBajaSeleccion()">'+icon('plusCircle',16,'margin-right:6px')+'Registrar nueva baja</button>';
+  claves.forEach(function(k){
+    const g = grupos[k].slice().sort(function(a,b){ return (a.codigo||"").localeCompare(b.codigo||""); });
+    const f = g[0];
+    const sub = g.reduce(function(a,b){ return a+Number(b.valor||0); },0);
+    h += '<div class="msec">'+esc(f.bajaDocumento||"(sin documento)")+'</div>'
+      + '<div class="bajameta">A partir del <b>'+esc(f.bajaDesde||"—")+'</b> · '+g.length+' bien(es) · '+money(sub)
+      + (f.bajaMotivo?(' · '+esc(f.bajaMotivo)):'')
+      + (f.bajaEnlace?(' · <a href="'+esc(f.bajaEnlace)+'" target="_blank" rel="noopener">Ver documento ›</a>'):'')+'</div>';
+    h += g.map(function(b){
+      return '<div class="tlist-item bajaitem"><div><b>'+esc(b.codigo)+'</b> — '+esc(b.descripcion||"")
+        + '<small>'+money(b.valor)+(b.bajaResponsable?(' · era de '+esc(b.bajaResponsable)+(b.bajaTarjetaNumero?(' (Tarj. '+esc(b.bajaTarjetaNumero)+')'):'')):'')
+        + (b.bajaRegistro?(' · registrada '+esc(b.bajaRegistro)+(b.bajaPor?(' por '+esc(b.bajaPor)):'')):'')+'</small></div>'
+        + '<div class="bajaacc"><span class="moretog" onclick="verHistorial(\''+b.id+'\')">'+icon('clock',13)+' Historial</span>'
+        + (puedeEditar()?'<span class="moretog" style="color:var(--naranja)" onclick="bajaRevertir(\''+b.id+'\')">Revertir</span>':'')+'</div></div>';
+    }).join("");
+  });
+  h += '<button class="act o" onclick="closeMenu()">Cerrar</button>';
+  document.getElementById("sheet").innerHTML = h;
+  showSheet();
+}
+function bajaRevertir(id){
+  if(!requiereEdicion()) return;
+  const b = BAJAS[id]; if(!b) return;
+  if(!confirm('¿Revertir la baja de "'+b.codigo+'"? Volverá al inventario y a su tarjeta anterior, y se sumará de nuevo al monto total.')) return;
+  const sello = firebase.firestore.FieldValue.serverTimestamp();
+  const batch = db.batch();
+  batch.update(db.collection("bienes").doc(id), { bajaAutorizada:false, bajaRevertida:today(), actualizado:sello });
+  batch.set(db.collection("movimientos").doc(), {
+    codigo:b.codigo, tipoMovimiento:"BAJA_REVERTIDA",
+    tarjetaAnteriorNumero:"", responsableAnterior:"",
+    tarjetaNuevaNumero:b.tarjetaNumero||"", responsableNuevo:b.responsable||"",
+    estado:b.estado||"", ubicacion:b.ubicacion||"",
+    observaciones:"Se revirtió la baja registrada con "+(b.bajaDocumento||"documento sin indicar"),
+    fecha:sello, fechaTxt:today(), capturadoPor:META.by||""
+  });
+  batch.commit().then(function(){ toast("Baja revertida ✓ — el bien volvió al inventario"); setTimeout(abrirBajas, 250); })
+    .catch(function(){ toast("No se pudo revertir (revise conexión)"); });
 }
 // Helpers para el botón atrás (js/navegacion.js)
 window.__oficioEnModo = function(){ return oficioModo; };
-window.__oficioReset = function(){ oficioModo = false; oficioSel = new Set(); };
+window.__oficioReset = function(){ oficioModo = false; oficioSel = new Set(); selProposito = "oficio"; };
 function oficioToggle(id, checked){
   if(checked) oficioSel.add(id); else oficioSel.delete(id);
   const card = document.getElementById("it_"+id);
@@ -1987,6 +2137,11 @@ function buscarBienPorCodigoOSiges(raw){
 }
 function addInv(){
   const el = document.getElementById("invin"); const raw = (el?el.value:"").trim(); if(!raw) return;
+  const enBaja = BAJAS[bienDocId(raw)];
+  if(enBaja){
+    toast('El bien '+enBaja.codigo+' está dado de BAJA ('+(enBaja.bajaDocumento||"baja autorizada")+'). No se agrega.');
+    el.value=""; el.focus(); return;
+  }
   const existing = buscarBienPorCodigoOSiges(raw);
   const cn = existing ? existing.id : bienDocId(raw);
   if(curSes.items.some(function(it){ return bienDocId(it.codigo)===cn; })){
@@ -2402,7 +2557,7 @@ function procesarFilasImportadas(rows, nombreHoja, totalHojas){
     if(!esCodigoValido(cod)){ invalidos++; return; }
     const id = bienDocId(cod);
     if(vistos[id]) return; vistos[id]=1;
-    if(BIENES[id]){ existentes++; return; }
+    if(BIENES[id] || BAJAS[id]){ existentes++; return; }
     nuevos.push({ id:id, codigo:cod,
       codigoSiges: colSiges? String(r[colSiges]==null?"":r[colSiges]).trim() : "",
       descripcion: colDesc? String(r[colDesc]==null?"":r[colDesc]).trim() : "",
@@ -2670,6 +2825,7 @@ function openMenu(){
 
     + sec("Oficios y correcciones")
     +'<div class="mitem" onclick="abrirOficioEgreso()"><span class="ic">'+icon('clipboardCheck',20)+'</span><div><b>Oficio de egreso de bienes</b><small>Elija los bienes y genere el oficio en Word</small></div></div>'
+    +'<div class="mitem" onclick="abrirBajas()"><span class="ic">'+icon('trash',20)+'</span><div><b>Bajas autorizadas</b><small>Bienes dados de baja con su documento; fuera del monto total</small></div></div>'
     +(puedeEditar()?'<div class="mitem" onclick="abrirCorregirNumero()"><span class="ic">'+icon('refreshCw',20)+'</span><div><b>Corregir número de un bien</b><small>Cuando un No. de bien quedó mal escrito</small></div></div>':'')
 
     + sec("Reportes")

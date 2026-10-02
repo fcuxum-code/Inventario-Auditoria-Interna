@@ -307,6 +307,28 @@
     });
     X.utils.book_append_sheet(wb, crearHoja(X, "Detalle de bienes", colsBienes, bienesOrd, {totales:true}), "BIENES");
 
+    // Bienes con baja autorizada: ya no cuentan en el inventario, pero se reportan aparte.
+    var bajasLista = (typeof BAJAS==="object" && BAJAS) ? Object.values(BAJAS).sort(function(a,b){ return (a.codigo||"").localeCompare(b.codigo||""); }) : [];
+    if(bajasLista.length){
+      var colsBajas = [
+        { h:"No. Inventario", w:15, get:function(b){ return b.codigo||""; } },
+        { h:"Descripción", w:44, get:function(b){ return b.descripcion||""; } },
+        { h:"Marca", w:16, get:function(b){ return b.marca||""; } },
+        { h:"Modelo", w:16, get:function(b){ return b.modelo||""; } },
+        { h:"No. de serie", w:18, get:function(b){ return b.serie||""; } },
+        { h:"Valor", w:13, tipo:"moneda", get:function(b){ return b.valor||0; } },
+        { h:"Documento que autoriza", w:30, get:function(b){ return b.bajaDocumento||""; } },
+        { h:"Baja a partir de", w:15, get:function(b){ return b.bajaDesde||""; } },
+        { h:"Motivo", w:24, get:function(b){ return b.bajaMotivo||""; } },
+        { h:"Era de (responsable)", w:28, get:function(b){ return b.bajaResponsable||""; } },
+        { h:"Tarjeta", w:12, get:function(b){ return b.bajaTarjetaNumero||""; } },
+        { h:"Registrada", w:13, get:function(b){ return b.bajaRegistro||""; } },
+        { h:"Registrada por", w:20, get:function(b){ return b.bajaPor||""; } },
+        { h:"Enlace al documento", w:34, get:function(b){ return b.bajaEnlace||""; } }
+      ];
+      X.utils.book_append_sheet(wb, crearHoja(X, "Bajas autorizadas", colsBajas, bajasLista, {totales:true}), "BAJAS");
+    }
+
     var disc = bienesOrd.filter(function(b){ return b.existe==="NO" || b.existe==="NO UBICADO"; });
     var colsDisc = [
       { h:"No. Inventario", w:15, get:function(b){ return b.codigo||""; } },
