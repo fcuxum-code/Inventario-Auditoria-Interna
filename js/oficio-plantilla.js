@@ -50,8 +50,18 @@
     saludo: 'Licenciado Oliva:',
 
     /* --------- CUERPO --------- */
-    intro: 'De manera atenta me dirijo a usted, para solicitarle se autorice el egreso de los bienes de activo fijo a continuación descritos:',
-    fungibleIntro: 'Asimismo, del bien fungible siguiente:',
+    /* Textos que cambian según sea UN bien o VARIOS (n = cantidad). */
+    txtEgreso: function(n){ return n===1
+      ? 'el egreso del bien de activo fijo a continuación descrito:'
+      : 'el egreso de los bienes de activo fijo a continuación descritos:'; },
+    txtReferidos: function(n){ return n===1
+      ? 'El referido bien pertenece a este Departamento y será trasladado'
+      : 'Los referidos bienes pertenecen a este Departamento y serán trasladados'; },
+    txtFungible: function(n){ return n===1
+      ? 'del bien fungible siguiente:'
+      : 'de los bienes fungibles siguientes:'; },
+    intro: function(n){ return 'De manera atenta me dirijo a usted, para solicitarle se autorice '+this.txtEgreso(n); },
+    fungibleIntro: function(n){ return 'Asimismo, '+this.txtFungible(n); },
 
     // Descripción combinada para la columna DESCRIPCIÓN (omite datos "sin dato").
     descBien: function(b){
@@ -66,7 +76,7 @@
     // Párrafo final (variable): destino + fecha de la actividad.
     parrafoFinal: function(d){
       var destino = (d.ubicacion==='__OTRA__') ? (d.destinoOtro||'') : (d.ubicacion||'');
-      return 'Los referidos bienes pertenecen a este Departamento y serán trasladados '
+      return window.OFICIO_PLANTILLA.txtReferidos(d.totalUnidades)+' '
         + e(destino) + '. Dicha actividad se llevará a cabo el día ' + e(d.fechaActividad||'') + '.';
     },
     despedida: 'Deferentemente,',

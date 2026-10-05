@@ -103,10 +103,13 @@
         return r;
       }).join("");
       bloqueF = rep(tpl.bloqueFungible, "{{FILAS_FUNG}}", filasF);
+      bloqueF = rep(bloqueF, "{{TXT_FUNGIBLE}}", escX(P.txtFungible ? P.txtFungible(d.totalFungibles) : "del bien fungible siguiente:"));
     }
     var destino = (d.ubicacion==="__OTRA__") ? (d.destinoOtro||"") : (d.ubicacion||"");
     var xml = tpl.documentTmpl;
     xml = rep(xml, "{{FECHA_OFICIO}}", escX(d.fechaOficio||""));
+    xml = rep(xml, "{{TXT_EGRESO}}", escX(P.txtEgreso ? P.txtEgreso(bienes.length) : "el egreso de los bienes de activo fijo a continuación descritos:"));
+    xml = rep(xml, "{{TXT_REFERIDOS}}", escX(P.txtReferidos ? P.txtReferidos(d.totalUnidades) : "Los referidos bienes pertenecen a este Departamento y serán trasladados"));
     xml = rep(xml, "{{DESTINO}}", escX(destino));
     xml = rep(xml, "{{ACT_FECHA}}", escX(d.fechaActividad||""));
     xml = rep(xml, "{{FILAS_ACTIVO}}", filasA);

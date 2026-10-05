@@ -1688,6 +1688,9 @@ function _oficioDatos(){
     return m ? { cantidad:m[1], descripcion:m[2].trim() } : { cantidad:"1", descripcion:l };
   });
   d.cantidad = bienes.length;
+  // Total de bienes del oficio (activo fijo + unidades de fungibles): decide singular/plural.
+  d.totalFungibles = fungibles.reduce(function(a,f){ return a+(parseInt(f.cantidad,10)||1); },0);
+  d.totalUnidades = bienes.length + d.totalFungibles;
   return { P:P, d:d, bienes:bienes, fungibles:fungibles };
 }
 /* Arma el HTML del oficio tal como el modelo. Estilos en línea (una sola versión que
@@ -1711,7 +1714,7 @@ function _oficioDoc(info){
       return '<tr><td style="'+bordeTd+'text-align:center;width:90px">'+esc(f.cantidad)+'</td>'
         + '<td style="'+bordeTd+'">'+esc(f.descripcion)+'</td></tr>';
     }).join("");
-    bloqueFung = '<p style="text-indent:1.2cm;margin:12px 0 0">'+esc(P.fungibleIntro||"")+'</p>'
+    bloqueFung = '<p style="text-indent:1.2cm;margin:12px 0 0">'+esc(typeof P.fungibleIntro==="function"?P.fungibleIntro(d.totalFungibles):(P.fungibleIntro||""))+'</p>'
       + '<table style="width:100%;border-collapse:collapse;margin:10px 0"><thead><tr>'
       + th("CANTIDAD") + th("DESCRIPCIÓN") + '</tr></thead><tbody>'+filasF+'</tbody></table>';
   }
@@ -1731,7 +1734,7 @@ function _oficioDoc(info){
     + '<div style="text-align:right;margin:4px 0 12px">Guatemala, '+esc(d.fechaOficio||"")+'</div>'
     + (P.destinatario||"")
     + '<div style="margin:12px 0 2px">'+esc(P.saludo||"")+'</div>'
-    + '<p style="'+pStyle+'">'+esc(P.intro||"")+'</p>'
+    + '<p style="'+pStyle+'">'+esc(typeof P.intro==="function"?P.intro(bienes.length):(P.intro||""))+'</p>'
     + tablaAF + bloqueFung
     + '<p style="'+pStyle+'">'+(typeof P.parrafoFinal==="function"?P.parrafoFinal(d):"")+'</p>'
     + '<p style="text-indent:1.2cm;margin:16px 0 0">'+esc(P.despedida||"")+'</p>'
