@@ -209,6 +209,10 @@
     par("Valor total del inventario", datos.valorTotal, "moneda");
     par("Valor de los bienes con diferencia", datos.valorDiscrepancias, "moneda");
 
+    seccion("BAJAS AUTORIZADAS (no incluidas en los totales)");
+    par("Bienes dados de baja", datos.bajasN);
+    par("Valor de los bienes dados de baja", datos.bajasValor, "moneda");
+
     seccion("RESPONSABLES");
     par("Tarjetas de responsabilidad activas", datos.tarjetas);
     par("Tarjetas ya actualizadas en AS-400", datos.tarjetasAS400 + " de " + datos.tarjetas);
@@ -255,6 +259,8 @@
       noUbicado: bienes.filter(function(b){ return b.existe==="NO UBICADO"; }).length,
       pendientesAsignar: bienes.filter(function(b){ return !b.tarjetaId; }).length,
       hallazgos: Object.keys(HALLAZGOS).length,
+      bajasN: (typeof BAJAS==="object" && BAJAS) ? Object.keys(BAJAS).length : 0,
+      bajasValor: (typeof BAJAS==="object" && BAJAS) ? Object.values(BAJAS).reduce(function(s,b){ return s+Number(b.valor||0); }, 0) : 0,
       valorTotal: bienes.reduce(function(s,b){ return s+Number(b.valor||0); }, 0),
       valorDiscrepancias: disc.reduce(function(s,b){ return s+Number(b.valor||0); }, 0),
       tarjetas: (typeof tarjetasActivas==="function" ? tarjetasActivas().length : 0),

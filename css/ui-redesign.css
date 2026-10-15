@@ -331,3 +331,15 @@ select.offld{ appearance:auto; }
 .bajaitem small{ display:block; margin-top:2px; }
 .bajaacc{ display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex:none; }
 .bajahint{ cursor:pointer; color:var(--naranja); }
+
+/* Bienes dados de baja: se ven como los demás, pero marcados y en solo lectura */
+.chip.c-baja{ background:var(--rojobg); color:var(--rojo); font-weight:800; margin-right:5px; }
+.item.es-baja{ border-left-color:var(--gris2); background:color-mix(in srgb, var(--card) 92%, var(--rojo) 3%); }
+.item.es-baja .val{ color:var(--gris2); }
+.bajabox{ margin:8px 0 2px; padding:9px 11px; border-radius:10px; font-size:13px; line-height:1.45;
+  background:var(--rojobg); color:var(--ink); border:1px solid color-mix(in srgb, var(--rojo) 30%, transparent); }
+.bajabox small{ display:block; margin-top:3px; color:var(--gris2); font-size:12px; }
+.bajabox a{ color:var(--azul2); font-weight:700; }
+.msec.bajasec{ display:flex; align-items:center; color:var(--rojo); margin-top:18px; }
+.homefilters .fp.fp-baja.on{ background:var(--rojo); border-color:var(--rojo); color:#fff; }
+.homefilters{ flex-wrap:wrap; }

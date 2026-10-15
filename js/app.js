@@ -457,6 +457,7 @@ function render(){
   h+='<div class="filters homefilters">'
     +'<div class="fp '+(homeTab==="pend"?"on":"")+'" onclick="setHomeTab(\'pend\')">Pendientes ('+pendientesT.length+')</div>'
     +'<div class="fp '+(homeTab==="ok"?"on":"")+'" onclick="setHomeTab(\'ok\')">Completas ('+completasT.length+')</div>'
+    +'<div class="fp fp-baja '+(homeTab==="bajas"?"on":"")+'" onclick="setHomeTab(\'bajas\')">De baja ('+Object.keys(BAJAS).length+')</div>'
     +'</div>';
 
   function filaTarjeta(t){
@@ -472,7 +473,9 @@ function render(){
       +'<div style="color:var(--chev);font-size:20px">›</div></div>';
   }
 
-  if(homeTab==="pend"){
+  if(homeTab==="bajas"){
+    h += renderListaBajas();
+  } else if(homeTab==="pend"){
     if(!pendientesT.length){
       h+=emptyState("¡Todo verificado!","No queda ningún bien pendiente en las tarjetas activas.");
     } else {
@@ -875,7 +878,7 @@ function resumenBien(b){
   return cab + (partes.length ? "; "+partes.join("; ") : "");
 }
 function copiarResumenBien(id){
-  const b = BIENES[id]; if(!b) return;
+  const b = BIENES[id] || BAJAS[id]; if(!b) return;
   const txt = resumenBien(b);
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(txt).then(function(){ toast("Resumen copiado ✓ — péguelo en la tarjeta"); })
@@ -883,20 +886,36 @@ function copiarResumenBien(id){
   } else toast("Selecciónelo y copie manual");
 }
 function itemCard(b, showOwner, extraChip, selUI){
-  const cls = b.existe==="SÍ"?"done-si":b.existe==="NO"?"done-no":b.existe==="NO UBICADO"?"done-nu":"";
+  // Un bien con baja autorizada se muestra igual que los demás, pero en solo lectura y con su información de baja.
+  const esBajaB = !!b.bajaAutorizada;
+  const cls = esBajaB ? "es-baja" : (b.existe==="SÍ"?"done-si":b.existe==="NO"?"done-no":b.existe==="NO UBICADO"?"done-nu":"");
   const dup = b.notaDuplicado?'<span class="chip c-dup">⚠ REVISAR</span>':'';
   const nuevo = b.esNuevo?'<span class="chip c-hz">NUEVO</span>':'';
-  const pendChip = !b.tarjetaId?'<span class="chip c-dup">SIN ASIGNAR</span>':'';
-  const owner = (showOwner && b.tarjetaId)?'<div class="powner">'+esc(b.responsable||"")+' · Tarj. '+esc(b.tarjetaNumero||"")+'</div>':'';
+  const pendChip = (!b.tarjetaId && !esBajaB)?'<span class="chip c-dup">SIN ASIGNAR</span>':'';
+  const bajaChip = esBajaB?'<span class="chip c-baja">DADO DE BAJA</span>':'';
+  const eraDe = esBajaB ? (b.bajaResponsable||b.responsable||"") : "";
+  const eraTarj = esBajaB ? (b.bajaTarjetaNumero||b.tarjetaNumero||"") : "";
+  const owner = esBajaB
+    ? (eraDe?'<div class="powner">Era de '+esc(eraDe)+(eraTarj?(' · Tarj. '+esc(eraTarj)):'')+'</div>':'')
+    : ((showOwner && b.tarjetaId)?'<div class="powner">'+esc(b.responsable||"")+' · Tarj. '+esc(b.tarjetaNumero||"")+'</div>':'');
   const id = b.id;
-  const soloLectura = typeof puedeEditar==='function' && !puedeEditar();
+  const puedeEd = typeof puedeEditar==='function' && puedeEditar();
+  const soloLectura = !puedeEd || esBajaB;
+  const bajaBox = esBajaB
+    ? '<div class="bajabox">'+icon('trash',13,'margin-right:5px')+'Baja autorizada por <b>'+esc(b.bajaDocumento||"(sin documento)")+'</b>'
+      +(b.bajaDesde?(' a partir del <b>'+esc(b.bajaDesde)+'</b>'):'')
+      +(b.bajaMotivo?(' · '+esc(b.bajaMotivo)):'')
+      +'<small>No se suma al valor total ni al avance del inventario.'
+      +(b.bajaRegistro?(' Registrada el '+esc(b.bajaRegistro)+(b.bajaPor?(' por '+esc(b.bajaPor)):'')+'.'):'')
+      +(b.bajaEnlace?(' <a href="'+esc(b.bajaEnlace)+'" target="_blank" rel="noopener">Ver documento ›</a>'):'')+'</small></div>'
+    : '';
   const descField = (b.esNuevo && !soloLectura)
     ? '<input type="text" value="'+esc(b.descripcion||"")+'" onchange="markCampo(\''+id+'\',\'descripcion\',this.value)" placeholder="Descripción del bien" style="width:100%;padding:9px 11px;border:1.4px solid #E2E6EC;border-radius:9px;font-size:14px;margin:4px 0 2px">'
     : '<div class="desc">'+esc(b.descripcion||"")+'</div>';
   const asignarBtn = (!b.tarjetaId && !soloLectura) ? '<button class="act p" style="margin:8px 0 0" onclick="asignarPendiente(\''+id+'\')">'+icon('user',15,'margin-right:6px')+'Asignar a una persona</button>' : '';
   const estadoActualTxt = {BUENO:"Bueno",REGULAR:"Regular",MALO:"Malo","PARA BAJA":"Para baja"}[b.estado] || "";
   const accionesExiste = soloLectura
-    ? '<div class="powner" style="margin-top:6px">'+(b.existe?('Estado: <b>'+esc(b.existe)+'</b>'+(estadoActualTxt?" · "+esc(estadoActualTxt):"")):"Sin verificar todavía")+'</div>'
+    ? '<div class="powner" style="margin-top:6px">'+(esBajaB?'Último estado registrado: ':'')+(b.existe?('<b>'+esc(b.existe)+'</b>'+(estadoActualTxt?" · "+esc(estadoActualTxt):"")):(esBajaB?"sin verificar":"Sin verificar todavía"))+'</div>'
     : '<div class="bgrp">'
         +'<button class="btn b-si '+(b.existe==="SÍ"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'SÍ\')">'+icon('check',16)+' SÍ<small>existe</small></button>'
         +'<button class="btn b-no '+(b.existe==="NO"?"sel":"")+'" onclick="markExiste(\''+id+'\',\'NO\')">'+icon('x',16)+' NO<small>no está</small></button>'
@@ -911,11 +930,12 @@ function itemCard(b, showOwner, extraChip, selUI){
   return '<div class="item '+cls+(selUI && oficioSel.has(id)?' ofsel':'')+'" id="it_'+id+'">'
     +selBox
     +'<div class="itop"><span class="inv">'+esc(b.codigo)+(b.codigoSiges?' <small style="font-weight:600;color:var(--gris2)">· SIGES '+esc(b.codigoSiges)+'</small>':'')+'</span><span class="val">'+money(b.valor)+'</span></div>'
-    +'<div class="ochips">'+chipCategoria(b)+chipTipo(b.tipo)+nuevo+pendChip+dup+(extraChip||"")+'</div>'
+    +'<div class="ochips">'+bajaChip+chipCategoria(b)+chipTipo(b.tipo)+nuevo+pendChip+dup+(extraChip||"")+'</div>'
     +descField
+    +bajaBox
     +(b.existe==="NO UBICADO"?'<div class="warnbox">'+icon('alertTriangle',13,'margin-right:4px')+'Quedó marcado como “NO UBICADO”, opción que ya se retiró. Vuelva a marcarlo como SÍ o NO.</div>':'')
     +(b.notaDuplicado?'<div class="warnbox">'+esc(b.notaDuplicado)+'</div>':'')
-    +(b.tarjetaAnteriorNumero?'<div class="warnbox">↩ Descargado de tarjeta '+esc(b.tarjetaAnteriorNumero)+' ('+esc(b.responsableAnterior||"")+')</div>':'')
+    +(b.tarjetaAnteriorNumero && !esBajaB?'<div class="warnbox">↩ Descargado de tarjeta '+esc(b.tarjetaAnteriorNumero)+' ('+esc(b.responsableAnterior||"")+')</div>':'')
     +owner
     +asignarBtn
     +accionesExiste
@@ -925,7 +945,8 @@ function itemCard(b, showOwner, extraChip, selUI){
        +(b.fotoUrl?'<a class="drivefoto" href="'+b.fotoUrl+'" target="_blank" rel="noopener"><img class="dthumb" src="'+driveThumbUrl(b.fotoUrl)+'" loading="lazy" alt="foto">🖼️ Ver foto</a>':'')
       +'<span class="moretog" onclick="toggleExtra(\''+id+'\')">＋ Ficha (marca, serie…) / ubicación</span>'
       +'<span class="moretog" onclick="verHistorial(\''+id+'\')">'+icon('clock',13)+' Historial</span>'
-      +'<span class="moretog" onclick="etiquetaBien(\''+id+'\')">'+icon('tag',13)+' Etiqueta QR</span>'
+      +(esBajaB?'':'<span class="moretog" onclick="etiquetaBien(\''+id+'\')">'+icon('tag',13)+' Etiqueta QR</span>')
+      +(esBajaB && puedeEd?'<span class="moretog" style="color:var(--naranja)" onclick="bajaRevertir(\''+id+'\')">'+icon('refreshCw',13)+' Revertir baja</span>':'')
       +(!soloLectura && b.existe==="NO" && b.tarjetaId?'<span class="moretog" style="color:var(--naranja)" onclick="descargarBien(\''+id+'\')">'+icon('logOut',13)+' Quitar de la tarjeta</span>':'')
       +(!soloLectura && b.esNuevo?'<span class="moretog" style="color:var(--rojo)" onclick="borrarBien(\''+id+'\')">'+icon('trash',13)+' Borrar</span>':'')
     +'</div>'
@@ -1464,18 +1485,24 @@ function renderSearch(v){
       ? '<div class="hint" style="margin-top:-4px">Busque y <b>marque</b> los bienes que tienen <b>baja autorizada</b> y toque <b>Registrar baja</b> abajo. Después se le pedirá el documento que la autoriza.</div>'
       : '<div class="hint" style="margin-top:-4px">Busque y <b>marque</b> los bienes que van en el oficio (uno o varios) y toque <b>Generar oficio</b> abajo. No cambia nada en el inventario.</div>';
   }
-  if(q){
-    const bajasQ = Object.values(BAJAS).filter(function(b){ return coincide([b.codigo, b.descripcion, b.codigoSiges, b.modelo, b.serie]); });
-    if(bajasQ.length) h += '<div class="hint bajahint" onclick="abrirBajas()">'+icon('alertTriangle',13,'margin-right:5px')+bajasQ.length+' bien(es) que coinciden están dados de <b>baja autorizada</b> — ver en Bajas autorizadas ›</div>';
-  }
   const soloGuia = oficioModo && !q && !filtrosActivos();  // sin búsqueda todavía: no volcar todo
-  if(!soloGuia) h += '<div class="hint">'+(ids.length+hz.length)+' resultado(s)'+(q?' para "'+esc(mode.q)+'"':(filtrosActivos()?' con estos filtros':''))+'.</div>';
+  // Los bienes dados de baja también se encuentran al buscar (no al seleccionar para oficio o baja),
+  // en un apartado propio: se ven, pero no se suman a nada.
+  const bajasQ = (q && !oficioModo) ? Object.values(BAJAS).filter(function(b){
+      return coincide([b.codigo, b.descripcion, b.responsable, b.bajaResponsable, b.tarjetaNumero, b.bajaTarjetaNumero, b.codigoSiges, b.modelo, b.serie, b.bajaDocumento]);
+    }).sort(function(a,b){ return (a.codigo||"").localeCompare(b.codigo||""); }) : [];
+  if(!soloGuia) h += '<div class="hint">'+(ids.length+hz.length)+' resultado(s)'+(q?' para "'+esc(mode.q)+'"':(filtrosActivos()?' con estos filtros':''))
+    +(bajasQ.length?(' y '+bajasQ.length+' dado'+(bajasQ.length===1?'':'s')+' de baja'):'')+'.</div>';
   if(soloGuia){
     h += emptyState('Escriba en el buscador', 'Encuentre los bienes por nombre, número, descripción, modelo o serie, y márquelos.');
   } else {
     if(hz.length) h += hz.map(hallCard).join("");
-    if(ids.length===0 && hz.length===0) h += emptyState('Sin coincidencias', q?'Si el bien no está en el listado, use Nueva toma o Hallazgo':'Pruebe con otros filtros');
+    if(ids.length===0 && hz.length===0 && !bajasQ.length) h += emptyState('Sin coincidencias', q?'Si el bien no está en el listado, use Nueva toma o Hallazgo':'Pruebe con otros filtros');
     else h += ids.slice(0,200).map(function(id){ return itemCard(BIENES[id], true, "", oficioModo); }).join("");
+    if(bajasQ.length){
+      h += '<div class="msec bajasec">'+icon('trash',13,'margin-right:5px')+'Dados de baja · no suman al total</div>'
+        + bajasQ.slice(0,100).map(function(b){ return itemCard(b, true); }).join("");
+    }
   }
   if(oficioModo){
     h += '<div class="ofbar"><span class="ofbar-n" id="ofcount">'+oficioSel.size+' seleccionado(s)</span>'
@@ -1575,44 +1602,43 @@ function bajaRegistrar(){
   })).then(function(){
     toast(sel.length+" bien(es) dados de baja ✓ — fuera del monto del inventario");
     closeMenu();
-    oficioModo=false; oficioSel=new Set(); selProposito="oficio";
-    render();
-    setTimeout(abrirBajas, 350);
+    setTimeout(abrirBajas, 300);
   }).catch(function(){ toast("No se pudo registrar la baja (revise conexión)"); });
 }
+/* Abre el apartado "De baja" en la pantalla de inicio. */
 function abrirBajas(){
+  closeMenu();
+  oficioModo=false; oficioSel=new Set(); selProposito="oficio";
+  homeTab = "bajas";
+  goHome();
+  window.scrollTo(0,0);
+}
+/* Lista de bienes dados de baja, agrupada por el documento que la autorizó, con la misma
+   tarjeta que los bienes de alta (en solo lectura). */
+function renderListaBajas(){
   const lista = Object.values(BAJAS);
   const total = lista.reduce(function(a,b){ return a+Number(b.valor||0); },0);
+  let h = '<div class="note bajanote">'+(lista.length
+      ? ('<b>'+lista.length+'</b> bien'+(lista.length===1?'':'es')+' dado'+(lista.length===1?'':'s')+' de baja por <b>'+money(total)+'</b>. No se suman al valor total ni al avance del inventario, pero su información se conserva completa.')
+      : 'Aún no hay bienes dados de baja. Al registrar una baja, el bien sale del valor total del inventario pero su información se conserva aquí, con el documento que la autorizó.')+'</div>';
+  if(puedeEditar()) h += '<button class="act p" style="margin-bottom:12px" onclick="abrirBajaSeleccion()">'+icon('plusCircle',16,'margin-right:6px')+'Registrar nueva baja</button>';
+  if(!lista.length) return h;
   const grupos = {};
   lista.forEach(function(b){
     const k = (b.bajaDocumento||"(sin documento)")+"|"+(b.bajaDesdeISO||"");
     (grupos[k]=grupos[k]||[]).push(b);
   });
-  const claves = Object.keys(grupos).sort(function(a,b){ return (b.split("|")[1]||"").localeCompare(a.split("|")[1]||""); });
-  let h = '<div class="grip"></div><h3>'+icon('trash',18,'margin-right:6px;vertical-align:-3px')+'Bajas autorizadas</h3>'
-    + '<div class="note">'+(lista.length
-        ? ('<b>'+lista.length+'</b> bien(es) dados de baja por <b>'+money(total)+'</b>. Ya <b>no se cuentan</b> en el inventario ni en el monto total; sus datos se conservan.')
-        : 'Aún no hay bajas registradas. Los bienes dados de baja salen del inventario y del monto total, pero sus datos se conservan aquí con el documento que las autorizó.')+'</div>';
-  if(puedeEditar()) h += '<button class="act p" onclick="abrirBajaSeleccion()">'+icon('plusCircle',16,'margin-right:6px')+'Registrar nueva baja</button>';
-  claves.forEach(function(k){
+  Object.keys(grupos).sort(function(a,b){ return (b.split("|")[1]||"").localeCompare(a.split("|")[1]||""); }).forEach(function(k){
     const g = grupos[k].slice().sort(function(a,b){ return (a.codigo||"").localeCompare(b.codigo||""); });
     const f = g[0];
     const sub = g.reduce(function(a,b){ return a+Number(b.valor||0); },0);
     h += '<div class="msec">'+esc(f.bajaDocumento||"(sin documento)")+'</div>'
-      + '<div class="bajameta">A partir del <b>'+esc(f.bajaDesde||"—")+'</b> · '+g.length+' bien(es) · '+money(sub)
+      + '<div class="bajameta">A partir del <b>'+esc(f.bajaDesde||"—")+'</b> · '+g.length+' bien'+(g.length===1?'':'es')+' · '+money(sub)
       + (f.bajaMotivo?(' · '+esc(f.bajaMotivo)):'')
       + (f.bajaEnlace?(' · <a href="'+esc(f.bajaEnlace)+'" target="_blank" rel="noopener">Ver documento ›</a>'):'')+'</div>';
-    h += g.map(function(b){
-      return '<div class="tlist-item bajaitem"><div><b>'+esc(b.codigo)+'</b> — '+esc(b.descripcion||"")
-        + '<small>'+money(b.valor)+(b.bajaResponsable?(' · era de '+esc(b.bajaResponsable)+(b.bajaTarjetaNumero?(' (Tarj. '+esc(b.bajaTarjetaNumero)+')'):'')):'')
-        + (b.bajaRegistro?(' · registrada '+esc(b.bajaRegistro)+(b.bajaPor?(' por '+esc(b.bajaPor)):'')):'')+'</small></div>'
-        + '<div class="bajaacc"><span class="moretog" onclick="verHistorial(\''+b.id+'\')">'+icon('clock',13)+' Historial</span>'
-        + (puedeEditar()?'<span class="moretog" style="color:var(--naranja)" onclick="bajaRevertir(\''+b.id+'\')">Revertir</span>':'')+'</div></div>';
-    }).join("");
+    h += g.map(function(b){ return itemCard(b, true); }).join("");
   });
-  h += '<button class="act o" onclick="closeMenu()">Cerrar</button>';
-  document.getElementById("sheet").innerHTML = h;
-  showSheet();
+  return h;
 }
 function bajaRevertir(id){
   if(!requiereEdicion()) return;
@@ -1629,7 +1655,7 @@ function bajaRevertir(id){
     observaciones:"Se revirtió la baja registrada con "+(b.bajaDocumento||"documento sin indicar"),
     fecha:sello, fechaTxt:today(), capturadoPor:META.by||""
   });
-  batch.commit().then(function(){ toast("Baja revertida ✓ — el bien volvió al inventario"); setTimeout(abrirBajas, 250); })
+  batch.commit().then(function(){ toast("Baja revertida ✓ — el bien volvió al inventario"); })
     .catch(function(){ toast("No se pudo revertir (revise conexión)"); });
 }
 // Helpers para el botón atrás (js/navegacion.js)
