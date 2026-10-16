@@ -369,15 +369,15 @@ function renderPanelMetricas(){
       +'</div>') : '');
 }
 /* ================= FILTROS DE BÚSQUEDA ================= */
-let searchFiltros = { ubic:"", estado:"", categoria:"", as400:"", pend:"" };
+let searchFiltros = { ubic:"", estado:"", categoria:"", as400:"", pend:"", oficial:"" };
 let mostrarFiltros = false;
 /* Selección de bienes para armar un OFICIO de salida (no toca la base, solo genera el PDF). */
 let oficioModo = false;
 let oficioSel = new Set();
 /* Para qué se están seleccionando bienes en la búsqueda: "oficio" (egreso) o "baja" (baja autorizada). */
 let selProposito = "oficio";
-function filtrosActivos(){ return !!(searchFiltros.ubic || searchFiltros.estado || searchFiltros.categoria || searchFiltros.as400 || searchFiltros.pend); }
-function resetFiltrosBusqueda(){ searchFiltros={ubic:"",estado:"",categoria:"",as400:"",pend:""}; mostrarFiltros=false; }
+function filtrosActivos(){ return !!(searchFiltros.ubic || searchFiltros.estado || searchFiltros.categoria || searchFiltros.as400 || searchFiltros.pend || searchFiltros.oficial); }
+function resetFiltrosBusqueda(){ searchFiltros={ubic:"",estado:"",categoria:"",as400:"",pend:"",oficial:""}; mostrarFiltros=false; }
 function toggleFiltrosBusqueda(){ mostrarFiltros=!mostrarFiltros; render(); }
 function setFiltroBusqueda(campo,val){ searchFiltros[campo]=val; render(); }
 function limpiarFiltrosBusqueda(){ resetFiltrosBusqueda(); render(); }
@@ -394,7 +394,65 @@ function bienCoincideFiltros(b){
     if(searchFiltros.as400==="SI" && !cargado) return false;
     if(searchFiltros.as400==="NO" && cargado) return false;
   }
+  if(searchFiltros.oficial){
+    const m = mismoPoseedor(b);
+    if(searchFiltros.oficial==="OTRA" && m!==false) return false;
+    if(searchFiltros.oficial==="MISMA" && m!==true) return false;
+    if(searchFiltros.oficial==="SINASIG" && !(tieneOficialAS400(b) && !b.tarjetaId)) return false;
+    if(searchFiltros.oficial==="SINDATO" && tieneOficialAS400(b)) return false;
+  }
   return true;
+}
+/* ================= RESPONSABLE OFICIAL (AS-400) Y POSEEDOR FÍSICO (AUDITORÍA) =================
+   Tras sincronizar con el reporte oficial del AS-400, cada bien guarda a quién está cargado
+   (as400Responsable / as400Tarjeta). La tarjeta en la que está dentro de la app sigue siendo
+   lo que comprobó la auditoría: con quién se encuentra físicamente. Aquí se comparan las dos. */
+function tieneOficialAS400(b){ return !!(b && (b.as400Responsable || b.as400Tarjeta)); }
+function _numTarjeta(s){
+  const t = String(s==null?"":s).replace(/\s/g,"").toUpperCase();
+  return /^\d+$/.test(t) ? t.replace(/^0+(?=\d)/,"") : t;
+}
+function normNombre(s){ return normTexto(s).replace(/[^A-Z0-9 ]/g," ").replace(/\s+/g," ").trim(); }
+/* true = lo tiene la misma persona de la tarjeta oficial; false = lo tiene otra persona;
+   null = no hay dato oficial o la auditoría todavía no lo asigna a nadie. */
+function mismoPoseedor(b){
+  if(!tieneOficialAS400(b) || !b.tarjetaId) return null;
+  const tj = TARJETAS[b.tarjetaId] || {};
+  const tOf = _numTarjeta(b.as400Tarjeta), tAud = _numTarjeta(b.tarjetaNumero || tj.numero);
+  if(tOf && tAud && tOf===tAud) return true;
+  const nOf = normNombre(b.as400Responsable), nAud = normNombre(b.responsable || tj.responsable);
+  if(!nOf || !nAud) return false;
+  if(nOf===nAud) return true;
+  // Mismo nombre escrito más corto o más largo ("JUAN PEREZ" / "JUAN CARLOS PEREZ LOPEZ").
+  const a = nOf.split(" "), c = nAud.split(" ");
+  const corto = a.length<=c.length ? a : c, largo = a.length<=c.length ? c : a;
+  return corto.length>=2 && corto.every(function(w){ return largo.indexOf(w)>=0; });
+}
+function refOficialHtml(b, compacto){
+  if(!tieneOficialAS400(b) || b.bajaAutorizada) return "";
+  const m = mismoPoseedor(b);
+  const tarjOf = b.as400Tarjeta ? ' · Tarj. '+esc(b.as400Tarjeta) : '';
+  if(compacto && m===true){
+    return '<div class="refbox ok mini">'+icon('check',13,'margin-right:4px')+'Coincide con AS-400'+tarjOf+'</div>';
+  }
+  const estado = m===true ? icon('check',13,'margin-right:4px')+'Lo tiene la misma persona de la tarjeta oficial'
+    : m===false ? icon('alertTriangle',13,'margin-right:4px')+'Lo tiene otra persona según la revisión'
+    : 'La auditoría aún no lo asigna a nadie';
+  return '<div class="refbox '+(m===true?'ok':m===false?'warn':'pend')+'">'
+    +'<div class="refrow"><span class="reflbl">Responsable oficial · AS-400</span><b>'+esc(b.as400Responsable||"—")+'</b>'+tarjOf+'</div>'
+    +'<div class="refrow"><span class="reflbl">Lo tiene físicamente · auditoría</span>'
+      +(b.tarjetaId?'<b>'+esc(b.responsable||"")+'</b> · Tarj. '+esc(b.tarjetaNumero||""):'<i>sin asignar</i>')+'</div>'
+    +'<div class="refest">'+estado+'</div>'
+  +'</div>';
+}
+/* Lista los bienes que según la revisión los tiene alguien distinto del responsable oficial. */
+function verOtraPersonaAS400(){
+  closeMenu();
+  resetFiltrosBusqueda();
+  searchFiltros.oficial = "OTRA";
+  mostrarFiltros = true;
+  mode.q = ""; const s = document.getElementById("search"); if(s) s.value = "";
+  render(); window.scrollTo(0,0);
 }
 /* ================= NAVEGACIÓN / RENDER ================= */
 // El buscador general solo tiene sentido en las pantallas que listan bienes.
@@ -897,7 +955,9 @@ function itemCard(b, showOwner, extraChip, selUI){
   const eraTarj = esBajaB ? (b.bajaTarjetaNumero||b.tarjetaNumero||"") : "";
   const owner = esBajaB
     ? (eraDe?'<div class="powner">Era de '+esc(eraDe)+(eraTarj?(' · Tarj. '+esc(eraTarj)):'')+'</div>':'')
-    : ((showOwner && b.tarjetaId)?'<div class="powner">'+esc(b.responsable||"")+' · Tarj. '+esc(b.tarjetaNumero||"")+'</div>':'');
+    : ((showOwner && b.tarjetaId && !tieneOficialAS400(b))?'<div class="powner">'+esc(b.responsable||"")+' · Tarj. '+esc(b.tarjetaNumero||"")+'</div>':'');
+  // Las dos referencias tras sincronizar con AS-400: a quién está cargado y quién lo tiene.
+  const refOficial = esBajaB ? "" : refOficialHtml(b, !showOwner);
   const id = b.id;
   const puedeEd = typeof puedeEditar==='function' && puedeEditar();
   const soloLectura = !puedeEd || esBajaB;
@@ -929,7 +989,7 @@ function itemCard(b, showOwner, extraChip, selUI){
     : '';
   return '<div class="item '+cls+(selUI && oficioSel.has(id)?' ofsel':'')+'" id="it_'+id+'">'
     +selBox
-    +'<div class="itop"><span class="inv">'+esc(b.codigo)+(b.codigoSiges?' <small style="font-weight:600;color:var(--gris2)">· SIGES '+esc(b.codigoSiges)+'</small>':'')+'</span><span class="val">'+money(b.valor)+'</span></div>'
+    +'<div class="itop"><span class="inv">'+esc(b.codigo)+(b.codigoSiges?' <small style="font-weight:600;color:var(--gris2)">· SICOIN '+esc(b.codigoSiges)+'</small>':'')+'</span><span class="val">'+money(b.valor)+'</span></div>'
     +'<div class="ochips">'+bajaChip+chipCategoria(b)+chipTipo(b.tipo)+nuevo+pendChip+dup+(extraChip||"")+'</div>'
     +descField
     +bajaBox
@@ -937,6 +997,7 @@ function itemCard(b, showOwner, extraChip, selUI){
     +(b.notaDuplicado?'<div class="warnbox">'+esc(b.notaDuplicado)+'</div>':'')
     +(b.tarjetaAnteriorNumero && !esBajaB?'<div class="warnbox">↩ Descargado de tarjeta '+esc(b.tarjetaAnteriorNumero)+' ('+esc(b.responsableAnterior||"")+')</div>':'')
     +owner
+    +refOficial
     +asignarBtn
     +accionesExiste
     +'<div class="tools">'
@@ -1192,6 +1253,8 @@ function verHistorial(id){
   document.getElementById("sheet").innerHTML =
     '<div class="grip"></div><h3>Historial · '+esc(codigo)+'</h3>'
     +(b&&b.descripcion?'<div class="hint" style="margin-top:-8px">'+esc(b.descripcion)+'</div>':'')
+    +(b && tieneOficialAS400(b) ? refOficialHtml(b, false)
+        +(b.as400Sync?'<div class="hint" style="margin-top:4px">Según el reporte AS-400 sincronizado el '+esc(b.as400Sync)+'.</div>':'') : '')
     +'<div id="histBody"><div class="hint">Cargando…</div></div>'
     +'<button class="act o" onclick="closeMenu()">Cerrar</button>';
   showSheet();
@@ -1452,6 +1515,12 @@ function renderBarraFiltros(){
      + '<option value="NO" '+(searchFiltros.as400==="NO"?"selected":"")+'>Pendientes de cargar</option>'
      + '<option value="SI" '+(searchFiltros.as400==="SI"?"selected":"")+'>Ya cargadas</option>'
      + '</select>';
+  h += '<select onchange="setFiltroBusqueda(\'oficial\',this.value)"><option value="">Responsable oficial (todos)</option>'
+     + '<option value="OTRA" '+(searchFiltros.oficial==="OTRA"?"selected":"")+'>Lo tiene otra persona</option>'
+     + '<option value="MISMA" '+(searchFiltros.oficial==="MISMA"?"selected":"")+'>Con la persona de su tarjeta oficial</option>'
+     + '<option value="SINASIG" '+(searchFiltros.oficial==="SINASIG"?"selected":"")+'>Con tarjeta oficial, sin asignar aquí</option>'
+     + '<option value="SINDATO" '+(searchFiltros.oficial==="SINDATO"?"selected":"")+'>No aparece en el reporte AS-400</option>'
+     + '</select>';
   if(filtrosActivos()) h += '<span class="moretog" onclick="limpiarFiltrosBusqueda()">'+icon('x',12)+' Limpiar filtros</span>';
   h += '</div>';
   return h;
@@ -1471,7 +1540,7 @@ function renderSearch(v){
     const b=BIENES[id];
     if(!bienCoincideFiltros(b)) return false;
     if(!q) return true;
-    return coincide([b.codigo, b.descripcion, b.responsable, b.tarjetaNumero, b.codigoSiges, b.colaborador, b.modelo, b.serie]);
+    return coincide([b.codigo, b.descripcion, b.responsable, b.tarjetaNumero, b.codigoSiges, b.colaborador, b.modelo, b.serie, b.as400Responsable, b.as400Tarjeta]);
   });
   const hz = q ? Object.values(HALLAZGOS).filter(function(z){
     return coincide([z.inv, z.desc]);
@@ -2514,6 +2583,13 @@ document.getElementById("excelin").addEventListener("change", function(){
   rd.onload = function(e){
     try{
       const wb = XLSX.read(e.target.result, {type:"array", cellDates:true});
+      // El reporte oficial del AS-400 no es una lista de bienes nuevos: importarlo aquí crearía
+      // registros con el número de fila. Se ofrece la sincronización, que es lo que corresponde.
+      if(typeof esReporteAS400==="function" && esReporteAS400(wb)){
+        self.value="";
+        if(confirm("Este archivo es el reporte oficial del AS-400.\n\nNo se importa como bienes nuevos. ¿Desea abrir la Sincronización con AS-400 (asigna No. SICOIN y responsable oficial sin tocar el avance)?")) syncAS400DesdeLibro(wb, f.name);
+        return;
+      }
       const elegida = elegirMejorHoja(wb);
       if(!elegida){ toast("No encontré una hoja con una columna de No. de Inventario reconocible."); return; }
       procesarFilasImportadas(elegida.rows, elegida.nombre, wb.SheetNames.length);
@@ -2567,7 +2643,7 @@ function leerColumnas(rows){
   const colVal = hallarColumna(first, ["MONTO","VALOR","PRECIO","COSTO"]);
   const colNombre = hallarColumna(first, ["NOMBRE"]);
   const colTarjeta = hallarColumna(first, ["TARJETA"]);
-  const colSiges = hallarColumna(first, ["BIESIC","SIGES"]);
+  const colSiges = hallarColumna(first, ["BIESIC","NO. SICOIN","SICOIN","SIGES"]);
   const colMarca = hallarColumna(first, ["MARCA"]);
   const colModelo = hallarColumna(first, ["MODELO"]);
   const colSerie = hallarColumna(first, ["SERIE"]);
@@ -2674,7 +2750,7 @@ function importarExcel(){
 function mostrarImportarExcel(){
   window.__excelMode = "importar";
   document.getElementById("sheet").innerHTML = '<div class="grip"></div><h3>📥 Importar bienes desde Excel</h3>'
-    +'<div class="note"><b>¿No sabe qué columnas llevar?</b> Descargue la plantilla, llénela con sus bienes y súbala. Ya trae las columnas correctas: <b>No. de Inventario</b>, <b>No. SIGES</b>, <b>Descripción</b>, <b>Marca</b>, <b>Modelo</b>, <b>No. de Serie</b>, <b>Fecha de compra</b> y <b>Valor</b>.</div>'
+    +'<div class="note"><b>¿No sabe qué columnas llevar?</b> Descargue la plantilla, llénela con sus bienes y súbala. Ya trae las columnas correctas: <b>No. de Inventario</b>, <b>No. SICOIN</b>, <b>Descripción</b>, <b>Marca</b>, <b>Modelo</b>, <b>No. de Serie</b>, <b>Fecha de compra</b> y <b>Valor</b>.</div>'
     +'<div class="note">Solo el <b>No. de Inventario</b> es obligatorio; lo demás es opcional. No importa el orden ni el nombre exacto de la columna, la app las reconoce sola. Los bienes se crean <b>sin responsable</b> (después los asigna con 🧍 Nueva toma). Esta opción solo AGREGA, nunca elimina nada.</div>'
     +'<button class="act g" onclick="descargarPlantillaBienes()">⬇️ Descargar plantilla Excel</button>'
     +'<button class="act p" onclick="document.getElementById(\'excelin\').click()">📎 Elegir archivo y subir</button>'
@@ -2688,7 +2764,7 @@ function descargarPlantillaBienes(){
   cargarLectorExcel().then(function(ok){
     if(!ok || typeof XLSX==="undefined"){ toast("No se pudo preparar la plantilla (revise su conexión)"); return; }
     try{
-      const headers = ["No. de Inventario","No. SIGES","Descripción","Marca","Modelo","No. de Serie","Fecha de compra","Valor"];
+      const headers = ["No. de Inventario","No. SICOIN","Descripción","Marca","Modelo","No. de Serie","Fecha de compra","Valor"];
       const ejemplos = [
         ["255483","","LOCKER METAL 3 COMPARTIMIENTOS COLOR BEIGE","Argueta","S/M","S/S","22/01/1997",320],
         ["INV-1001","BS-77012","Computadora portátil","HP","ProBook 450 G8","5CD1234ABC","10/05/2022",6400]
@@ -2861,6 +2937,7 @@ function openMenu(){
     +'<div class="mitem" onclick="imprimirReporteEjecutivo()"><span class="ic">'+icon('clipboardCheck',20)+'</span><div><b>Reporte ejecutivo (PDF)</b><small>Resumen de una página: avance, diferencias y carga al AS-400</small></div></div>'
     +'<div class="mitem" onclick="generarExcel()"><span class="ic">'+icon('barChart',20)+'</span><div><b>Generar reporte en Excel</b><small>Resumen, bienes, discrepancias, tarjetas, personal, movimientos y hallazgos</small></div></div>'
     +'<div class="mitem" onclick="importarExcel()"><span class="ic">'+icon('upload',20)+'</span><div><b>Importar bienes nuevos desde Excel</b><small>Los crea como pendientes de asignar</small></div></div>'
+    +(puedeEditar()?'<div class="mitem" onclick="abrirSyncAS400()"><span class="ic">'+icon('refreshCw',20)+'</span><div><b>Sincronizar con reporte AS-400</b><small>Asigna No. SICOIN y responsable oficial; no toca el avance</small></div></div>':'')
 
     + sec("Configuración")
     +'<div class="fld"><label>'+icon('mail',14)+' URL de Apps Script (correos y fotos a Drive)</label>'

@@ -21,7 +21,7 @@
     var l = [];
     function add(et, val){ val = (val==null?'':String(val)).trim(); if(val) l.push(et+': '+val); }
     add('No', b.codigo);
-    if(b.codigoSiges) add('SIGES', b.codigoSiges);
+    if(b.codigoSiges) add('SICOIN', b.codigoSiges);
     add('Descripcion', b.descripcion);
     add('Marca', b.marca);
     add('Modelo', b.modelo);

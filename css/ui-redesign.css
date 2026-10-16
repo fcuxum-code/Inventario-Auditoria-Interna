@@ -343,3 +343,30 @@ select.offld{ appearance:auto; }
 .msec.bajasec{ display:flex; align-items:center; color:var(--rojo); margin-top:18px; }
 .homefilters .fp.fp-baja.on{ background:var(--rojo); border-color:var(--rojo); color:#fff; }
 .homefilters{ flex-wrap:wrap; }
+
+/* ===== Sincronización con AS-400 y referencias oficial / físico ===== */
+.syncbox{ margin:10px 0 4px; padding:10px 12px; border-radius:10px; font-size:13px; line-height:1.45;
+  background:var(--fondo); border:1px solid var(--linea); color:inherit; }
+.syncbox ul{ margin:6px 0 0; padding-left:18px; }
+.syncbox li{ margin:2px 0; }
+.syncbox small{ display:block; margin-top:4px; color:var(--gris2); font-size:12px; }
+.syncbox.ok{ background:var(--verdebg); border-color:var(--verdeb); }
+.syncbox.warn{ background:var(--naranjabg); border-color:var(--naranjab); }
+.syncrow{ display:flex; align-items:flex-start; gap:10px; padding:7px 2px; border-bottom:1px solid var(--linea); font-size:13.5px; line-height:1.35; }
+.syncrow small{ display:block; color:var(--gris2); font-size:12px; margin-top:2px; }
+.syncn{ flex:none; min-width:46px; text-align:right; font-weight:800; font-size:16px; color:var(--titulo); font-variant-numeric:tabular-nums; }
+.syncrow.ok .syncn{ color:var(--verde); }
+.syncrow.warn .syncn{ color:var(--naranja); }
+.synccheck{ display:flex; align-items:flex-start; gap:8px; margin:8px 2px 2px; font-size:13px; line-height:1.35; cursor:pointer; }
+.synccheck input{ width:18px; height:18px; flex:none; margin-top:1px; accent-color:var(--verde); }
+.refbox{ margin:7px 0 2px; padding:8px 10px; border-radius:10px; font-size:12.5px; line-height:1.4;
+  background:var(--fondo); border:1px solid var(--linea); border-left:4px solid var(--gris2); }
+.refbox.ok{ border-left-color:var(--verde); }
+.refbox.warn{ border-left-color:var(--naranja); background:var(--naranjabg); border-color:var(--naranjab); }
+.refbox.mini{ display:inline-flex; align-items:center; padding:4px 9px; color:var(--verde); font-weight:700; }
+.refrow{ margin:1px 0; }
+.reflbl{ display:block; font-size:10.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:var(--gris2); }
+.refest{ margin-top:4px; font-weight:700; display:flex; align-items:center; }
+.refbox.ok .refest{ color:var(--verde); }
+.refbox.warn .refest{ color:var(--naranja); }
+.refbox.pend .refest{ color:var(--gris); }

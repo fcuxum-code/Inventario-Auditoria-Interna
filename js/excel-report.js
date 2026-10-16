@@ -284,7 +284,7 @@
 
     var colsBienes = [
       { h:"No. Inventario", w:15, get:function(b){ return b.codigo||""; } },
-      { h:"No. SIGES", w:13, get:function(b){ return b.codigoSiges||""; } },
+      { h:"No. SICOIN", w:13, get:function(b){ return b.codigoSiges||""; } },
       { h:"Descripción", w:44, get:function(b){ return b.descripcion||""; } },
       { h:"Marca", w:16, get:function(b){ return b.marca||""; } },
       { h:"Modelo", w:16, get:function(b){ return b.modelo||""; } },
@@ -294,6 +294,13 @@
       { h:"Valor", w:13, tipo:"moneda", get:function(b){ return b.valor||0; } },
       { h:"No. Tarjeta", w:12, get:function(b){ return b.tarjetaNumero||""; } },
       { h:"Responsable", w:30, get:function(b){ return b.responsable||""; } },
+      { h:"Tarjeta oficial (AS-400)", w:14, get:function(b){ return b.as400Tarjeta||""; } },
+      { h:"Responsable oficial (AS-400)", w:30, get:function(b){ return b.as400Responsable||""; } },
+      { h:"¿Lo tiene la misma persona?", w:16, get:function(b){
+          if(typeof mismoPoseedor!=="function") return "";
+          var m = mismoPoseedor(b);
+          return m===true ? "SÍ" : m===false ? "NO, otra persona" : (b.as400Responsable||b.as400Tarjeta ? "Sin asignar" : "Sin dato AS-400");
+        } },
       { h:"¿Existe?", w:12, tipo:"estado", get:function(b){ return b.existe||""; } },
       { h:"Estado físico", w:13, get:function(b){ return b.estado||""; } },
       { h:"Ubicación", w:22, get:function(b){ return b.ubicacion||""; } },
