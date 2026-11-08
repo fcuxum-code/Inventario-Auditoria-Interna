@@ -132,7 +132,7 @@ class PetService : Service() {
         sounds = Sounds(this, prefs)
         wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         refreshScreen()
-        size = dp(110).toInt()
+        size = dp(140).toInt()
         toySize = dp(60).toInt()
         floorFrac = prefs.floorFrac
         x = maxX() * 0.7f

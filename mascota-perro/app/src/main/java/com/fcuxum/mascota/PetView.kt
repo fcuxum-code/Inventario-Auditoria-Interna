@@ -1,6 +1,8 @@
 package com.fcuxum.mascota
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
@@ -125,8 +127,82 @@ class PetView(ctx: Context) : View(ctx) {
 
     private var draw: Canvas? = null
 
+    // ---------- sprites (imágenes generadas por IA) ----------
+
+    private class Sprite(val bmp: Bitmap, val mouthX: Float = -1f, val mouthY: Float = -1f)
+
+    private val sprites: Map<String, Sprite> by lazy {
+        fun load(id: Int, mx: Float = -1f, my: Float = -1f) =
+            Sprite(BitmapFactory.decodeResource(resources, id), mx, my)
+        mapOf(
+            "sentado" to load(R.drawable.mango_sentado, 285f, 110f),
+            "caminar1" to load(R.drawable.mango_caminar1, 285f, 128f),
+            "caminar2" to load(R.drawable.mango_caminar2, 360f, 128f),
+            "feliz" to load(R.drawable.mango_feliz, 295f, 140f),
+            "aro" to load(R.drawable.mango_aro),
+            "acostado" to load(R.drawable.mango_acostado),
+            "dormido" to load(R.drawable.mango_dormido),
+            "escuchando" to load(R.drawable.mango_escuchando),
+            "volando" to load(R.drawable.mango_volando),
+        )
+    }
+    private val bp = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val dst = RectF()
+
+    private fun drawSprite(c: Canvas, u: Float) {
+        val step = ((t / (if (pose == Pose.RUN) 0.13f else 0.22f)).toInt() % 2 == 0)
+        val ring = withToy && toyKind == Toys.ARO
+        var lift = 0f
+        var sy = 1f
+        var rot = 0f
+        val sp: Sprite = when (pose) {
+            Pose.SIT -> { sy = 1f + 0.012f * sin(t * 2.5f); sprites.getValue("sentado") }
+            Pose.THINK -> { sy = 1f + 0.01f * sin(t * 2.5f); sprites.getValue("escuchando") }
+            Pose.WALK, Pose.RUN -> {
+                val amp = if (pose == Pose.RUN) 0.05f else 0.025f
+                lift = abs(sin(t * (if (pose == Pose.RUN) 24f else 14f))) * height * amp
+                if (ring) sprites.getValue("aro") else sprites.getValue(if (step) "caminar1" else "caminar2")
+            }
+            Pose.HAPPY -> {
+                lift = abs(sin(t * 7f)) * height * 0.09f
+                if (ring) sprites.getValue("aro") else sprites.getValue("feliz")
+            }
+            Pose.LIE -> { sy = 1f + 0.015f * sin(t * 2f); sprites.getValue("acostado") }
+            Pose.SLEEP -> { sy = 1f + 0.02f * sin(t * 1.6f); sprites.getValue("dormido") }
+            Pose.FLY, Pose.DRAG -> {
+                lift = sin(t * 5f) * height * 0.03f
+                rot = sin(t * 3f) * 4f
+                sprites.getValue("volando")
+            }
+        }
+        val k = width / 460f
+        val bw = sp.bmp.width * k
+        val bh = sp.bmp.height * k
+        c.save()
+        c.scale(scale, scale, width / 2f, height.toFloat())
+        groundShadow(c, u)
+        if (facingLeft) c.scale(-1f, 1f, width / 2f, 0f)
+        c.translate(width / 2f, height * 0.95f - lift)
+        c.rotate(rot)
+        c.scale(1f, sy)
+        dst.set(-bw / 2f, -bh, bw / 2f, 0f)
+        c.drawBitmap(sp.bmp, null, dst, bp)
+        if (withToy && !ring && sp.mouthX >= 0f) {
+            Toys.draw(c, toyKind, -bw / 2f + sp.mouthX * k, -bh + sp.mouthY * k, 22f * k, -10f)
+        }
+        c.restore()
+    }
+
+    /** true = usar las imágenes; false = el dibujo vectorial anterior. */
+    var useSprites = true
+
     override fun onDraw(c: Canvas) {
         val u = width / 100f
+        if (useSprites) {
+            drawSprite(c, u)
+            if (pose == Pose.SLEEP) zzz(c, u)
+            return
+        }
         draw = c
         c.save()
         c.scale(scale, scale, width / 2f, height.toFloat())
