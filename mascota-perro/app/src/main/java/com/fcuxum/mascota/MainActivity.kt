@@ -194,10 +194,19 @@ class MainActivity : Activity() {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
 
-        // Arranque automático (lo usa la prueba en el emulador)
-        if (intent.getBooleanExtra("autostart", false) && Settings.canDrawOverlays(this) && !PetService.running) {
+        handleAutostart(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleAutostart(intent)
+    }
+
+    /** Arranque automático (lo usa la prueba en el emulador). */
+    private fun handleAutostart(i: Intent?) {
+        if (i?.getBooleanExtra("autostart", false) == true && Settings.canDrawOverlays(this)) {
             startForegroundService(Intent(this, PetService::class.java)
-                .putExtra(PetService.EXTRA_DEMO, intent.getStringExtra(PetService.EXTRA_DEMO)))
+                .putExtra(PetService.EXTRA_DEMO, i.getStringExtra(PetService.EXTRA_DEMO)))
         }
     }
 

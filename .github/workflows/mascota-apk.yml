@@ -87,7 +87,7 @@ jobs:
         run: |
           cd capturas
           ls -la
-          (montage 0[1-9].png 1[0-6].png -tile 8x2 -geometry 270x600+4+4 hoja.png || convert 0[1-9].png 1[0-6].png -resize 270x +append hoja.png) || true
+          ls -la
       - name: Publicar capturas de la prueba
         uses: softprops/action-gh-release@v2
         with:
