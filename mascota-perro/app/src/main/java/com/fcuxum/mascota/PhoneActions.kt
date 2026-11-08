@@ -104,7 +104,7 @@ class PhoneActions(private val svc: PetService) {
 
     fun readScreen(): String {
         if (ScreenInfo.service == null) {
-            return "No tengo permiso de 'ayuda en pantalla' (accesibilidad). Dile al usuario que lo active en la app Mascota."
+            return "No tengo permiso de 'ayuda en pantalla' (accesibilidad). Dile al usuario que lo active en la app Mangobeja."
         }
         if (ScreenInfo.sensitive) return "En pantalla hay un campo de contraseña; por privacidad no la leo."
         val texts = ScreenInfo.lastTexts
@@ -114,7 +114,7 @@ class PhoneActions(private val svc: PetService) {
 
     fun point(text: String, msg: String): String {
         val s = ScreenInfo.service
-            ?: return "No tengo permiso de 'ayuda en pantalla' (accesibilidad). Explica el paso con palabras y sugiere activarlo en la app Mascota."
+            ?: return "No tengo permiso de 'ayuda en pantalla' (accesibilidad). Explica el paso con palabras y sugiere activarlo en la app Mangobeja."
         Thread.sleep(1200) // dejar que se abra la pantalla
         repeat(4) {
             val r = s.find(text)

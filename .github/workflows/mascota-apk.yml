@@ -37,10 +37,51 @@ jobs:
         with:
           tag_name: mascota-beta
           target_commitish: ${{ github.sha }}
-          name: Mascota (beta)
+          name: Mangobeja (beta)
           prerelease: true
           make_latest: false
           files: mascota-perro/mascota-perro-beta.apk
           body: |
-            APK de prueba de la mascota. Descárgalo desde el teléfono Android e instálalo
+            APK de prueba de Mangobeja. Descárgalo desde el teléfono Android e instálalo
             (Android pedirá permitir instalar apps de esta fuente). Commit: ${{ github.sha }}
+
+  prueba-emulador:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: mascota-perro-beta
+          path: mascota-perro
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Probar en Android virtual
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash mascota-perro/ci/prueba-emulador.sh
+      - name: Hoja de capturas
+        run: |
+          cd capturas
+          ls -la
+          (montage 0[1-9].png 1[0-6].png -tile 8x2 -geometry 270x600+4+4 hoja.png || convert 0[1-9].png 1[0-6].png -resize 270x +append hoja.png) || true
+      - name: Publicar capturas de la prueba
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mascota-pruebas
+          target_commitish: ${{ github.sha }}
+          name: Mangobeja (capturas de prueba automática)
+          prerelease: true
+          make_latest: false
+          files: |
+            capturas/*.png
+            capturas/logcat.txt
+          body: Capturas tomadas en un Android virtual para verificar que la mascota se mueve y juega. Commit ${{ github.sha }}

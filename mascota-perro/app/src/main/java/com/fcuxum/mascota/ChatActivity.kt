@@ -46,9 +46,12 @@ class ChatActivity : Activity() {
             }
         }
         box.addView(input)
-        if (prefs.apiKey.isBlank()) {
+        val sinIa = prefs.brain == Prefs.BRAIN_NONE ||
+            (prefs.brain == Prefs.BRAIN_GEMINI && prefs.geminiKey.isBlank()) ||
+            (prefs.brain == Prefs.BRAIN_CLAUDE && prefs.apiKey.isBlank())
+        if (sinIa) {
             box.addView(TextView(this).apply {
-                text = "Sin clave de IA solo sé trucos: «enciende la linterna», «alarma 6:30», «temporizador 5 minutos», «abre WhatsApp»."
+                text = "Sin IA solo sé trucos: «juguemos», «ladra», «enciende la linterna», «alarma 6:30», «abre WhatsApp»."
                 textSize = 13f
                 setTextColor(0xFF666666.toInt())
                 setPadding(0, dp(4), 0, dp(4))
