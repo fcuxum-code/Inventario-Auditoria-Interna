@@ -104,7 +104,7 @@ class GeminiBrain(private val prefs: Prefs, private val actions: PhoneActions) {
                 return r
             } catch (e: HttpError) {
                 last = e
-                if (e.code != 404) throw e // solo probamos otro modelo si este no existe
+                if (e.code !in RETRY_OTHER) throw e // clave mala, etc.: no tiene caso probar otro
             }
         }
         throw last ?: HttpError(404, "sin modelo")
@@ -118,7 +118,7 @@ class GeminiBrain(private val prefs: Prefs, private val actions: PhoneActions) {
         con.readTimeout = 90_000
         con.doOutput = true
         con.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-        con.setRequestProperty("x-goog-api-key", prefs.geminiKey.trim())
+        con.setRequestProperty("x-goog-api-key", prefs.geminiKey.trim().replace(Regex("\\s"), ""))
         con.outputStream.use { it.write(body().toString().toByteArray()) }
         val code = con.responseCode
         val txt = (if (code in 200..299) con.inputStream else con.errorStream)
@@ -130,6 +130,11 @@ class GeminiBrain(private val prefs: Prefs, private val actions: PhoneActions) {
 
     companion object {
         /** Se prueba en orden; si Google retira uno, pasa al siguiente. */
-        val MODELS = listOf("gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite")
+        val MODELS = listOf(
+            "gemini-flash-latest", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-3-flash-preview",
+            "gemini-3.1-flash-lite", "gemini-flash-lite-latest",
+        )
+        /** Errores con los que vale la pena probar otro modelo: no existe, saturado o sin cuota. */
+        private val RETRY_OTHER = setOf(404, 429, 500, 503)
     }
 }

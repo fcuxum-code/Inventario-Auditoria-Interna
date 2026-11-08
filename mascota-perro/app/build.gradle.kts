@@ -13,8 +13,8 @@ android {
         applicationId = "com.fcuxum.mascota"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "0.4-beta"
+        versionCode = 5
+        versionName = "0.5-beta"
     }
 
     // Llave fija para que cada nueva versión beta se instale encima de la anterior.
