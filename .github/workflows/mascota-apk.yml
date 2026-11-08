@@ -21,11 +21,20 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.14.3'
+      - name: Preparar Gradle 8.14.3 (con reintentos)
+        run: |
+          for i in 1 2 3 4 5 6; do
+            curl -fsSL --retry 3 -o /tmp/gradle.zip https://downloads.gradle.org/distributions/gradle-8.14.3-bin.zip && break
+            curl -fsSL --retry 3 -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.14.3-bin.zip && break
+            echo "reintento $i"; sleep 20
+          done
+          if [ -s /tmp/gradle.zip ]; then
+            unzip -q /tmp/gradle.zip -d /tmp && echo "/tmp/gradle-8.14.3/bin" >> "$GITHUB_PATH"
+          else
+            echo "::warning::No se pudo descargar Gradle; se usará el del runner"
+          fi
       - name: Compilar APK
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: gradle --version && gradle assembleDebug --no-daemon --stacktrace
       - name: Renombrar APK
         run: cp app/build/outputs/apk/debug/app-debug.apk mascota-perro-beta.apk
       - uses: actions/upload-artifact@v4
