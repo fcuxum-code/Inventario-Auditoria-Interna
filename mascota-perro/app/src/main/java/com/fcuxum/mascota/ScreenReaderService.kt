@@ -3,7 +3,10 @@ package com.fcuxum.mascota
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.graphics.Rect
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
+import android.view.accessibility.AccessibilityWindowInfo
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import java.text.Normalizer
@@ -16,6 +19,10 @@ object ScreenInfo {
     @Volatile var lastTexts: List<String> = emptyList()
     /** Hay un campo de contraseña visible: la mascota se esconde y no lee nada. */
     @Volatile var sensitive: Boolean = false
+    /** Parte de arriba del teclado en pantalla (-1 si no hay teclado). */
+    @Volatile var imeTop: Int = -1
+    /** Campo de texto donde el usuario está escribiendo. */
+    @Volatile var focusedField: Rect? = null
 
     fun norm(s: String): String =
         Normalizer.normalize(s.lowercase(), Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "").trim()
@@ -31,6 +38,8 @@ object ScreenInfo {
 class ScreenReaderService : AccessibilityService() {
 
     private var lastScan = 0L
+    private val handler = Handler(Looper.getMainLooper())
+    private val rescan = Runnable { try { scan() } catch (_: Exception) { } }
 
     override fun onServiceConnected() {
         ScreenInfo.service = this
@@ -50,7 +59,11 @@ class ScreenReaderService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val now = SystemClock.uptimeMillis()
-        if (now - lastScan < 700) return
+        handler.removeCallbacks(rescan)
+        if (now - lastScan < 500) {
+            handler.postDelayed(rescan, 550) // no perder el último cambio (p. ej. el teclado se cerró)
+            return
+        }
         lastScan = now
         try { scan() } catch (_: Exception) { }
     }
@@ -64,7 +77,29 @@ class ScreenReaderService : AccessibilityService() {
         }
     }
 
+    private fun scanKeyboard() {
+        var top = -1
+        try {
+            for (w in windows) {
+                if (w.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD) {
+                    val r = Rect()
+                    w.getBoundsInScreen(r)
+                    if (r.height() > 50) top = r.top
+                }
+            }
+        } catch (_: Exception) { }
+        ScreenInfo.imeTop = top
+        ScreenInfo.focusedField = if (top > 0) {
+            try {
+                findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable }?.let { n ->
+                    Rect().also { n.getBoundsInScreen(it) }
+                }
+            } catch (_: Exception) { null }
+        } else null
+    }
+
     fun scan() {
+        scanKeyboard()
         val root = rootInActiveWindow ?: return
         val pkg = root.packageName?.toString() ?: ""
         if (pkg == packageName) return // nuestra propia ventana de chat: conservar lo anterior
@@ -73,7 +108,7 @@ class ScreenReaderService : AccessibilityService() {
         var pwd = false
         walk(root, 0) { n ->
             if (n.isPassword) pwd = true
-            if (n.isClickable && n.isVisibleToUser) {
+            if (n.isClickable && n.isVisibleToUser && !n.isEditable) {
                 val r = Rect()
                 n.getBoundsInScreen(r)
                 if (r.width() > 30 && r.height() > 30) rects.add(r)

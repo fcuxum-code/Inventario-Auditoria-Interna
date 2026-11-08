@@ -37,6 +37,11 @@ class Prefs(ctx: Context) {
         get() = sp.getBoolean("sounds", true)
         set(v) = sp.edit().putBoolean("sounds", v).apply()
 
+    /** Altura del "suelo" de la mascota como fracción de la pantalla (-1 = abajo). */
+    var floorFrac: Float
+        get() = sp.getFloat("floorFrac", -1f)
+        set(v) = sp.edit().putFloat("floorFrac", v).apply()
+
     var toy: String
         get() = str("toy", Toys.ARO)
         set(v) = put("toy", v)

@@ -104,15 +104,18 @@ class PetService : Service() {
     private fun dp(v: Int): Float = v * resources.displayMetrics.density
     private fun maxX() = (screenW - size).toFloat().coerceAtLeast(0f)
     private fun groundY() = (screenH - size - dp(48)).coerceAtLeast(0f)
+    /** "Suelo" de Mango: donde el usuario lo dejó la última vez (por defecto, abajo). */
+    private var floorFrac = -1f
+    private fun floor(): Float = if (floorFrac < 0f) groundY() else (floorFrac * screenH).coerceIn(dp(60), groundY())
     private fun rnd(a: Float, b: Float) = a + Random.nextFloat() * (b - a)
     private fun now() = SystemClock.elapsedRealtime()
 
     // ---------- profundidad ----------
-    private fun depthRange() = screenH * 0.42f
+    private fun depthRange() = (screenH * 0.42f).coerceAtMost(floor() - dp(40)).coerceAtLeast(dp(80))
     private fun scaleFor(z: Float) = 1f - 0.62f * z
     /** Línea del suelo (donde van las patas) a la profundidad z. */
-    private fun floorLine(z: Float) = groundY() + size * 0.93f - z * depthRange()
-    private fun zForFloor(fy: Float) = ((groundY() + size * 0.93f - fy) / depthRange()).coerceIn(0f, 1f)
+    private fun floorLine(z: Float) = floor() + size * 0.93f - z * depthRange()
+    private fun zForFloor(fy: Float) = ((floor() + size * 0.93f - fy) / depthRange()).coerceIn(0f, 1f)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -131,8 +134,9 @@ class PetService : Service() {
         refreshScreen()
         size = dp(110).toInt()
         toySize = dp(60).toInt()
+        floorFrac = prefs.floorFrac
         x = maxX() * 0.7f
-        y = groundY()
+        y = floor()
         setupPet()
         setupBubble()
         setupToy()
@@ -339,6 +343,7 @@ class PetService : Service() {
 
     private fun update(dt: Float) {
         checkSensitive()
+        checkTyping()
         stateLeft -= dt
         if (playing) {
             updatePlay(dt)
@@ -373,7 +378,9 @@ class PetService : Service() {
                     }
                 }
                 Pose.DRAG -> {}
-                else -> if (stateLeft <= 0f && !busy) pickNext()
+                else -> if (stateLeft <= 0f && !busy) {
+                    if (typing) setState(if (Random.nextFloat() < 0.6f) Pose.SIT else Pose.LIE, rnd(4f, 8f)) else pickNext()
+                }
             }
         }
         pet.pose = state
@@ -387,6 +394,43 @@ class PetService : Service() {
         }
         if (bubbleShown) positionBubble()
     }
+
+    // ---------- quitarse del camino cuando escribes ----------
+
+    private var typing = false
+
+    /** Zona que Mango no debe tapar: el teclado y el campo donde escribes. */
+    private fun petRect() = android.graphics.RectF(x, y, x + size, y + size)
+
+    private fun checkTyping() {
+        val imeTop = ScreenInfo.imeTop
+        val now = imeTop > 0
+        if (now && !typing) {
+            typing = true
+            if (playing) endPlay(false)
+            onArrive = null
+            val field = ScreenInfo.focusedField
+            // subir a la parte de arriba, del lado contrario al campo de texto
+            val leftSide = field?.let { it.centerX() > screenW / 2 } ?: (x + size / 2f > screenW / 2f)
+            val nx = if (leftSide) dp(8) else maxX() - dp(8)
+            var ny = dp(90)
+            if (field != null && RectFIntersects(nx, ny, field)) ny = (field.bottom + dp(8)).coerceAtMost(imeTop - size.toFloat())
+            flyTo(nx, ny) { setState(Pose.SIT, rnd(4f, 8f)) }
+        } else if (!now && typing) {
+            typing = false
+            perched = false
+            flyTo(x, floor()) { setState(Pose.SIT, 2f) }
+        } else if (typing && state != Pose.FLY && state != Pose.DRAG) {
+            // si aun así tapa el campo, moverse
+            val f = ScreenInfo.focusedField
+            if (f != null && RectFIntersects(x, y, f)) {
+                flyTo(if (x > screenW / 2f) dp(8) else maxX() - dp(8), dp(90)) { setState(Pose.SIT, 6f) }
+            }
+        }
+    }
+
+    private fun RectFIntersects(px: Float, py: Float, r: Rect) =
+        px < r.right && px + size > r.left && py < r.bottom && py + size > r.top
 
     /** Si hay una contraseña en pantalla, la mascota se esconde (y deja pasar los toques). */
     private fun checkSensitive() {
@@ -426,7 +470,7 @@ class PetService : Service() {
 
     private fun goHome() {
         perched = false
-        flyTo(rnd(0f, maxX()), groundY()) { setState(Pose.SIT, 2f) }
+        flyTo(rnd(0f, maxX()), floor()) { setState(Pose.SIT, 2f) }
     }
 
     private fun isSleepyTime(): Boolean {
@@ -443,7 +487,7 @@ class PetService : Service() {
             setState(Pose.SLEEP, 1e9f)
             return
         }
-        val g = groundY()
+        val g = floor()
         val onGround = abs(y - g) < dp(6)
         if (!onGround && !perched) {
             flyTo(x, g) { setState(Pose.SIT, 2f) }
@@ -563,7 +607,7 @@ class PetService : Service() {
         lastInteraction = now()
         onArrive = null
         dz = 0f
-        y = groundY()
+        y = floor()
         homeCx = dogCx()
         pet.toyKind = prefs.toy
         toy.kind = prefs.toy
@@ -578,7 +622,7 @@ class PetService : Service() {
         hideToy()
         dz = 0f
         pet.scale = 1f
-        y = groundY()
+        y = floor()
         pet.withToy = true
         setState(Pose.LIE, 4f)
         if (talk) say("¡Uf, qué chilero! Ya me cansé 😮‍💨")
@@ -869,7 +913,11 @@ class PetService : Service() {
                     main.removeCallbacks(longPress)
                     lastInteraction = now()
                     if (moved) {
-                        perched = y < groundY() - dp(8)
+                        // donde lo dejes, ahí se queda: ese es su nuevo suelo
+                        perched = false
+                        floorFrac = if (y >= groundY() - dp(8)) -1f else y / screenH
+                        prefs.floorFrac = floorFrac
+                        if (floorFrac < 0f) y = groundY()
                         setState(Pose.SIT, rnd(3f, 6f))
                     } else if (!longFired && e.actionMasked == MotionEvent.ACTION_UP) {
                         if (pendingTap) { // doble toque: ¡a jugar!
@@ -980,6 +1028,6 @@ class PetService : Service() {
         refreshScreen()
         x = x.coerceIn(0f, maxX())
         y = y.coerceIn(0f, groundY())
-        if (!perched) y = groundY()
+        if (!perched) y = floor()
     }
 }
