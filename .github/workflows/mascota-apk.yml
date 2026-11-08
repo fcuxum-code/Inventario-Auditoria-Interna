@@ -21,6 +21,14 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Caché de dependencias
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-mascota-${{ hashFiles('mascota-perro/**/*.gradle.kts') }}
+          restore-keys: gradle-mascota-
       - name: Preparar Gradle 8.14.3 (con reintentos)
         run: |
           for i in 1 2 3 4 5 6; do
