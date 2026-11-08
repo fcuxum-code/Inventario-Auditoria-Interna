@@ -1,4 +1,4 @@
-# 🐝🐶 Mascota (beta)
+# 🐝🐶 Mangobeja (beta)
 
 Un perrito con disfraz de abeja, basado en un perro real, que vive **encima de tus apps** en Android:
 pasea por la pantalla, se posa sobre los botones, juega con su juguete rojo y, con una clave de IA (Claude),
@@ -21,12 +21,14 @@ te ayuda con el teléfono.
 | Gesto | Qué hace |
 |---|---|
 | Un toque | Abre la cajita para hablarle (texto o micrófono) |
-| Doble toque | Juega con su juguete rojo |
+| Doble toque | Saca su juguete (aro, pelota o hueso). Deslízalo hacia arriba para lanzarlo: se aleja, Mango corre por él y te lo trae |
 | Arrastrar | Lo dejas donde quieras |
-| Mantener presionado | Se duerme y deja de pasear (otro toque lo despierta) |
+| Mantener presionado | Se duerme y deja de pasear (un toque lo despierta, también de noche) |
 | Notificación › «Guardar mascota» | Lo quita de la pantalla |
 
-Con la IA puede: poner alarmas y temporizadores, abrir apps, encender la linterna, abrir ajustes,
+Ladra de vez en cuando (de noche solo si juegas con él); en la app puedes **grabar el ladrido real** de tu perro.
+
+Cerebro: **Gemini gratis** (clave en aistudio.google.com), **Claude** (de pago) o sin IA. Con IA puede: poner alarmas y temporizadores, abrir apps, encender la linterna, abrir ajustes,
 buscar en internet, **leer lo que hay en pantalla** cuando se lo pides, y **volar hasta el botón que
 tienes que tocar** para enseñarte cómo hacer algo.
 
@@ -42,5 +44,7 @@ App Android nativa en Kotlin, sin dependencias de AndroidX. El APK lo compila Gi
 - `PetView.kt`: dibujo y animaciones del perro (vectores en código).
 - `PetService.kt`: ventana flotante sin marco, comportamiento, toques y globito de diálogo.
 - `ScreenReaderService.kt`: accesibilidad opcional (botones en pantalla, leer y señalar).
-- `Brain.kt`: Claude con herramientas (SDK oficial `anthropic-java`) y modo sin clave.
+- `Brain.kt`, `GeminiBrain.kt`, `ClaudeBrain.kt`, `ToolSpecs.kt`: cerebros con herramientas del teléfono y modo sin IA.
+- `Toys.kt`, `Sounds.kt`: juguetes y ladridos (`tools/generar_sonidos.py` genera los WAV).
+- `ci/prueba-emulador.sh`: prueba en Android virtual; capturas en la release `mascota-pruebas`.
 - `PhoneActions.kt`: acciones del teléfono.
