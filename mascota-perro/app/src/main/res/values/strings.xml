@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Mangobeja</string>
-    <string name="acc_desc">Permite que tu mascota vea los botones de la pantalla para pararse sobre ellos y señalarte dónde tocar, y que lea la pantalla SOLO cuando tú se lo pidas. Nunca lee campos de contraseña: si aparece uno, la mascota se esconde.</string>
-</resources>
