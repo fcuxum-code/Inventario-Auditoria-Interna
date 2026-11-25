@@ -1794,14 +1794,17 @@ function _oficioDoc(info){
   const P=info.P, d=info.d, bienes=info.bienes, fung=info.fungibles;
   const bordeTd = 'border:1px solid #333;padding:4px 6px;font-size:11pt;';
   const th = function(txt, w){ return '<th style="'+bordeTd+'background:#e9e9e9;text-align:center'+(w?';width:'+w:'')+'">'+esc(txt)+'</th>'; };
-  // Tabla de activo fijo: No. | No. BIEN | DESCRIPCIÓN
+  // Tabla de activo fijo: No. | No. AS-400 | No. SICOIN | DESCRIPCIÓN
+  const sinNum = P.sinNumero || "—";
   const filasAF = bienes.map(function(b,i){
+    const nums = P.numerosBien ? P.numerosBien(b) : { as400:b.codigo||"", sicoin:b.codigoSiges||"" };
     return '<tr><td style="'+bordeTd+'text-align:center">'+(i+1)+'</td>'
-      + '<td style="'+bordeTd+'text-align:center">'+esc(b.codigo||"")+'</td>'
+      + '<td style="'+bordeTd+'text-align:center">'+esc(nums.as400||sinNum)+'</td>'
+      + '<td style="'+bordeTd+'text-align:center">'+esc(nums.sicoin||sinNum)+'</td>'
       + '<td style="'+bordeTd+'">'+esc(P.descBien?P.descBien(b):(b.descripcion||""))+'</td></tr>';
   }).join("");
   const tablaAF = '<table style="width:100%;border-collapse:collapse;margin:10px 0"><thead><tr>'
-    + th("No.","40px") + th("No. BIEN","120px") + th("DESCRIPCIÓN") + '</tr></thead><tbody>'+filasAF+'</tbody></table>';
+    + th("No.","34px") + th("No. AS-400","95px") + th("No. SICOIN","95px") + th("DESCRIPCIÓN") + '</tr></thead><tbody>'+filasAF+'</tbody></table>';
   // Bloque de fungibles (solo si se escribieron)
   let bloqueFung = "";
   if(fung && fung.length){

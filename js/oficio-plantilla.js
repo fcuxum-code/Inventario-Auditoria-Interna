@@ -63,6 +63,22 @@
     intro: function(n){ return 'De manera atenta me dirijo a usted, para solicitarle se autorice '+this.txtEgreso(n); },
     fungibleIntro: function(n){ return 'Asimismo, '+this.txtFungible(n); },
 
+    /* Números del bien para la tabla: No. según AS-400 y No. SICOIN.
+       El número con que se registró el bien en la app es el del AS-400 (es la llave con la
+       que se sincroniza el reporte oficial). Algunos ingresos recientes se registraron con su
+       SICOIN como número (8 caracteres con letras que empiezan con 0, p. ej. 007AA4AF); en ese caso ese
+       número va en la columna SICOIN y la del AS-400 queda pendiente hasta que se opere. */
+    numerosBien: function(b){
+      var cod = String(b.codigo||"").trim(), sic = String(b.codigoSiges||"").trim();
+      var codEsSicoin = !b.as400Sync && cod && (
+        (sic && cod.toUpperCase()===sic.toUpperCase()) || (/^0[0-9A-F]{7}$/i.test(cod) && /[A-F]/i.test(cod)));
+      return {
+        as400: codEsSicoin ? "" : cod,
+        sicoin: sic || (codEsSicoin ? cod : "")
+      };
+    },
+    sinNumero: '—',   // se escribe cuando el bien todavía no tiene ese número
+
     // Descripción combinada para la columna DESCRIPCIÓN (omite datos "sin dato").
     descBien: function(b){
       var partes=[];

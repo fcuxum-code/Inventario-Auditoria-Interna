@@ -89,9 +89,13 @@
   // ---- Construir el word/document.xml con los datos ----
   function construirDocumentXml(tpl, info){
     var P=info.P, d=info.d, bienes=info.bienes, fung=info.fungibles;
+    var sinNum = P.sinNumero || "—";
     var filasA = bienes.map(function(b,i){
+      var nums = P.numerosBien ? P.numerosBien(b) : { as400:b.codigo||"", sicoin:b.codigoSiges||"" };
       var r = rep(tpl.rowActivo, "{{N}}", String(i+1));
-      r = rep(r, "{{BIEN}}", escX(b.codigo||""));
+      r = rep(r, "{{AS400}}", escX(nums.as400||sinNum));
+      r = rep(r, "{{SICOIN}}", escX(nums.sicoin||sinNum));
+      r = rep(r, "{{BIEN}}", escX(nums.as400||sinNum));   // plantilla anterior (una sola columna)
       r = rep(r, "{{DESC}}", escX(P.descBien?P.descBien(b):(b.descripcion||"")));
       return r;
     }).join("");
